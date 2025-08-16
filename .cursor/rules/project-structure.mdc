@@ -6,6 +6,11 @@ alwaysApply: true
 
 This is a full-stack TypeScript application for creating Chinese language lesson plans with AI assistance.
 DO NOT USE MOCK API/INTEGRATE
+All commands need support by Windows 10, PowerShell
+JUST IMPLEMENT DO NOT RUN TEST, CREATE TEST PLAN WHEN ALL FINISH
+DO NOT DELAY TOO LONG IN WAIT TOOL CALL
+Implement AS SIMPLE AS POSIBLE, DO NTO ADD MANY NEW CODES, NEW LAYERS, TRY FIX/UPDATE
+FOR FIX BUGS TASK, PLEASE MADE SMALLEST CHANGES
 
 ## Project Architecture
 

@@ -86,15 +86,98 @@ export function StepCard({
     }
   };
 
+  const translateActivities = async (activities: string[]) => {
+    if (activities.length === 0) return;
+    
+    try {
+      const response = await fetch('/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ words: activities })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setActivityTranslations(data.translations);
+        console.log('Received activity translations:', data.translations);
+      } else {
+        console.error('Activity translation API error:', response.status);
+      }
+    } catch (error) {
+      console.error('Activity translation error:', error);
+    }
+  };
+
+  const translateLevel = async (level: string) => {
+    if (!level) return;
+    
+    try {
+      const response = await fetch('/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ words: [level] })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setLevelTranslations(data.translations);
+        console.log('Received level translation:', data.translations);
+      } else {
+        console.error('Level translation API error:', response.status);
+      }
+    } catch (error) {
+      console.error('Level translation error:', error);
+    }
+  };
+
+  const translateText = async (text: string): Promise<string> => {
+    try {
+      const response = await fetch('/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ words: [text] })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        return data.translations[text] || text;
+      }
+    } catch (error) {
+      console.error('Translation error:', error);
+    }
+    return text;
+  };
+
+  const [activityTranslations, setActivityTranslations] = useState<Record<string, string>>({});
+  const [levelTranslations, setLevelTranslations] = useState<Record<string, string>>({});
+
   const getVietnameseActivityTranslation = (activity: string): string => {
-    // Return activity as-is, translation should be handled by DeepL API
-    return `${activity} (Translation pending...)`;
+    return activityTranslations[activity] || activity;
   };
 
   const getVietnameseLevelTranslation = (level: string): string => {
-    // Return level as-is, translation should be handled by DeepL API
-    return `${level} (Translation pending...)`;
+    return levelTranslations[level] || level;
   };
+
+  // Translate analysis data when it becomes available
+  useEffect(() => {
+    if (analysis) {
+      // Translate vocabulary
+      if (analysis.vocabulary && analysis.vocabulary.length > 0) {
+        translateVocabulary(analysis.vocabulary);
+      }
+      
+      // Translate activities
+      if (analysis.activities && analysis.activities.length > 0) {
+        translateActivities(analysis.activities);
+      }
+      
+      // Translate level
+      if (analysis.detectedLevel) {
+        translateLevel(analysis.detectedLevel);
+      }
+    }
+  }, [analysis]);
 
   // Initialize state from lesson data if available
   useEffect(() => {
@@ -177,6 +260,15 @@ export function StepCard({
         // Trigger DeepL translation for vocabulary
         if (analysisData.vocabulary && analysisData.vocabulary.length > 0) {
           translateVocabulary(analysisData.vocabulary);
+        }
+        
+        // Translate activities and level
+        if (analysisData.activities && analysisData.activities.length > 0) {
+          translateActivities(analysisData.activities);
+        }
+        
+        if (analysisData.detectedLevel) {
+          translateLevel(analysisData.detectedLevel);
         }
         
         // Force UI refresh by invalidating all related queries
@@ -391,7 +483,7 @@ export function StepCard({
                       <ul className="mt-1 space-y-1">
                         {analysisData.activities?.map((activity: string, index: number) => (
                           <li key={index} className="text-blue-700 dark:text-blue-300">
-                            • {activity} → {getVietnameseActivityTranslation(activity)} (hardcoded)
+                            • {activity} → {getVietnameseActivityTranslation(activity)}
                           </li>
                         ))}
                       </ul>
@@ -399,7 +491,7 @@ export function StepCard({
                     <div>
                       <span className="font-medium text-blue-800 dark:text-blue-200">Level:</span>
                       <span className="text-blue-700 dark:text-blue-300 ml-1">
-                        {analysisData.detectedLevel} → {getVietnameseLevelTranslation(analysisData.detectedLevel)} (hardcoded)
+                        {analysisData.detectedLevel} → {getVietnameseLevelTranslation(analysisData.detectedLevel)}
                       </span>
                     </div>
                   </div>
