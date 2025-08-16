@@ -1,11 +1,22 @@
-import { type User, type InsertUser, type Lesson, type InsertLesson } from "./schema.js";
+import { type User, type InsertUser, type Lesson, type InsertLesson } from "../../shared/schema.js";
 import { randomUUID } from "crypto";
 
 // In-memory storage for serverless environments
+// TODO: Replace with persistent storage (database/file system) for production
 let memoryStorage = {
   users: new Map<string, User>(),
   lessons: new Map<string, Lesson>(),
   initialized: false
+};
+
+// Debug: Log memory state
+const logMemoryState = () => {
+  console.log('Memory storage state:', {
+    usersCount: memoryStorage.users.size,
+    lessonsCount: memoryStorage.lessons.size,
+    initialized: memoryStorage.initialized,
+    lessonIds: Array.from(memoryStorage.lessons.keys())
+  });
 };
 
 export interface IStorage {
@@ -121,11 +132,17 @@ export class ServerlessStorage implements IStorage {
       updatedAt: now
     };
     memoryStorage.lessons.set(id, lesson);
+    console.log('Created lesson with ID:', id);
+    logMemoryState();
     return lesson;
   }
 
   async getLesson(id: string): Promise<Lesson | undefined> {
-    return memoryStorage.lessons.get(id);
+    logMemoryState();
+    console.log('Getting lesson with ID:', id);
+    const lesson = memoryStorage.lessons.get(id);
+    console.log('Found lesson:', lesson ? 'YES' : 'NO');
+    return lesson;
   }
 
   async getAllLessons(): Promise<Lesson[]> {

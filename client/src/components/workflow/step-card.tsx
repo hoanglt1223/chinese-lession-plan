@@ -735,6 +735,10 @@ export function StepCard({
                   Debug: Sync State
                 </Button>
               </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <p>No lesson plans available. Generate lesson plans to view them here.</p>
+              </div>
             )}
             
             {/* Flashcard Generation */}
@@ -957,6 +961,10 @@ export function StepCard({
                   <div>Current summary: {summariesData[selectedSummaryIndex]?.filename || 'None'}</div>
                   <div>Content: {summariesData[selectedSummaryIndex]?.content.length || 0} chars</div>
                 </div>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <p>No summaries available. Generate summaries to view them here.</p>
               </div>
             )}
             

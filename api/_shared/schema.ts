@@ -34,7 +34,7 @@ export interface Lesson {
     detectedLevel: string;
     ageAppropriate: string;
   } | null;
-  lessonPlan: string | null; // Markdown content
+  lessonPlans: string[] | null; // Markdown content
   flashcards: Array<{
     word: string;
     pinyin: string;
@@ -42,7 +42,7 @@ export interface Lesson {
     imageUrl: string;
     id: string;
   }> | null;
-  summary: string | null; // DOCX content
+  summaries: string[] | null; // DOCX content
   createdAt: Date;
   updatedAt: Date;
 }
@@ -64,7 +64,7 @@ export const insertLessonSchema = z.object({
     detectedLevel: z.string(),
     ageAppropriate: z.string(),
   }).optional(),
-  lessonPlan: z.string().optional(),
+  lessonPlans: z.array(z.string()).optional(),
   flashcards: z.array(z.object({
     word: z.string(),
     pinyin: z.string(),
@@ -72,7 +72,7 @@ export const insertLessonSchema = z.object({
     imageUrl: z.string(),
     id: z.string(),
   })).optional(),
-  summary: z.string().optional(),
+  summaries: z.array(z.string()).optional(),
 });
 
 export type InsertLesson = z.infer<typeof insertLessonSchema>;
