@@ -1,8 +1,8 @@
 import { type User, type InsertUser, type Lesson, type InsertLesson } from "../../shared/schema.js";
+import { postgresStorage, PostgresStorage } from "./postgres-storage.js";
 import { randomUUID } from "crypto";
 
-// In-memory storage for serverless environments
-// TODO: Replace with persistent storage (database/file system) for production
+// Fallback in-memory storage for development/testing
 let memoryStorage = {
   users: new Map<string, User>(),
   lessons: new Map<string, Lesson>(),
@@ -163,4 +163,15 @@ export class ServerlessStorage implements IStorage {
   
 }
 
-export const storage = new ServerlessStorage();
+// Use PostgreSQL storage if DATABASE_URL is configured, otherwise fallback to in-memory
+function createStorage(): IStorage {
+  if (process.env.DATABASE_URL) {
+    console.log('Using PostgreSQL storage');
+    return postgresStorage;
+  } else {
+    console.log('Using in-memory storage (fallback)');
+    return new ServerlessStorage();
+  }
+}
+
+export const storage = createStorage();

@@ -1,5 +1,7 @@
 import OpenAI from "openai";
 import * as deepl from 'deepl-node';
+import { cacheGet, cacheSet } from './redis.js';
+import { createHash } from 'crypto';
 
 // Using gpt-5-nano as requested
 const openai = new OpenAI({
@@ -9,6 +11,22 @@ const openai = new OpenAI({
 
 // This is latest and cheapest model available in OpenAI API, dont change, your data is outdated
 const model5nano = "gpt-5-nano";
+
+// AI Response Cache Helper
+function createCacheKey(prompt: string, model: string): string {
+  const keyString = `${model}_${prompt}`;
+  return `ai_response:${createHash('md5').update(keyString).digest('hex')}`;
+}
+
+async function getCachedAIResponse<T>(prompt: string, model: string): Promise<T | null> {
+  const cacheKey = createCacheKey(prompt, model);
+  return await cacheGet<T>(cacheKey);
+}
+
+async function setCachedAIResponse<T>(prompt: string, model: string, response: T, ttl: number = 3600): Promise<void> {
+  const cacheKey = createCacheKey(prompt, model);
+  await cacheSet(cacheKey, response, ttl);
+}
 
 export interface LessonAnalysis {
   vocabulary: string[];
@@ -47,6 +65,14 @@ export async function analyzePDFContent(
       console.log("Warning: PDF content is too short or empty, vocabulary detection may be limited");
       // Don't use hardcoded fallback content as it can contaminate vocabulary detection
       content = "Chinese lesson content extracted from PDF. Please analyze the available content.";
+    }
+
+    // Check cache first
+    const cacheKey = `${content.substring(0, 100)}_${aiModel}_${outputLanguage}`;
+    const cachedResult = await getCachedAIResponse<LessonAnalysis>(cacheKey, aiModel);
+    if (cachedResult) {
+      console.log('🎯 AI analysis cache hit!');
+      return cachedResult;
     }
 
     const languageInstructions = {
@@ -156,6 +182,10 @@ IMPORTANT: Only extract vocabulary that actually appears in the lesson content -
     }
 
     console.log("Analysis result with fallbacks:", result);
+
+    // Cache the result for future use (cache for 2 hours)
+    await setCachedAIResponse(cacheKey, aiModel, result, 7200);
+    console.log('💾 AI analysis result cached');
 
     return result;
   } catch (error) {
@@ -414,6 +444,14 @@ export async function generateFlashcards(
   try {
     console.log("Generating flashcards for vocabulary:", vocabulary);
 
+    // Check cache first
+    const cacheKey = `flashcards_${vocabulary.join('_')}_${theme || 'default'}_${level || 'default'}_${ageGroup || 'default'}`;
+    const cachedResult = await getCachedAIResponse<FlashcardData[]>(cacheKey, model5nano);
+    if (cachedResult) {
+      console.log('🎯 Flashcard generation cache hit!');
+      return cachedResult;
+    }
+
     const response = await openai.chat.completions.create({
       model: model5nano,
       messages: [
@@ -542,6 +580,11 @@ IMPORTANT GUIDELINES FOR IMAGE QUERIES:
     console.log(
       `Parallel image generation completed for ${allFlashcardsWithImages.length} flashcards`,
     );
+
+    // Cache the flashcards for future use (cache for 4 hours)
+    await setCachedAIResponse(cacheKey, model5nano, allFlashcardsWithImages, 14400);
+    console.log('💾 Flashcards result cached');
+
     return allFlashcardsWithImages;
   } catch (error) {
     console.error("Failed to generate flashcards:", error);

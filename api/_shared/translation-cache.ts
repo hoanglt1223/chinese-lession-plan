@@ -2,6 +2,8 @@ import { writeFile, readFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
 import { createHash } from 'crypto';
+import { getCachedTranslation, setCachedTranslation } from './redis.js';
+import { storage } from './storage.js';
 
 interface CacheEntry {
   word: string;
@@ -100,6 +102,29 @@ export class TranslationCacheService {
   }
 
   async get(word: string, sourceLang: string = 'zh', targetLang: string = 'vi'): Promise<string | null> {
+    // Try Redis cache first
+    const redisResult = await getCachedTranslation(word, sourceLang, targetLang);
+    if (redisResult) {
+      console.log(`🎯 Redis cache hit for "${word}" → "${redisResult}"`);
+      return redisResult;
+    }
+
+    // Try PostgreSQL cache if available
+    if (process.env.DATABASE_URL && 'getCachedTranslation' in storage) {
+      try {
+        const dbResult = await (storage as any).getCachedTranslation(word, sourceLang, targetLang);
+        if (dbResult) {
+          console.log(`🎯 DB cache hit for "${word}" → "${dbResult}"`);
+          // Also cache in Redis for faster access next time
+          await setCachedTranslation(word, sourceLang, targetLang, dbResult);
+          return dbResult;
+        }
+      } catch (error) {
+        console.error('Error reading from database cache:', error);
+      }
+    }
+
+    // Fallback to local file cache
     const key = this.generateCacheKey(word, sourceLang, targetLang);
     const entry = this.cache[key];
     
@@ -113,21 +138,36 @@ export class TranslationCacheService {
       return null;
     }
     
-    console.log(`🎯 Cache hit for "${word}" → "${entry.translation}" (source: ${entry.source})`);
+    console.log(`🎯 File cache hit for "${word}" → "${entry.translation}" (source: ${entry.source})`);
     return entry.translation;
   }
 
   async set(word: string, translation: string, source: 'deepl' | 'openai' = 'deepl', sourceLang: string = 'zh', targetLang: string = 'vi'): Promise<void> {
-    const key = this.generateCacheKey(word, sourceLang, targetLang);
+    const cleanWord = word.trim();
+    const cleanTranslation = translation.trim();
     
+    // Cache in Redis for fast access
+    await setCachedTranslation(cleanWord, sourceLang, targetLang, cleanTranslation);
+    
+    // Cache in PostgreSQL for persistence if available
+    if (process.env.DATABASE_URL && 'setCachedTranslation' in storage) {
+      try {
+        await (storage as any).setCachedTranslation(cleanWord, sourceLang, targetLang, cleanTranslation, source);
+      } catch (error) {
+        console.error('Error saving to database cache:', error);
+      }
+    }
+    
+    // Also maintain local file cache as fallback
+    const key = this.generateCacheKey(cleanWord, sourceLang, targetLang);
     this.cache[key] = {
-      word: word.trim(),
-      translation: translation.trim(),
+      word: cleanWord,
+      translation: cleanTranslation,
       timestamp: Date.now(),
       source
     };
     
-    console.log(`💾 Cached translation: "${word}" → "${translation}" (source: ${source})`);
+    console.log(`💾 Cached translation: "${cleanWord}" → "${cleanTranslation}" (source: ${source})`);
     
     // Save cache periodically (every 10 new entries or immediately)
     const cacheSize = Object.keys(this.cache).length;

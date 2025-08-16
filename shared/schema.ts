@@ -26,34 +26,11 @@ export interface Lesson {
   level: string; // N1, N2, etc.
   ageGroup: string; // preschool, primary, lower-secondary
   status: string; // draft, review, plan, flashcards, summary, completed
-  originalFiles: Array<{name: string, content: string, type: string}> | null;
-  aiAnalysis: {
-    vocabulary: string[];
-    activities: string[];
-    learningObjectives: string[];
-    detectedLevel: string;
-    ageAppropriate: string;
-  } | null;
-  lessonPlans: Array<{
-    lessonNumber: number;
-    title: string;
-    type: string; // "综合课", "听说课", "写作课"
-    content: string;
-    filename: string;
-  }> | null;
-  flashcards: Array<{
-    word: string;
-    pinyin: string;
-    vietnamese: string;
-    imageUrl: string;
-    id: string;
-  }> | null;
-  summaries: Array<{
-    lessonNumber: number;
-    title: string;
-    content: string;
-    filename: string;
-  }> | null;
+  originalFiles: any | null;
+  aiAnalysis: any | null;
+  lessonPlans: any | null;
+  flashcards: any | null;
+  summaries: any | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -63,38 +40,11 @@ export const insertLessonSchema = z.object({
   level: z.string().min(1),
   ageGroup: z.string().min(1),
   status: z.string().default("draft"),
-  originalFiles: z.array(z.object({
-    name: z.string(),
-    content: z.string(),
-    type: z.string()
-  })).optional(),
-  aiAnalysis: z.object({
-    vocabulary: z.array(z.string()),
-    activities: z.array(z.string()),
-    learningObjectives: z.array(z.string()),
-    detectedLevel: z.string(),
-    ageAppropriate: z.string(),
-  }).optional(),
-  lessonPlans: z.array(z.object({
-    lessonNumber: z.number(),
-    title: z.string(),
-    type: z.string(),
-    content: z.string(),
-    filename: z.string(),
-  })).optional(),
-  flashcards: z.array(z.object({
-    word: z.string(),
-    pinyin: z.string(),
-    vietnamese: z.string(),
-    imageUrl: z.string(),
-    id: z.string(),
-  })).optional(),
-  summaries: z.array(z.object({
-    lessonNumber: z.number(),
-    title: z.string(),
-    content: z.string(),
-    filename: z.string(),
-  })).optional(),
+  originalFiles: z.any().optional(),
+  aiAnalysis: z.any().optional(),
+  lessonPlans: z.any().optional(),
+  flashcards: z.any().optional(),
+  summaries: z.any().optional(),
 });
 
 export type InsertLesson = z.infer<typeof insertLessonSchema>;
