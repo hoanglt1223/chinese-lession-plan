@@ -5,6 +5,7 @@ alwaysApply: true
 # Chinese Lesson Plan Project Structure
 
 This is a full-stack TypeScript application for creating Chinese language lesson plans with AI assistance.
+DO NOT USE MOCK API/INTEGRATE
 
 ## Project Architecture
 
