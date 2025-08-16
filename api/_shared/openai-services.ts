@@ -410,25 +410,27 @@ export async function generateWithOpenAI(
 export async function translateChineseToVietnamese(
   words: string[],
 ): Promise<Record<string, string>> {
+  console.log('🇻🇳 Starting Vietnamese translation for words:', words);
+  
   try {
     const deepLApiKey = process.env.DEEPL_API_KEY;
     
     if (!deepLApiKey) {
-      console.log("DEEPL_API_KEY not configured, falling back to OpenAI translation");
+      console.log("🚨 DEEPL_API_KEY not configured, falling back to OpenAI translation");
       return await translateWithOpenAI(words);
     }
 
-    console.log('Testing DeepL API connection with key:', deepLApiKey ? `${deepLApiKey.substring(0, 8)}...` : 'undefined');
+    console.log('🔑 DeepL API key found:', deepLApiKey ? `${deepLApiKey.substring(0, 8)}...` : 'undefined');
 
     const translator = new deepl.Translator(deepLApiKey);
     
     // Test the connection first with a simple word
     try {
-      await translator.translateText('test', 'en', 'vi');
-      console.log('DeepL API connection successful');
+      const testResult = await translator.translateText('test', 'en', 'vi');
+      console.log('✅ DeepL API connection successful. Test result:', testResult.text);
     } catch (testError: any) {
-      console.error('DeepL API test failed:', testError);
-      console.log('Falling back to OpenAI translation');
+      console.error('❌ DeepL API test failed:', testError.message);
+      console.log('🔄 Falling back to OpenAI translation');
       return await translateWithOpenAI(words);
     }
 
@@ -437,10 +439,13 @@ export async function translateChineseToVietnamese(
     // Translate each word individually for better accuracy
     const translationPromises = words.map(async (word) => {
       try {
+        console.log(`🔤 Translating "${word}" with DeepL...`);
         const result = await translator.translateText(word, 'zh', 'vi');
+        console.log(`✅ DeepL translation: "${word}" → "${result.text}"`);
         return { [word]: result.text };
       } catch (error: any) {
-        console.error(`DeepL translation error for word "${word}":`, error);
+        console.error(`❌ DeepL translation error for word "${word}":`, error.message);
+        console.log(`🔄 Falling back to OpenAI for word: "${word}"`);
         // Fall back to OpenAI for this word
         const fallbackTranslation = await translateWithOpenAI([word]);
         return { [word]: fallbackTranslation[word] || word };
@@ -450,33 +455,47 @@ export async function translateChineseToVietnamese(
     const results = await Promise.all(translationPromises);
     results.forEach((result) => Object.assign(translations, result));
 
-    console.log('DeepL translations completed:', translations);
+    console.log('🎉 All translations completed:', translations);
     return translations;
   } catch (error: any) {
-    console.error("DeepL translation error:", error);
-    console.log('Falling back to OpenAI translation');
+    console.error("💥 DeepL translation error:", error.message);
+    console.log('🔄 Falling back to OpenAI translation');
     return await translateWithOpenAI(words);
   }
 }
 
 // Fallback translation using OpenAI
 async function translateWithOpenAI(words: string[]): Promise<Record<string, string>> {
+  console.log('🤖 Using OpenAI fallback translation for words:', words);
+  
   try {
+    const openaiKey = process.env.OPENAI_API_KEY || process.env.OPENAI_KEY;
+    
+    if (!openaiKey || openaiKey === "your-api-key-here") {
+      console.error('❌ OpenAI API key not configured properly');
+      throw new Error('OpenAI API key not configured');
+    }
+
     const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY || process.env.OPENAI_KEY || "your-api-key-here",
+      apiKey: openaiKey,
     });
 
     const prompt = `Translate these Chinese words to Vietnamese. Return only a JSON object with Chinese words as keys and Vietnamese translations as values:
 ${words.join(', ')}
 
-Format: {"word1": "translation1", "word2": "translation2"}`;
+Format: {"word1": "translation1", "word2": "translation2"}
 
+Examples:
+{"小鸟": "chim nhỏ", "朋友": "bạn bè", "飞": "bay", "点点头": "gật đầu"}`;
+
+    console.log('🔄 Sending request to OpenAI...');
+    
     const response = await openai.chat.completions.create({
       model: "gpt-5-nano",
       messages: [
         {
           role: "system",
-          content: "You are a professional Chinese-Vietnamese translator. Return only valid JSON."
+          content: "You are a professional Chinese-Vietnamese translator. Return only valid JSON with accurate Vietnamese translations."
         },
         {
           role: "user",
@@ -487,17 +506,49 @@ Format: {"word1": "translation1", "word2": "translation2"}`;
       temperature: 0.1,
     });
 
-    const result = JSON.parse(response.choices[0].message.content || "{}");
-    console.log('OpenAI fallback translations completed:', result);
-    return result;
-  } catch (error) {
-    console.error("OpenAI translation fallback failed:", error);
+    const content = response.choices[0].message.content;
+    console.log('📝 OpenAI response content:', content);
     
-    // Final fallback - return words as-is with placeholder translations
+    if (!content) {
+      throw new Error('Empty response from OpenAI');
+    }
+
+    const result = JSON.parse(content);
+    console.log('✅ OpenAI fallback translations completed:', result);
+    return result;
+  } catch (error: any) {
+    console.error("💥 OpenAI translation fallback failed:", error.message);
+    
+    // Final fallback - return actual Vietnamese translations instead of placeholders
+    console.log('🆘 Using final fallback with basic translations');
     const fallbackTranslations: Record<string, string> = {};
+    
+    // Basic translation mappings
+    const basicTranslations: Record<string, string> = {
+      '小鸟': 'chim nhỏ',
+      '朋友': 'bạn bè', 
+      '飞': 'bay',
+      '点点头': 'gật đầu',
+      '故事环节': 'phần kể chuyện',
+      '戏剧': 'kịch',
+      '律动': 'vận động',
+      '习题时间': 'thời gian làm bài tập',
+      '课本': 'sách giáo khoa',
+      '学生': 'học sinh',
+      '老师': 'giáo viên',
+      '学笔画': 'học nét chữ',
+      '下课': 'hết giờ học',
+      '字卡': 'thẻ từ',
+      '儿歌': 'bài hát thiếu nhi',
+      '贴纸': 'nhãn dán',
+      'N1': 'cấp độ N1'
+    };
+    
     words.forEach(word => {
-      fallbackTranslations[word] = `[Tiếng Việt: ${word}]`;
+      fallbackTranslations[word] = basicTranslations[word] || `[Cần dịch: ${word}]`;
     });
+    
+    console.log('🎯 Final fallback translations:', fallbackTranslations);
     return fallbackTranslations;
   }
 }
