@@ -77,22 +77,4 @@ export const insertLessonSchema = z.object({
 
 export type InsertLesson = z.infer<typeof insertLessonSchema>;
 
-// Workflow types
-export interface Workflow {
-  id: string;
-  lessonId: string | null;
-  currentStep: number;
-  stepData: Record<string, any> | null;
-  completedSteps: number[] | null;
-  createdAt: Date;
-  updatedAt: Date;
-}
 
-export const insertWorkflowSchema = z.object({
-  lessonId: z.string().optional(),
-  currentStep: z.number().default(0),
-  stepData: z.record(z.any()).optional(),
-  completedSteps: z.array(z.number()).default([]),
-});
-
-export type InsertWorkflow = z.infer<typeof insertWorkflowSchema>;

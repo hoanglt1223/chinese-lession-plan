@@ -1,7 +1,9 @@
 import { StepCard } from "./step-card";
+import type { Lesson } from "@shared/schema";
 
 interface KanbanBoardProps {
   selectedLesson: string | null;
+  lesson: Lesson | null;
   onLessonSelect: (lessonId: string) => void;
   currentStep: number;
   onStepUpdate: (step: number, data?: any) => Promise<void>;
@@ -9,6 +11,7 @@ interface KanbanBoardProps {
 
 export function KanbanBoard({ 
   selectedLesson, 
+  lesson,
   onLessonSelect, 
   currentStep, 
   onStepUpdate 
@@ -30,6 +33,7 @@ export function KanbanBoard({
           isActive={step.id === currentStep}
           isCompleted={step.id < currentStep}
           selectedLesson={selectedLesson}
+          lesson={lesson}
           onLessonSelect={onLessonSelect}
           onStepUpdate={onStepUpdate}
         />

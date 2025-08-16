@@ -1,10 +1,11 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ExportBar } from "@/components/export/export-bar";
 import { KanbanBoard } from "@/components/workflow/kanban-board";
 import { useWorkflow } from "@/hooks/use-workflow";
+import { WorkflowProvider } from "@/contexts/WorkflowContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
@@ -12,9 +13,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAI } from "@/contexts/AIContext";
 import { GraduationCap, Clock, FolderInput, Layers, Settings, Zap, Loader2, LogOut, DollarSign } from "lucide-react";
 
-export default function Home() {
+function HomeContent() {
   const [selectedLesson, setSelectedLesson] = useState<string | null>(null);
-  const { workflow, currentStep, updateStep } = useWorkflow(selectedLesson);
+  const { lesson, currentStep, updateStep } = useWorkflow(selectedLesson);
   const { user } = useAuth();
   const { settings: aiSettings, updateModel, updateLanguage } = useAI();
 
@@ -72,14 +73,9 @@ export default function Home() {
       });
       const analysisData = await analysisResponse.json();
       
-      // Update workflow with analysis
-      const workflowResponse = await apiRequest('GET', `/api/workflows/lesson/${lessonData.lesson.id}`);
-      const workflowData = await workflowResponse.json();
-      
-      await apiRequest('PATCH', `/api/workflows/${workflowData.id}`, {
-        currentStep: 1,
-        stepData: { analysis: analysisData },
-        completedSteps: [0]
+      // Update lesson with analysis
+      await apiRequest('PUT', `/api/lessons/${lessonData.lesson.id}`, {
+        aiAnalysis: analysisData
       });
       
       return { lessonId: lessonData.lesson.id, analysis: analysisData };
@@ -87,45 +83,64 @@ export default function Home() {
     onSuccess: (data) => {
       setSelectedLesson(data.lessonId);
       queryClient.invalidateQueries({ queryKey: ['/api/lessons'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/workflows'] });
     }
   });
 
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="export-bar border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8">
-          <div className="flex items-center justify-between h-14 lg:h-16">
-            <div className="flex items-center space-x-2 lg:space-x-4 min-w-0 flex-1">
-              <div className="flex items-center space-x-2">
-                <div className="w-6 h-6 lg:w-8 lg:h-8 bg-primary rounded-lg flex items-center justify-center">
-                  <GraduationCap className="text-primary-foreground text-xs lg:text-sm" />
+      <header className="export-bar border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8">
+          {/* Main header row */}
+          <div className="flex items-center justify-between h-14 sm:h-16">
+            {/* Logo and brand */}
+            <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+              <div className="flex items-center space-x-2 sm:space-x-3">
+                <div className="w-7 h-7 sm:w-8 sm:h-8 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
+                  <GraduationCap className="text-primary-foreground w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
-                <h1 className="text-lg lg:text-xl font-bold text-foreground">EduFlow</h1>
+                <div className="min-w-0">
+                  <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-foreground truncate">
+                    EduFlow
+                  </h1>
+                  <p className="text-xs sm:text-sm text-muted-foreground hidden md:block truncate">
+                    Chinese Lesson Planning Assistant
+                  </p>
+                </div>
               </div>
-              <span className="text-xs lg:text-sm text-muted-foreground hidden md:block truncate">
-                Chinese Lesson Planning Assistant
-              </span>
             </div>
             
-            <nav className="flex items-center justify-end space-x-2 lg:space-x-4">
+            {/* User info and actions */}
+            <nav className="flex items-center space-x-2 sm:space-x-3">
+              {/* User credit balance */}
               {user && (
-                <div className="flex items-center space-x-2 lg:space-x-4">
-                  <Badge variant="secondary" className="flex items-center gap-1 text-xs lg:text-sm">
-                    <DollarSign className="h-3 w-3 lg:h-4 lg:w-4" />
-                    <span className="hidden sm:inline">${user.creditBalance}</span>
-                    <span className="sm:hidden">${user.creditBalance.split('.')[0]}</span>
-                    <span className="hidden lg:inline">Credits</span>
-                  </Badge>
-                  <span className="text-xs lg:text-sm text-muted-foreground hidden md:block">
-                    Welcome, {user.username}
+                <Badge variant="secondary" className="flex items-center gap-1 text-xs sm:text-sm px-2 py-1">
+                  <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                  <span className="font-medium">
+                    ${user.creditBalance}
                   </span>
-                </div>
+                  <span className="hidden lg:inline text-xs">Credits</span>
+                </Badge>
               )}
-              <div className="hidden lg:flex items-center space-x-2 text-sm">
+              
+              {/* Settings dropdown for mobile */}
+              <div className="flex lg:hidden">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="p-2"
+                  onClick={() => {
+                    // Could toggle a mobile menu here
+                  }}
+                >
+                  <Settings className="h-4 w-4" />
+                </Button>
+              </div>
+              
+              {/* Desktop settings */}
+              <div className="hidden lg:flex items-center space-x-2">
                 <select 
-                  className="p-1 border rounded text-xs bg-background"
+                  className="px-2 py-1 border rounded-md text-xs bg-background hover:bg-accent transition-colors min-w-0"
                   value={aiSettings.selectedModel}
                   onChange={(e) => updateModel(e.target.value)}
                 >
@@ -134,7 +149,7 @@ export default function Home() {
                   <option value="gpt-4o-mini">GPT-4o-mini</option>
                 </select>
                 <select 
-                  className="p-1 border rounded text-xs bg-background"
+                  className="px-2 py-1 border rounded-md text-xs bg-background hover:bg-accent transition-colors min-w-0"
                   value={aiSettings.outputLanguage}
                   onChange={(e) => updateLanguage(e.target.value)}
                 >
@@ -145,43 +160,89 @@ export default function Home() {
                   <option value="bilingual">中文+Tiếng Việt</option>
                 </select>
               </div>
+              
+              {/* Tools button */}
               <Button 
                 variant="ghost" 
                 size="sm" 
                 onClick={() => window.location.href = '/tools'}
-                className="hidden sm:flex"
+                className="hidden sm:flex px-3"
               >
-                AI Tools
+                <Layers className="h-4 w-4 mr-2" />
+                <span className="hidden md:inline">AI Tools</span>
+                <span className="md:hidden">Tools</span>
               </Button>
+              
+              {/* Mobile tools button */}
               <Button 
                 variant="ghost" 
                 size="sm" 
                 onClick={() => window.location.href = '/tools'}
-                className="sm:hidden px-2"
+                className="sm:hidden p-2"
               >
-                Tools
+                <Layers className="h-4 w-4" />
               </Button>
+              
+              {/* Logout button */}
               {user && (
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => logoutMutation.mutate()}
                   disabled={logoutMutation.isPending}
-                  className="flex items-center gap-1 lg:gap-2 px-2 lg:px-3"
+                  className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3"
                 >
-                  <LogOut className="h-3 w-3 lg:h-4 lg:w-4" />
+                  {logoutMutation.isPending ? (
+                    <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
+                  ) : (
+                    <LogOut className="h-3 w-3 sm:h-4 sm:w-4" />
+                  )}
                   <span className="hidden sm:inline">Logout</span>
                 </Button>
               )}
             </nav>
-            
-            <div className="hidden lg:block">
-              <ExportBar 
-                lessonId={selectedLesson}
-                workflow={workflow}
-                disabled={!selectedLesson || currentStep === 0}
-              />
+          </div>
+          
+          {/* Secondary header row for user greeting on mobile */}
+          {user && (
+            <div className="md:hidden pb-2 border-t border-border/50 pt-2 mt-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">
+                  Welcome, {user.username}
+                </span>
+                <div className="flex items-center space-x-2">
+                  <select 
+                    className="px-2 py-1 border rounded text-xs bg-background w-24"
+                    value={aiSettings.selectedModel}
+                    onChange={(e) => updateModel(e.target.value)}
+                  >
+                    <option value="gpt-5-nano">5-nano</option>
+                    <option value="gpt-4o">4o</option>
+                    <option value="gpt-4o-mini">4o-mini</option>
+                  </select>
+                  <select 
+                    className="px-2 py-1 border rounded text-xs bg-background w-20"
+                    value={aiSettings.outputLanguage}
+                    onChange={(e) => updateLanguage(e.target.value)}
+                  >
+                    <option value="auto">Auto</option>
+                    <option value="chinese">中文</option>
+                    <option value="vietnamese">Việt</option>
+                    <option value="english">EN</option>
+                    <option value="bilingual">中+Việt</option>
+                  </select>
+                </div>
+              </div>
             </div>
+          )}
+          
+          {/* Desktop Export Bar */}
+          <div className="hidden lg:flex items-center justify-center mt-3 pt-3 border-t border-border/50">
+            <ExportBar 
+              lessonId={selectedLesson}
+              lesson={lesson || null}
+              disabled={!selectedLesson || currentStep === 0}
+            />
           </div>
         </div>
       </header>
@@ -206,7 +267,7 @@ export default function Home() {
             <div className="flex-1 flex justify-end">
               <ExportBar 
                 lessonId={selectedLesson}
-                workflow={workflow}
+                lesson={lesson || null}
                 disabled={!selectedLesson || currentStep === 0}
               />
             </div>
@@ -249,6 +310,7 @@ export default function Home() {
         {/* Kanban Board */}
         <KanbanBoard 
           selectedLesson={selectedLesson}
+          lesson={lesson || null}
           onLessonSelect={setSelectedLesson}
           currentStep={currentStep}
           onStepUpdate={updateStep}
@@ -443,5 +505,13 @@ export default function Home() {
         </Button>
       </div>
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <WorkflowProvider>
+      <HomeContent />
+    </WorkflowProvider>
   );
 }

@@ -1,53 +1,51 @@
-import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/api";
-import type { Workflow } from "@shared/schema";
+import { useWorkflowContext } from "@/contexts/WorkflowContext";
+import type { Lesson } from "@shared/schema";
 
 export function useWorkflow(lessonId: string | null) {
-  const [currentStep, setCurrentStep] = useState(0);
   const queryClient = useQueryClient();
+  const { getStepProgress, setCurrentStep } = useWorkflowContext();
 
-  const { data: workflow, isLoading } = useQuery<Workflow>({
-    queryKey: ["/api/workflows/lesson", lessonId],
+  // Get lesson data instead of workflow data
+  const { data: lesson, isLoading } = useQuery<Lesson>({
+    queryKey: ["/api/lessons", lessonId],
     enabled: !!lessonId,
   });
 
-  const updateWorkflowMutation = useMutation({
+  // Calculate workflow state from lesson data
+  const workflowState = getStepProgress(lesson || null);
+  const currentStep = workflowState.currentStep;
+  const completedSteps = workflowState.completedSteps;
+
+  // Update lesson data when steps are completed
+  const updateStepMutation = useMutation({
     mutationFn: async ({ step, data }: { step: number; data?: any }) => {
-      if (!workflow?.id) throw new Error("No workflow found");
+      if (!lessonId) throw new Error("No lesson ID provided");
       
-      const currentStepData = workflow.stepData || {};
-      const currentCompletedSteps = workflow.completedSteps || [];
-      const newCompletedSteps = Array.from(new Set([...currentCompletedSteps, step - 1])).filter(s => s >= 0);
-      
-      const response = await apiRequest('PATCH', `/api/workflows/${workflow.id}`, {
-        currentStep: step,
-        stepData: { ...currentStepData, ...data },
-        completedSteps: newCompletedSteps
-      });
+      // Update lesson with the new data
+      const response = await apiRequest('PUT', `/api/lessons/${lessonId}`, data);
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/workflows/lesson", lessonId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/lessons", lessonId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/lessons"] });
     }
   });
 
-  useEffect(() => {
-    if (workflow) {
-      setCurrentStep(workflow.currentStep || 0);
-    }
-  }, [workflow]);
-
   const updateStep = async (step: number, data?: any) => {
     setCurrentStep(step);
-    await updateWorkflowMutation.mutateAsync({ step, data });
+    if (data) {
+      await updateStepMutation.mutateAsync({ step, data });
+    }
   };
 
   return {
-    workflow,
+    lesson,
     currentStep,
+    completedSteps,
     updateStep,
     isLoading,
-    isUpdating: updateWorkflowMutation.isPending
+    isUpdating: updateStepMutation.isPending
   };
 }

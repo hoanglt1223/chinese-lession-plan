@@ -22,16 +22,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // Create new lesson
         const validatedData = insertLessonSchema.parse(req.body);
         const lesson = await storage.createLesson(validatedData);
-        
-        // Create associated workflow
-        const workflow = await storage.createWorkflow({
-          lessonId: lesson.id,
-          currentStep: 0,
-          stepData: {},
-          completedSteps: []
-        });
 
-        return res.json({ lesson, workflow });
+        return res.json({ lesson });
 
       default:
         return res.status(405).json({ message: 'Method not allowed' });

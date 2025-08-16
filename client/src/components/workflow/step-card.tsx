@@ -11,6 +11,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/api";
 import { Bot, Loader2, CheckCircle, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { Lesson } from "@shared/schema";
 
 interface Step {
   id: number;
@@ -23,6 +24,7 @@ interface StepCardProps {
   isActive: boolean;
   isCompleted: boolean;
   selectedLesson: string | null;
+  lesson: Lesson | null;
   onLessonSelect: (lessonId: string) => void;
   onStepUpdate: (step: number, data?: any) => Promise<void>;
 }
@@ -32,6 +34,7 @@ export function StepCard({
   isActive, 
   isCompleted, 
   selectedLesson,
+  lesson,
   onLessonSelect,
   onStepUpdate 
 }: StepCardProps) {
@@ -93,15 +96,30 @@ export function StepCard({
     return `${level} (Translation pending...)`;
   };
 
-  // Initialize state from workflow data if available
+  // Initialize state from lesson data if available
   useEffect(() => {
-    console.log('StepCard state changed:', { 
-      stepId: step.id, 
-      analysis: analysis ? 'has data' : 'null',
-      vocabularyCount: analysis?.vocabulary?.length || 0,
-      isAnalyzing 
-    });
-  }, [analysis, isAnalyzing, step.id]);
+    if (lesson) {
+      // Initialize analysis from lesson data
+      if (lesson.aiAnalysis && !analysis) {
+        setAnalysis(lesson.aiAnalysis);
+      }
+      
+      // Initialize lesson plan from lesson data
+      if (lesson.lessonPlan && !lessonPlan) {
+        setLessonPlan(lesson.lessonPlan);
+      }
+      
+      // Initialize flashcards from lesson data
+      if (lesson.flashcards && lesson.flashcards.length > 0 && flashcards.length === 0) {
+        setFlashcards(lesson.flashcards);
+      }
+      
+      // Initialize summary from lesson data
+      if (lesson.summary && !summary) {
+        setSummary(lesson.summary);
+      }
+    }
+  }, [lesson, analysis, lessonPlan, flashcards.length, summary]);
   
   const queryClient = useQueryClient();
 
@@ -186,8 +204,7 @@ export function StepCard({
   // Generate lesson plan mutation
   const generatePlanMutation = useMutation({
     mutationFn: async () => {
-      const workflowData = selectedLesson ? queryClient.getQueryData(['/api/workflows/lesson', selectedLesson]) : null;
-      const currentAnalysis = analysis || (workflowData as any)?.stepData?.analysis;
+      const currentAnalysis = analysis || lesson?.aiAnalysis;
       console.log('Generating plan with analysis:', currentAnalysis);
       
       const response = await apiRequest('POST', '/api/generate-plan', {
@@ -200,16 +217,13 @@ export function StepCard({
       console.log('Plan generation completed:', data.lessonPlan?.substring(0, 100));
       setLessonPlan(data.lessonPlan);
       await onStepUpdate(2, { lessonPlan: data.lessonPlan });
-      queryClient.invalidateQueries({ queryKey: ['/api/workflows'] });
-      queryClient.refetchQueries({ queryKey: ['/api/workflows'] });
     }
   });
 
   // Generate flashcards mutation
   const generateFlashcardsMutation = useMutation({
     mutationFn: async () => {
-      const workflowData = selectedLesson ? queryClient.getQueryData(['/api/workflows/lesson', selectedLesson]) : null;
-      const currentAnalysis = analysis || (workflowData as any)?.stepData?.analysis;
+      const currentAnalysis = analysis || lesson?.aiAnalysis;
       console.log('Generating flashcards with analysis:', currentAnalysis);
       console.log('Vocabulary being used:', currentAnalysis?.vocabulary);
       
@@ -225,17 +239,14 @@ export function StepCard({
       console.log('Flashcards generated:', data.flashcards?.length);
       setFlashcards(data.flashcards);
       await onStepUpdate(3, { flashcards: data.flashcards });
-      queryClient.invalidateQueries({ queryKey: ['/api/workflows'] });
-      queryClient.refetchQueries({ queryKey: ['/api/workflows'] });
     }
   });
 
   // Generate summary mutation
   const generateSummaryMutation = useMutation({
     mutationFn: async () => {
-      const workflowData = selectedLesson ? queryClient.getQueryData(['/api/workflows/lesson', selectedLesson]) : null;
-      const currentAnalysis = analysis || (workflowData as any)?.stepData?.analysis;
-      const currentPlan = lessonPlan || (workflowData as any)?.stepData?.lessonPlan;
+      const currentAnalysis = analysis || lesson?.aiAnalysis;
+      const currentPlan = lessonPlan || lesson?.lessonPlan;
       console.log('Generating summary with:', { 
         planLength: currentPlan?.length, 
         vocabularyCount: currentAnalysis?.vocabulary?.length 
@@ -251,7 +262,6 @@ export function StepCard({
       console.log('Summary generated:', data.summary?.substring(0, 100));
       setSummary(data.summary);
       await onStepUpdate(4, { summary: data.summary });
-      queryClient.invalidateQueries({ queryKey: ['/api/workflows'] });
     }
   });
 
@@ -286,9 +296,8 @@ export function StepCard({
         );
 
       case 1: // Review
-        // Check if analysis data exists in any active workflow step
-        const workflowAnalysis = selectedLesson ? queryClient.getQueryData(['/api/workflows/lesson', selectedLesson]) : null;
-        const analysisData = analysis || (workflowAnalysis as any)?.stepData?.analysis;
+        // Get analysis data from lesson or local state
+        const analysisData = analysis || lesson?.aiAnalysis;
         
         return (
           <div className="space-y-4">
@@ -343,27 +352,10 @@ export function StepCard({
                       const updatedAnalysis = { ...analysisData, vocabulary: newVocabulary };
                       setAnalysis(updatedAnalysis);
                       
-                      // Update the workflow data on backend
+                      // Update the lesson data on backend
                       if (selectedLesson) {
                         try {
-                          await onStepUpdate(1, { analysis: updatedAnalysis });
-                          
-                          // Update the local query cache
-                          queryClient.setQueryData(['/api/workflows/lesson', selectedLesson], (old: any) => {
-                            if (old?.stepData?.analysis) {
-                              return {
-                                ...old,
-                                stepData: {
-                                  ...old.stepData,
-                                  analysis: updatedAnalysis
-                                }
-                              };
-                            }
-                            return old;
-                          });
-                          
-                          // Invalidate to ensure data consistency
-                          queryClient.invalidateQueries({ queryKey: ['/api/workflows'] });
+                          await onStepUpdate(1, { aiAnalysis: updatedAnalysis });
                         } catch (error) {
                           console.error('Error updating vocabulary:', error);
                         }
@@ -453,9 +445,8 @@ export function StepCard({
         );
 
       case 2: // Plan
-        // Check for lesson plan in workflow data
-        const workflowPlan = selectedLesson ? queryClient.getQueryData(['/api/workflows/lesson', selectedLesson]) : null;
-        const planData = lessonPlan || (workflowPlan as any)?.stepData?.lessonPlan;
+        // Get lesson plan from lesson or local state
+        const planData = lessonPlan || lesson?.lessonPlan;
         
         return (
           <div className="space-y-4">
@@ -511,8 +502,7 @@ export function StepCard({
                 className="flex-1"
                 onClick={() => {
                   // Set analysis for flashcard generation
-                  const workflowData = selectedLesson ? queryClient.getQueryData(['/api/workflows/lesson', selectedLesson]) : null;
-                  const currentAnalysis = analysis || (workflowData as any)?.stepData?.analysis;
+                  const currentAnalysis = analysis || lesson?.aiAnalysis;
                   if (currentAnalysis && !analysis) {
                     setAnalysis(currentAnalysis);
                   }
@@ -534,13 +524,11 @@ export function StepCard({
         );
 
       case 3: // Flashcards
-        // Check for flashcards in workflow data
-        const workflowFlashcards = selectedLesson ? queryClient.getQueryData(['/api/workflows/lesson', selectedLesson]) : null;
-        const flashcardsData = flashcards.length > 0 ? flashcards : (workflowFlashcards as any)?.stepData?.flashcards || [];
+        // Get flashcards from lesson or local state
+        const flashcardsData = flashcards.length > 0 ? flashcards : lesson?.flashcards || [];
         
         // Get vocabulary from analysis for editing
-        const workflowData = selectedLesson ? queryClient.getQueryData(['/api/workflows/lesson', selectedLesson]) : null;
-        const currentAnalysis = analysis || (workflowData as any)?.stepData?.analysis;
+        const currentAnalysis = analysis || lesson?.aiAnalysis;
         const vocabularyList = currentAnalysis?.vocabulary || [];
         
         return (
@@ -555,21 +543,19 @@ export function StepCard({
               <div className="p-4">
                 <VocabularyEditor
                   vocabulary={vocabularyList}
-                  onChange={(newVocabulary) => {
+                  onChange={async (newVocabulary) => {
                     // Update analysis with new vocabulary
                     if (currentAnalysis) {
                       const updatedAnalysis = { ...currentAnalysis, vocabulary: newVocabulary };
                       setAnalysis(updatedAnalysis);
                       
-                      // Update workflow data
-                      if (selectedLesson && workflowData) {
-                        queryClient.setQueryData(['/api/workflows/lesson', selectedLesson], {
-                          ...workflowData,
-                          stepData: {
-                            ...(workflowData as any).stepData,
-                            analysis: updatedAnalysis
-                          }
-                        });
+                      // Update lesson data
+                      if (selectedLesson) {
+                        try {
+                          await onStepUpdate(3, { aiAnalysis: updatedAnalysis });
+                        } catch (error) {
+                          console.error('Error updating vocabulary:', error);
+                        }
                       }
                     }
                   }}
@@ -630,7 +616,7 @@ export function StepCard({
               className="w-full"
               onClick={() => {
                 // Set analysis and lesson plan for summary generation
-                const currentPlan = lessonPlan || (workflowData as any)?.stepData?.lessonPlan;
+                const currentPlan = lessonPlan || lesson?.lessonPlan;
                 if (currentAnalysis && !analysis) setAnalysis(currentAnalysis);
                 if (currentPlan && !lessonPlan) setLessonPlan(currentPlan);
                 generateSummaryMutation.mutate();
@@ -650,9 +636,8 @@ export function StepCard({
         );
 
       case 4: // Summary
-        // Check for summary in workflow data
-        const workflowSummary = selectedLesson ? queryClient.getQueryData(['/api/workflows/lesson', selectedLesson]) : null;
-        const summaryData = summary || (workflowSummary as any)?.stepData?.summary || "";
+        // Get summary from lesson or local state
+        const summaryData = summary || lesson?.summary || "";
         
         return (
           <div className="space-y-4">

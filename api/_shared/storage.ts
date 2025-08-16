@@ -1,11 +1,10 @@
-import { type User, type InsertUser, type Lesson, type InsertLesson, type Workflow, type InsertWorkflow } from "./schema.js";
+import { type User, type InsertUser, type Lesson, type InsertLesson } from "./schema.js";
 import { randomUUID } from "crypto";
 
 // In-memory storage for serverless environments
 let memoryStorage = {
   users: new Map<string, User>(),
   lessons: new Map<string, Lesson>(),
-  workflows: new Map<string, Workflow>(),
   initialized: false
 };
 
@@ -21,12 +20,6 @@ export interface IStorage {
   getLesson(id: string): Promise<Lesson | undefined>;
   getAllLessons(): Promise<Lesson[]>;
   updateLesson(id: string, updates: Partial<Lesson>): Promise<Lesson | undefined>;
-  
-  // Workflow methods
-  createWorkflow(workflow: InsertWorkflow): Promise<Workflow>;
-  getWorkflow(id: string): Promise<Workflow | undefined>;
-  getWorkflowByLessonId(lessonId: string): Promise<Workflow | undefined>;
-  updateWorkflow(id: string, updates: Partial<Workflow>): Promise<Workflow | undefined>;
 }
 
 export class ServerlessStorage implements IStorage {
@@ -150,41 +143,7 @@ export class ServerlessStorage implements IStorage {
     return updated;
   }
 
-  // Workflow methods
-  async createWorkflow(insertWorkflow: InsertWorkflow): Promise<Workflow> {
-    const id = randomUUID();
-    const now = new Date();
-    const workflow: Workflow = { 
-      lessonId: insertWorkflow.lessonId || null,
-      currentStep: insertWorkflow.currentStep || 0,
-      stepData: insertWorkflow.stepData || null,
-      completedSteps: insertWorkflow.completedSteps || null,
-      id,
-      createdAt: now,
-      updatedAt: now
-    };
-    memoryStorage.workflows.set(id, workflow);
-    return workflow;
-  }
-
-  async getWorkflow(id: string): Promise<Workflow | undefined> {
-    return memoryStorage.workflows.get(id);
-  }
-
-  async getWorkflowByLessonId(lessonId: string): Promise<Workflow | undefined> {
-    return Array.from(memoryStorage.workflows.values()).find(
-      (workflow) => workflow.lessonId === lessonId
-    );
-  }
-
-  async updateWorkflow(id: string, updates: Partial<Workflow>): Promise<Workflow | undefined> {
-    const workflow = memoryStorage.workflows.get(id);
-    if (!workflow) return undefined;
-    
-    const updated = { ...workflow, ...updates, updatedAt: new Date() };
-    memoryStorage.workflows.set(id, updated);
-    return updated;
-  }
+  
 }
 
 export const storage = new ServerlessStorage();

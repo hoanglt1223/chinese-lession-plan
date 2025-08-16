@@ -5,6 +5,7 @@ import { FileText, Download, Loader2, MoreHorizontal } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import type { Lesson } from "@shared/schema";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,11 +15,11 @@ import {
 
 interface ExportBarProps {
   lessonId: string | null;
-  workflow: any;
+  lesson: Lesson | null;
   disabled?: boolean;
 }
 
-export function ExportBar({ lessonId, workflow, disabled = false }: ExportBarProps) {
+export function ExportBar({ lessonId, lesson, disabled = false }: ExportBarProps) {
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -28,7 +29,7 @@ export function ExportBar({ lessonId, workflow, disabled = false }: ExportBarPro
       const response = await fetch('/api/export/pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ flashcards: workflow?.stepData?.flashcards || [] }),
+        body: JSON.stringify({ flashcards: lesson?.flashcards || [] }),
       });
       if (!response.ok) throw new Error('Export failed');
       const blob = await response.blob();
@@ -60,7 +61,7 @@ export function ExportBar({ lessonId, workflow, disabled = false }: ExportBarPro
 
   const exportDocxMutation = useMutation({
     mutationFn: async () => {
-      const content = workflow?.stepData?.lessonPlan || workflow?.stepData?.summary || "";
+      const content = lesson?.lessonPlan || lesson?.summary || "";
       const response = await fetch('/api/export/docx', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -96,7 +97,7 @@ export function ExportBar({ lessonId, workflow, disabled = false }: ExportBarPro
 
   const exportMarkdownMutation = useMutation({
     mutationFn: async () => {
-      const content = workflow?.stepData?.lessonPlan || "";
+      const content = lesson?.lessonPlan || "";
       const blob = new Blob([content], { type: 'text/markdown' });
       
       // Download file
