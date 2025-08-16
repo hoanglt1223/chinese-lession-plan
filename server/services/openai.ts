@@ -413,57 +413,99 @@ export async function generateWithOpenAI(
   }
 }
 
-// Real-time Chinese to Vietnamese translation using DeepL Node.js SDK
+// Real-time Chinese to Vietnamese translation using DeepL Node.js SDK with caching
 export async function translateChineseToVietnamese(
   words: string[],
 ): Promise<Record<string, string>> {
   console.log('🇻🇳 Starting Vietnamese translation for words:', words);
   
   try {
+    // Import cache service (for server environment)
+    const { TranslationCacheService } = await import('../storage.js');
+    const translationCache = new TranslationCacheService();
+    
+    // Check cache first
+    const { cached, missing } = await translationCache.getMultiple(words);
+    
+    if (missing.length === 0) {
+      console.log('🎯 All translations found in cache!');
+      return cached;
+    }
+    
+    console.log(`📊 Cache results - Found: ${Object.keys(cached).length}, Need to translate: ${missing.length}`);
+    
     const deepLApiKey = process.env.DEEPL_API_KEY;
     
     if (!deepLApiKey) {
       console.log("🚨 DEEPL_API_KEY not configured, falling back to OpenAI translation");
-      return await translateWithOpenAI(words);
+      const openaiTranslations = await translateWithOpenAI(missing);
+      
+      // Cache OpenAI translations
+      await translationCache.setMultiple(openaiTranslations, 'openai');
+      
+      return { ...cached, ...openaiTranslations };
     }
 
     console.log('🔑 DeepL API key found:', deepLApiKey ? `${deepLApiKey.substring(0, 8)}...` : 'undefined');
 
     const translator = new deepl.Translator(deepLApiKey);
     
-    // Test the connection first with a simple word
+    // Test the connection first with a simple word (only if not cached)
     try {
-      const testResult = await translator.translateText('test', 'en', 'vi');
-      console.log('✅ DeepL API connection successful. Test result:', testResult.text);
+      const testCached = await translationCache.get('test', 'en', 'vi');
+      if (!testCached) {
+        const testResult = await translator.translateText('test', 'en', 'vi');
+        console.log('✅ DeepL API connection successful. Test result:', testResult.text);
+        await translationCache.set('test', testResult.text, 'deepl', 'en', 'vi');
+      } else {
+        console.log('✅ DeepL API test skipped (cached)');
+      }
     } catch (testError: any) {
       console.error('❌ DeepL API test failed:', testError.message);
       console.log('🔄 Falling back to OpenAI translation');
-      return await translateWithOpenAI(words);
+      const openaiTranslations = await translateWithOpenAI(missing);
+      await translationCache.setMultiple(openaiTranslations, 'openai');
+      return { ...cached, ...openaiTranslations };
     }
 
-    const translations: Record<string, string> = {};
+    const newTranslations: Record<string, string> = {};
 
-    // Translate each word individually for better accuracy
-    const translationPromises = words.map(async (word) => {
+    // Translate missing words individually for better accuracy
+    const translationPromises = missing.map(async (word) => {
       try {
         console.log(`🔤 Translating "${word}" with DeepL...`);
         const result = await translator.translateText(word, 'zh', 'vi');
         console.log(`✅ DeepL translation: "${word}" → "${result.text}"`);
+        
+        // Cache the result
+        await translationCache.set(word, result.text, 'deepl');
+        
         return { [word]: result.text };
       } catch (error: any) {
         console.error(`❌ DeepL translation error for word "${word}":`, error.message);
         console.log(`🔄 Falling back to OpenAI for word: "${word}"`);
         // Fall back to OpenAI for this word
         const fallbackTranslation = await translateWithOpenAI([word]);
-        return { [word]: fallbackTranslation[word] || word };
+        const translation = fallbackTranslation[word] || word;
+        
+        // Cache the OpenAI fallback result
+        await translationCache.set(word, translation, 'openai');
+        
+        return { [word]: translation };
       }
     });
 
     const results = await Promise.all(translationPromises);
-    results.forEach((result) => Object.assign(translations, result));
+    results.forEach((result) => Object.assign(newTranslations, result));
 
-    console.log('🎉 All translations completed:', translations);
-    return translations;
+    const allTranslations = { ...cached, ...newTranslations };
+    console.log('🎉 All translations completed:', allTranslations);
+    
+    // Log cache stats
+    const stats = await translationCache.getCacheStats();
+    console.log(`📈 Cache stats: ${stats.totalEntries} total (${stats.deeplEntries} DeepL, ${stats.openaiEntries} OpenAI)`);
+    
+    return allTranslations;
   } catch (error: any) {
     console.error("💥 DeepL translation error:", error.message);
     console.log('🔄 Falling back to OpenAI translation');
