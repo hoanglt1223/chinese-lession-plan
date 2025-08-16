@@ -114,6 +114,7 @@ export class ServerlessStorage implements IStorage {
       originalFiles: insertLesson.originalFiles || null,
       aiAnalysis: insertLesson.aiAnalysis || null,
       lessonPlan: insertLesson.lessonPlan || null,
+      lessonPlans: insertLesson.lessonPlans || null,
       flashcards: insertLesson.flashcards || null,
       summary: insertLesson.summary || null,
       id,

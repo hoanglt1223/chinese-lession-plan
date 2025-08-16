@@ -34,7 +34,14 @@ export interface Lesson {
     detectedLevel: string;
     ageAppropriate: string;
   } | null;
-  lessonPlan: string | null; // Markdown content
+  lessonPlan: string | null; // Markdown content (legacy single file)
+  lessonPlans: Array<{
+    lessonNumber: number;
+    title: string;
+    type: string; // "综合课", "听说课", "写作课"
+    content: string;
+    filename: string;
+  }> | null; // Individual lesson files
   flashcards: Array<{
     word: string;
     pinyin: string;
@@ -65,6 +72,13 @@ export const insertLessonSchema = z.object({
     ageAppropriate: z.string(),
   }).optional(),
   lessonPlan: z.string().optional(),
+  lessonPlans: z.array(z.object({
+    lessonNumber: z.number(),
+    title: z.string(),
+    type: z.string(),
+    content: z.string(),
+    filename: z.string(),
+  })).optional(),
   flashcards: z.array(z.object({
     word: z.string(),
     pinyin: z.string(),

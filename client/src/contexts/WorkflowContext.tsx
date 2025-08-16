@@ -43,8 +43,8 @@ export function WorkflowProvider({ children }: WorkflowProviderProps) {
       current = 2;
     }
 
-    // Step 2: Plan - check if lesson plan exists
-    if (lesson.lessonPlan) {
+    // Step 2: Plan - check if lesson plan or lesson plans exist
+    if (lesson.lessonPlan || (lesson.lessonPlans && lesson.lessonPlans.length > 0)) {
       completed.push(2);
       current = 3;
     }

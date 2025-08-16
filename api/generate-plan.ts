@@ -20,8 +20,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ message: "Analysis data is required" });
     }
 
-    const lessonPlan = await generateLessonPlan(analysis, ageGroup || "preschool");
-    return res.json({ lessonPlan });
+    const result = await generateLessonPlan(analysis, ageGroup || "preschool");
+    
+    return res.json({ 
+      lessonPlan: result.fullPlan, // Legacy single file for backward compatibility
+      lessonPlans: result.individualLessons, // New individual lesson files
+      fullPlan: result.fullPlan // Full plan for reference
+    });
   } catch (error: any) {
     return handleError(res, error, 'Generate plan API');
   }

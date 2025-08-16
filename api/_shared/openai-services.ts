@@ -203,21 +203,105 @@ IMPORTANT: Only extract vocabulary that actually appears in the lesson content -
   }
 }
 
+// Function to split the 4-lesson plan into individual lesson files
+export function splitLessonPlan(fullPlan: string): Array<{
+  lessonNumber: number;
+  title: string;
+  type: string;
+  content: string;
+  filename: string;
+}> {
+  console.log('splitLessonPlan called with content length:', fullPlan.length);
+  console.log('First 500 chars of fullPlan:', fullPlan.substring(0, 500));
+  
+  const lessons: Array<{
+    lessonNumber: number;
+    title: string;
+    type: string;
+    content: string;
+    filename: string;
+  }> = [];
+
+  // Split by lesson sections
+  const lessonSections = fullPlan.split(/## LESSON \d+:/);
+  console.log('Split resulted in', lessonSections.length, 'sections');
+  
+  // Remove the first empty section and header
+  lessonSections.shift();
+  
+  for (let i = 0; i < lessonSections.length; i++) {
+    const lessonContent = lessonSections[i];
+    const lessonNumber = i + 1;
+    
+    // Extract lesson type from the content
+    let lessonType = "综合课";
+    let lessonTitle = "";
+    
+    if (lessonContent.includes("LEARN")) {
+      lessonType = "综合课";
+      lessonTitle = "Learn";
+    } else if (lessonContent.includes("STORY")) {
+      lessonType = "听说课";
+      lessonTitle = "Story";
+    } else if (lessonContent.includes("SING")) {
+      lessonType = "听说课";
+      lessonTitle = "Sing";
+    } else if (lessonContent.includes("WRITE")) {
+      lessonType = "写作课";
+      lessonTitle = "Write";
+    }
+
+    // Extract theme/title from the full plan header
+    const themeMatch = fullPlan.match(/第\d+课：([^|]+)/);
+    const theme = themeMatch ? themeMatch[1].trim() : "小鸟";
+    
+    // Reconstruct individual lesson plan with proper header
+    const individualLessonContent = `**👣 YUEXUELE LESSON PLAN 👣**
+
+es
+
+|**Level 1**|N1|**Unit 1**|第1课：${theme}|**Lesson ${lessonNumber}**|第${lessonNumber}节课|
+| :- | :- | :- | :- | :- | :- |
+||||||
+
+${lessonContent.trim()}`;
+
+    lessons.push({
+      lessonNumber,
+      title: lessonTitle,
+      type: lessonType,
+      content: individualLessonContent,
+      filename: `Lesson ${lessonNumber}.md`
+    });
+    
+    console.log(`Added lesson ${lessonNumber}: ${lessonTitle} (${lessonType})`);
+  }
+
+  console.log('splitLessonPlan returning', lessons.length, 'lessons');
+  return lessons;
+}
+
 export async function generateLessonPlan(
   analysis: LessonAnalysis,
   ageGroup: string,
-): Promise<string> {
+): Promise<{ fullPlan: string; individualLessons: Array<{
+  lessonNumber: number;
+  title: string;
+  type: string;
+  content: string;
+  filename: string;
+}> }> {
   try {
     const response = await openai.chat.completions.create({
       model: model5nano,
       messages: [
         {
           role: "system",
-          content: `You are an expert Chinese language curriculum developer for Vietnamese students. Create detailed, age-appropriate lesson plans following the pedagogical sequence: Listen & Repeat → Listen & Pick Image → See Image & Speak the Word.`,
+          content: `You are an expert Chinese language curriculum developer for Vietnamese students. Create a comprehensive 4-lesson unit plan following the YUEXUELE methodology with clear pedagogical progression: Learn → Story → Sing → Write.`,
         },
         {
           role: "user",
-          content: `Create a detailed lesson plan in Markdown format based on this analysis:
+          content: `Create a detailed 4-lesson unit plan in Markdown format based on this analysis:
 
 Vocabulary: ${analysis.vocabulary.join(", ")}
 Activities: ${analysis.activities.join(", ")}
@@ -225,24 +309,78 @@ Level: ${analysis.detectedLevel}
 Age Group: ${ageGroup}
 Theme: ${analysis.mainTheme}
 
-Structure the lesson plan with:
-1. Learning Objectives (Language and Non-language goals)
-2. Materials Needed
-3. Lesson Steps:
-   - Warm-up (5-10 min)
-   - Presentation (15-20 min) - Include Listen & Repeat activities
-   - Practice (15-20 min) - Include Listen & Pick Image activities  
-   - Production (10-15 min) - Include See Image & Speak activities
-   - Wrap-up (5 min)
-4. Assessment Methods
-5. Homework/Extension Activities
+Create 4 interconnected lessons following this structure:
 
-Make it practical for Vietnamese teachers with clear instructions, timing, and interactive elements suitable for ${ageGroup} students.`,
+# **👣 YUEXUELE LESSON PLAN 👣**
+
+## Unit Overview Table
+|**Level 1**|N1|**Unit 1**|第X课：[Theme]|**Lesson X**|第X节课|
+| :- | :- | :- | :- | :- | :- |
+|||||||
+
+For each lesson, include:
+|**References:**<br>参考资料||**Lesson aim:**<br>教学目标|**认知领域 （针对语音、词汇、语法、汉字）：**<br>- [Vocabulary/grammar objectives]<br><br>**技能领域（针对听、说、读、写）：**<br>- [Skill-based objectives]|**Sub aim:**<br>次要教学目标|**- 营造包容、开放、有爱的课堂氛围**<br>**- 建立师生信任，培养华文兴趣**<br>**- 建立课堂基本秩序,培养规则意识**|
+|**Type of lesson**<br>课型|[Lesson type]|**Materials required:**<br>教具|[Materials list]|||
+|**Lesson content**<br>教学内容|[Content description]|||||
+|**Duration:**<br>课时|45 分钟|||||
+
+## LESSON 1: LEARN (综合课 - Comprehensive)
+**Focus**: Vocabulary introduction and basic recognition through interactive games
+
+### Detailed Activities:
+|**Stage & aim**<br>**教学环节与目标**|**Activities ideas & Procedures**<br>**活动设计与教学步骤**|**Materials /**<br>**教具**|
+| :-: | :-: | :-: |
+|**Warm up**<br>**热身**<br>让学生重新适应课堂环境，做好上课准备，并复习之前学过的词汇和语言点。<br>5 分钟|● 老师用"你好"跟学生打招呼。<br>● 播放热身歌曲《如果开心你就跟我拍拍手》<br>● 用"坐好"照片卡组织学生回到座位。|[热身歌曲链接]|
+|**Rules**<br>**规则**<br>提醒学生课堂上的行为规范。<br>8 分钟|老师点名，展示规则闪卡，建立课堂管理体系和奖励制度。|规则闪卡<br>奖励贴纸|
+|**Lead-in**<br>**导入**<br>作为课程的重要引入部分。<br>3 分钟|**魔术盒活动**<br>- 用魔术盒引入主题<br>- 播放相关声音效果<br>- 引导学生猜测和参与|魔术盒<br>道具|
+|**Presentation - Target language**<br>**呈现目标词汇**<br>创设词汇语境，演示词汇用法。<br>8 分钟|- 出示字卡，引导重复<br>- 结合动作演示<br>- 多种感官参与学习|词汇闪卡|
+|**Convey meaning**<br>**传达词义**<br>传达并检查目标词汇的含义<br>15分钟|**课堂活动 - 拍一拍**<br>- 分组游戏<br>- 听词拍图<br>- 竞赛互动|苍蝇拍 x3|
+|**Pronunciation check**<br>**纠正发音**<br>注重发音训练<br>10分钟|**课堂活动 - 蹦蹦跳跳**<br>- 闪卡排列<br>- 跳跃读词<br>- 动作结合|地面闪卡|
+|**Post session - Vocabulary**<br>**课后词汇巩固**<br>复习检查已学词汇<br>5分钟|**课堂活动 - 大家一起来**<br>- 动作配词<br>- 集体模仿<br>- 巩固记忆|幻灯片|
+|**Wrap up & rewards**<br>**总结与奖励**<br>2分钟|课程总结，发放奖励|奖励用品|
+
+## LESSON 2: STORY (听说课 - Listening & Speaking)
+**Focus**: Story comprehension and narrative-based vocabulary reinforcement
+
+### Detailed Activities:
+[Similar detailed table format for Lesson 2 with story-focused activities including "听故事", "粘球大战" warmup, and narrative comprehension]
+
+## LESSON 3: SING (听说课 - Listening & Speaking)  
+**Focus**: Musical learning through songs and chants with performance elements
+
+### Detailed Activities:
+[Similar detailed table format for Lesson 3 with song/chant activities including "Bang Bang" games, "儿歌", and "戏剧：小鸟找朋友"]
+
+## LESSON 4: WRITE (写作课 - Writing)
+**Focus**: Writing practice, stroke learning, and creative hands-on activities
+
+### Detailed Activities:
+[Similar detailed table format for Lesson 4 with writing activities including stroke practice, "朗读时间", "学笔画", and "画一画、贴一贴"]
+
+REQUIREMENTS:
+1. Use the exact vocabulary words: ${analysis.vocabulary.join(", ")}
+2. Maintain 45-minute duration for each lesson
+3. Include specific materials and teaching aids
+4. Provide clear timing for each activity
+5. Ensure age-appropriate content for ${ageGroup}
+6. Include progressive difficulty across the 4 lessons
+7. Use interactive, game-based learning approaches
+8. Maintain consistent classroom management elements
+9. Include both Chinese and Vietnamese cultural elements
+10. Provide specific activity instructions with clear steps
+
+Make it practical for Vietnamese teachers with detailed procedures, timing, and materials lists.`,
         },
       ],
     });
 
-    return response.choices[0].message.content || "";
+    const fullPlan = response.choices[0].message.content || "";
+    const individualLessons = splitLessonPlan(fullPlan);
+    
+    return {
+      fullPlan,
+      individualLessons
+    };
   } catch (error) {
     console.error("Failed to generate lesson plan:", error);
     throw new Error("Failed to generate lesson plan with AI");

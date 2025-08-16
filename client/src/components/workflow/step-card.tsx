@@ -42,6 +42,14 @@ export function StepCard({
   const [files, setFiles] = useState<File[]>([]);
   const [analysis, setAnalysis] = useState<any>(null);
   const [lessonPlan, setLessonPlan] = useState<string>("");
+  const [lessonPlans, setLessonPlans] = useState<Array<{
+    lessonNumber: number;
+    title: string;
+    type: string;
+    content: string;
+    filename: string;
+  }>>([]);
+  const [selectedLessonIndex, setSelectedLessonIndex] = useState(0);
   const [flashcards, setFlashcards] = useState<any[]>([]);
   const [summary, setSummary] = useState<string>("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -192,6 +200,11 @@ export function StepCard({
         setLessonPlan(lesson.lessonPlan);
       }
       
+      // Initialize individual lesson plans from lesson data
+      if (lesson.lessonPlans && lesson.lessonPlans.length > 0 && lessonPlans.length === 0) {
+        setLessonPlans(lesson.lessonPlans);
+      }
+      
       // Initialize flashcards from lesson data
       if (lesson.flashcards && lesson.flashcards.length > 0 && flashcards.length === 0) {
         setFlashcards(lesson.flashcards);
@@ -202,7 +215,7 @@ export function StepCard({
         setSummary(lesson.summary);
       }
     }
-  }, [lesson, analysis, lessonPlan, flashcards.length, summary]);
+  }, [lesson, analysis, lessonPlan, lessonPlans.length, flashcards.length, summary]);
   
   const queryClient = useQueryClient();
 
@@ -307,8 +320,25 @@ export function StepCard({
     },
     onSuccess: async (data) => {
       console.log('Plan generation completed:', data.lessonPlan?.substring(0, 100));
+      console.log('Individual lessons:', data.lessonPlans?.length);
+      console.log('Full response data:', data);
+      
+      // Set both legacy and new format
       setLessonPlan(data.lessonPlan);
-      await onStepUpdate(2, { lessonPlan: data.lessonPlan });
+      if (data.lessonPlans && data.lessonPlans.length > 0) {
+        setLessonPlans(data.lessonPlans);
+        console.log('Setting lessonPlans state:', data.lessonPlans.length, 'lessons');
+      } else {
+        console.log('No lessonPlans found in response');
+      }
+      
+      // Update lesson with both formats for backward compatibility
+      await onStepUpdate(2, { 
+        lessonPlan: data.lessonPlan,
+        lessonPlans: data.lessonPlans
+      });
+      
+      console.log('Updated lesson with new data, triggering state refresh');
     }
   });
 
@@ -537,8 +567,20 @@ export function StepCard({
         );
 
       case 2: // Plan
-        // Get lesson plan from lesson or local state
+        // Get lesson plans from lesson or local state
         const planData = lessonPlan || lesson?.lessonPlan;
+        const plansData = lessonPlans.length > 0 ? lessonPlans : (lesson?.lessonPlans || []);
+        
+        // Debug logging
+        console.log('Step 2 - Plan render:', {
+          lessonPlanLocal: lessonPlan?.length || 0,
+          lessonPlanFromLesson: lesson?.lessonPlan?.length || 0,
+          lessonPlansLocal: lessonPlans.length,
+          lessonPlansFromLesson: lesson?.lessonPlans?.length || 0,
+          planData: planData?.length || 0,
+          plansData: plansData.length,
+          generationPending: generatePlanMutation.isPending
+        });
         
         return (
           <div className="space-y-4">
@@ -546,34 +588,93 @@ export function StepCard({
               <div className="bg-gradient-to-r from-accent/10 to-accent/5 rounded-lg p-4">
                 <div className="flex items-center space-x-2 mb-2">
                   <Loader2 className="w-4 h-4 animate-spin text-accent" />
-                  <span className="text-sm font-medium text-accent">Generating Lesson Plan</span>
+                  <span className="text-sm font-medium text-accent">Generating 4-Lesson Plan</span>
                 </div>
-                <p className="text-sm text-muted-foreground">Creating detailed lesson plan with AI... This may take 30-60 seconds</p>
+                <p className="text-sm text-muted-foreground">Creating detailed 4-lesson unit plan with AI... This may take 60-90 seconds</p>
                 <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
                   <div className="bg-accent h-2 rounded-full animate-pulse" style={{width: '70%'}}></div>
                 </div>
               </div>
             )}
             
-            <MarkdownEditor
-              value={planData || ""}
-              onChange={(value) => {
-                setLessonPlan(value);
-                if (value && !lessonPlan) {
-                  // Update local state if we got data from workflow
-                  console.log('Setting lesson plan from workflow data');
-                }
-              }}
-              placeholder="Lesson plan will be generated here..."
-              readOnly={generatePlanMutation.isPending}
-            />
-            
-            {/* Debug info for lesson plan */}
-            <div className="text-xs text-muted-foreground p-2 bg-muted/20 rounded">
-              <div>Plan data: {planData ? `✓ ${planData.length} chars` : '✗ null'}</div>
-              <div>Local state: {lessonPlan ? `✓ ${lessonPlan.length} chars` : '✗ empty'}</div>
-              <div>Generation: {generatePlanMutation.isPending ? 'in progress' : 'ready'}</div>
-            </div>
+            {/* Display individual lesson plans if available */}
+            {plansData.length > 0 ? (
+              <div className="space-y-4">
+                {/* Lesson selector tabs */}
+                <div className="flex flex-wrap gap-2 border-b border-border pb-2">
+                  {plansData.map((plan, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setSelectedLessonIndex(index)}
+                      className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                        selectedLessonIndex === index
+                          ? 'bg-accent text-accent-foreground'
+                          : 'bg-muted text-muted-foreground hover:bg-muted/70'
+                      }`}
+                    >
+                      Lesson {plan.lessonNumber}: {plan.title}
+                      <span className="ml-2 text-xs opacity-70">({plan.type})</span>
+                    </button>
+                  ))}
+                </div>
+                
+                {/* Selected lesson content */}
+                {plansData[selectedLessonIndex] && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-semibold">
+                        {plansData[selectedLessonIndex].filename}
+                      </h3>
+                      <div className="text-sm text-muted-foreground">
+                        {plansData[selectedLessonIndex].type}
+                      </div>
+                    </div>
+                    
+                    <MarkdownEditor
+                      value={plansData[selectedLessonIndex].content}
+                      onChange={(value) => {
+                        const updatedPlans = [...plansData];
+                        updatedPlans[selectedLessonIndex] = {
+                          ...updatedPlans[selectedLessonIndex],
+                          content: value
+                        };
+                        setLessonPlans(updatedPlans);
+                      }}
+                      placeholder="Individual lesson plan content..."
+                      readOnly={generatePlanMutation.isPending}
+                    />
+                  </div>
+                )}
+                
+                {/* Summary info */}
+                <div className="text-xs text-muted-foreground p-2 bg-muted/20 rounded">
+                  <div>Individual lessons: {plansData.length}/4</div>
+                  <div>Current lesson: {plansData[selectedLessonIndex]?.filename || 'None'}</div>
+                  <div>Content: {plansData[selectedLessonIndex]?.content.length || 0} chars</div>
+                </div>
+              </div>
+            ) : (
+              /* Fallback to single lesson plan view */
+              <div className="space-y-4">
+                <MarkdownEditor
+                  value={planData || ""}
+                  onChange={(value) => {
+                    setLessonPlan(value);
+                    if (value && !lessonPlan) {
+                      console.log('Setting lesson plan from workflow data');
+                    }
+                  }}
+                  placeholder="Lesson plan will be generated here..."
+                  readOnly={generatePlanMutation.isPending}
+                />
+                
+                <div className="text-xs text-muted-foreground p-2 bg-muted/20 rounded">
+                  <div>Plan data: {planData ? `✓ ${planData.length} chars` : '✗ null'}</div>
+                  <div>Local state: {lessonPlan ? `✓ ${lessonPlan.length} chars` : '✗ empty'}</div>
+                  <div>Generation: {generatePlanMutation.isPending ? 'in progress' : 'ready'}</div>
+                </div>
+              </div>
+            )}
             
             {/* Flashcard Generation */}
             {generateFlashcardsMutation.isPending && (
