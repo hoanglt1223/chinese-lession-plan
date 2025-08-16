@@ -22,7 +22,7 @@ export function KanbanBoard({
   ];
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {steps.map((step) => (
         <StepCard
           key={step.id}
