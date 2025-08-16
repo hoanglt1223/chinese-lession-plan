@@ -10,6 +10,15 @@ export function useWorkflow(lessonId: string | null) {
   // Get lesson data instead of workflow data
   const { data: lesson, isLoading } = useQuery<Lesson>({
     queryKey: ["/api/lessons", lessonId],
+    queryFn: async () => {
+      if (!lessonId) throw new Error("No lesson ID");
+      
+      const response = await apiRequest('POST', '/api/lessons', {
+        action: 'get',
+        lessonId: lessonId
+      });
+      return response.json();
+    },
     enabled: !!lessonId,
   });
 
@@ -23,8 +32,11 @@ export function useWorkflow(lessonId: string | null) {
     mutationFn: async ({ step, data }: { step: number; data?: any }) => {
       if (!lessonId) throw new Error("No lesson ID provided");
       
-      // Update lesson with the new data
-      const response = await apiRequest('PUT', `/api/lessons/${lessonId}`, data);
+      // Update lesson with the new data using body parameters
+      const response = await apiRequest('PUT', '/api/lessons', {
+        id: lessonId,
+        ...data
+      });
       return response.json();
     },
     onSuccess: () => {

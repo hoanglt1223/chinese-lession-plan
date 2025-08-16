@@ -74,7 +74,8 @@ function HomeContent() {
       const analysisData = await analysisResponse.json();
       
       // Update lesson with analysis
-      await apiRequest('PUT', `/api/lessons/${lessonData.lesson.id}`, {
+      await apiRequest('PUT', '/api/lessons', {
+        id: lessonData.lesson.id,
         aiAnalysis: analysisData
       });
       
