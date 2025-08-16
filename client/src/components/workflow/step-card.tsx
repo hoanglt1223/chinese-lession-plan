@@ -60,13 +60,29 @@ export function StepCard({
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // DeepL translations 
-  const [translations, setTranslations] = useState<Record<string, string>>({});
+  // Consolidated translation state
+  const [allTranslations, setAllTranslations] = useState<{
+    vocabulary: Record<string, string>;
+    activities: Record<string, string>;
+    levels: Record<string, string>;
+  }>({
+    vocabulary: {},
+    activities: {},
+    levels: {}
+  });
   const [isTranslating, setIsTranslating] = useState(false);
 
-  // Simple translation lookup without infinite loops
-  const getTranslation = (word: string): string => {
-    return translations[word] || word;
+  // Consolidated translation getters
+  const getVocabularyTranslation = (word: string): string => {
+    return allTranslations.vocabulary[word] || word;
+  };
+  
+  const getActivityTranslation = (activity: string): string => {
+    return allTranslations.activities[activity] || activity;
+  };
+  
+  const getLevelTranslation = (level: string): string => {
+    return allTranslations.levels[level] || level;
   };
 
   // Trigger DeepL translation when analysis is completed
@@ -83,8 +99,11 @@ export function StepCard({
       
       if (response.ok) {
         const data = await response.json();
-        setTranslations(data.translations);
-        console.log('Received DeepL translations:', data.translations);
+        setAllTranslations(prev => ({
+          ...prev,
+          vocabulary: { ...prev.vocabulary, ...data.translations }
+        }));
+        console.log('Received vocabulary translations:', data.translations);
       } else {
         const errorData = await response.json().catch(() => ({}));
         console.error('Translation API error:', response.status, response.statusText, errorData);
@@ -111,7 +130,10 @@ export function StepCard({
       
       if (response.ok) {
         const data = await response.json();
-        setActivityTranslations(data.translations);
+        setAllTranslations(prev => ({
+          ...prev,
+          activities: { ...prev.activities, ...data.translations }
+        }));
         console.log('Received activity translations:', data.translations);
       } else {
         console.error('Activity translation API error:', response.status);
@@ -133,7 +155,10 @@ export function StepCard({
       
       if (response.ok) {
         const data = await response.json();
-        setLevelTranslations(data.translations);
+        setAllTranslations(prev => ({
+          ...prev,
+          levels: { ...prev.levels, ...data.translations }
+        }));
         console.log('Received level translation:', data.translations);
       } else {
         console.error('Level translation API error:', response.status);
@@ -161,16 +186,7 @@ export function StepCard({
     return text;
   };
 
-  const [activityTranslations, setActivityTranslations] = useState<Record<string, string>>({});
-  const [levelTranslations, setLevelTranslations] = useState<Record<string, string>>({});
 
-  const getVietnameseActivityTranslation = (activity: string): string => {
-    return activityTranslations[activity] || activity;
-  };
-
-  const getVietnameseLevelTranslation = (level: string): string => {
-    return levelTranslations[level] || level;
-  };
 
   // Translate analysis data when it becomes available
   useEffect(() => {
@@ -216,7 +232,7 @@ export function StepCard({
         setSummaries(lesson.summaries);
       }
     }
-  }, [lesson, analysis, lessonPlans.length, flashcards.length, summaries.length]);
+  }, [lesson?.id, lesson?.aiAnalysis, lesson?.lessonPlans, lesson?.flashcards, lesson?.summaries]);
   
   const queryClient = useQueryClient();
 
@@ -333,11 +349,7 @@ export function StepCard({
         console.log('No lessonPlans found in response');
       }
       
-      // Force a re-render by updating state after a short delay
-      setTimeout(() => {
-        console.log('Post-update check - lessonPlans state length:', lessonPlans.length);
-        console.log('Post-update check - lesson object:', lesson?.lessonPlans?.length);
-      }, 100);
+      console.log('Post-update state - lessonPlans local:', lessonPlans.length);
       
       // Update lesson with new format
       await onStepUpdate(2, { 
@@ -531,7 +543,7 @@ export function StepCard({
                       <div className="mt-1 flex flex-wrap gap-1">
                         {analysisData.vocabulary?.map((word: string, index: number) => (
                           <span key={index} className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded text-xs">
-                            {word} ({getTranslation(word) || "Translation pending..."}){getTranslation(word) === word ? " (hardcoded)" : ""}
+                            {word} ({getVocabularyTranslation(word) || "Translation pending..."}){getVocabularyTranslation(word) === word ? " (hardcoded)" : ""}
                           </span>
                         ))}
                       </div>
@@ -541,7 +553,7 @@ export function StepCard({
                       <ul className="mt-1 space-y-1">
                         {analysisData.activities?.map((activity: string, index: number) => (
                           <li key={index} className="text-blue-700 dark:text-blue-300">
-                            • {activity} → {getVietnameseActivityTranslation(activity)}
+                            • {activity} → {getActivityTranslation(activity)}
                           </li>
                         ))}
                       </ul>
@@ -549,7 +561,7 @@ export function StepCard({
                     <div>
                       <span className="font-medium text-blue-800 dark:text-blue-200">Level:</span>
                       <span className="text-blue-700 dark:text-blue-300 ml-1">
-                        {analysisData.detectedLevel} → {getVietnameseLevelTranslation(analysisData.detectedLevel)}
+                        {analysisData.detectedLevel} → {getLevelTranslation(analysisData.detectedLevel)}
                       </span>
                     </div>
                   </div>
@@ -595,22 +607,9 @@ export function StepCard({
         );
 
       case 2: // Plan
-        // Get lesson plans from lesson or local state
-        const plansData = lessonPlans.length > 0 ? lessonPlans : (lesson?.lessonPlans || []);
+        // Get lesson plans - prioritize lesson data over local state for consistency
+        const plansData = lesson?.lessonPlans?.length ? lesson.lessonPlans : lessonPlans;
         
-        // Force state sync if lesson has plans but local state doesn't
-        if (lesson?.lessonPlans && lesson.lessonPlans.length > 0 && lessonPlans.length === 0) {
-          console.log('Force syncing lessonPlans from lesson object');
-          setLessonPlans(lesson.lessonPlans);
-        }
-        
-        // Debug logging
-        console.log('Step 2 - Plan render:', {
-          lessonPlansLocal: lessonPlans.length,
-          lessonPlansFromLesson: lesson?.lessonPlans?.length || 0,
-          plansData: plansData.length,
-          generationPending: generatePlanMutation.isPending
-        });
         
         return (
           <div className="space-y-4">
@@ -857,13 +856,6 @@ export function StepCard({
         // Get summaries from lesson or local state
         const summariesData = summaries.length > 0 ? summaries : (lesson?.summaries || []);
         
-        // Debug logging
-        console.log('Step 4 - Summary render:', {
-          summariesLocal: summaries.length,
-          summariesFromLesson: lesson?.summaries?.length || 0,
-          summariesData: summariesData.length,
-          generationPending: generateSummaryMutation.isPending
-        });
         
         return (
           <div className="space-y-4">
