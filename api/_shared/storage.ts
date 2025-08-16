@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Lesson, type InsertLesson, type Workflow, type InsertWorkflow } from "./schema";
+import { type User, type InsertUser, type Lesson, type InsertLesson, type Workflow, type InsertWorkflow } from "./schema.js";
 import { randomUUID } from "crypto";
 
 // In-memory storage for serverless environments

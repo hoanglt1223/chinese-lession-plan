@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-// Note: File processing disabled for now - can be re-enabled with proper serverless file handling
-import { setCorsHeaders, handleOptions } from './_shared/cors';
-import { handleError } from './_shared/error-handler';
+import { fileProcessor } from './_shared/file-processor.js';
+import { setCorsHeaders, handleOptions } from './_shared/cors.js';
+import { handleError } from './_shared/error-handler.js';
 import multer from 'multer';
 
 // Configure multer for memory storage
@@ -42,13 +42,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ message: "No files uploaded" });
     }
 
-    // Mock file processing for now
-    const processedFiles = files.map(file => ({
-      name: file.originalname,
-      content: "Mock extracted content from PDF file. This would contain the actual text extracted from the uploaded PDF.",
-      type: file.mimetype,
-      size: file.size
-    }));
+    const processedFiles: any[] = [];
+    for (const file of files) {
+      if (file.mimetype === 'application/pdf') {
+        const processed = await fileProcessor.processPDF(file.buffer, file.originalname);
+        processedFiles.push(processed);
+      }
+    }
 
     return res.json({ files: processedFiles });
   } catch (error: any) {

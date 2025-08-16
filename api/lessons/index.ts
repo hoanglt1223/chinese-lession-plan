@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { insertLessonSchema } from '../_shared/schema';
-import { storage } from '../_shared/storage';
-import { setCorsHeaders, handleOptions } from '../_shared/cors';
-import { handleError } from '../_shared/error-handler';
+import { insertLessonSchema } from '../_shared/schema.js';
+import { storage } from '../_shared/storage.js';
+import { setCorsHeaders, handleOptions } from '../_shared/cors.js';
+import { handleError } from '../_shared/error-handler.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(res);

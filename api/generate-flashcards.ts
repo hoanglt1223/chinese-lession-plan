@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { generateFlashcards } from './_shared/openai-services';
-import { setCorsHeaders, handleOptions } from './_shared/cors';
-import { handleError } from './_shared/error-handler';
+import { generateFlashcards } from './_shared/openai-services.js';
+import { setCorsHeaders, handleOptions } from './_shared/cors.js';
+import { handleError } from './_shared/error-handler.js';
 import { randomUUID } from 'crypto';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
