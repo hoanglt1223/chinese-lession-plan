@@ -20,24 +20,7 @@ export interface LessonAnalysis {
   duration: string;
 }
 
-export interface LessonPlan {
-  title: string;
-  level: string;
-  duration: string;
-  objectives: {
-    language: string[];
-    nonLanguage: string[];
-  };
-  materials: string[];
-  activities: Array<{
-    name: string;
-    duration: string;
-    description: string;
-    type: "warmup" | "presentation" | "practice" | "production" | "wrap-up";
-  }>;
-  assessment: string;
-  homework: string;
-}
+
 
 export interface FlashcardData {
   word: string;
@@ -65,12 +48,6 @@ export async function analyzePDFContent(
       // Don't use hardcoded fallback content as it can contaminate vocabulary detection
       content = "Chinese lesson content extracted from PDF. Please analyze the available content.";
     }
-
-    // Debug level detection
-    const debugLevelMatch = content.match(/N\d+/);
-    console.log("Level detection regex result:", debugLevelMatch);
-    console.log("Content includes N1:", content.includes("N1"));
-    console.log("Content includes N8:", content.includes("N8"));
 
     const languageInstructions = {
       chinese: "Provide analysis in Chinese",
@@ -258,8 +235,6 @@ export function splitLessonPlan(fullPlan: string): Array<{
     // Reconstruct individual lesson plan with proper header
     const individualLessonContent = `**👣 YUEXUELE LESSON PLAN 👣**
 
-es
-
 |**Level 1**|N1|**Unit 1**|第1课：${theme}|**Lesson ${lessonNumber}**|第${lessonNumber}节课|
 | :- | :- | :- | :- | :- | :- |
 ||||||
@@ -372,75 +347,47 @@ export async function generateLessonPlan(
         },
         {
           role: "user",
-          content: `Create a detailed 4-lesson unit plan in Markdown format based on this analysis:
+          content: `Create 4 lesson plans based on this analysis:
 
 Vocabulary: ${analysis.vocabulary.join(", ")}
-Activities: ${analysis.activities.join(", ")}
-Level: ${analysis.detectedLevel}
-Age Group: ${ageGroup}
 Theme: ${analysis.mainTheme}
+Age Group: ${ageGroup}
 
-Create 4 interconnected lessons following this structure:
+Follow this EXACT structure for each lesson (example for Lesson 1):
 
-# **👣 YUEXUELE LESSON PLAN 👣**
+## LESSON 1: LEARN (综合课)
 
-## Unit Overview Table
-|**Level 1**|N1|**Unit 1**|第X课：[Theme]|**Lesson X**|第X节课|
+**👣 YUEXUELE LESSON PLAN 👣**
+
+es
+
+|**Level 1**|N1|**Unit 1**|第1课：${analysis.mainTheme}|**Lesson 1**|第1节课|
 | :- | :- | :- | :- | :- | :- |
 |||||||
 
-For each lesson, include:
-|**References:**<br>参考资料||**Lesson aim:**<br>教学目标|**认知领域 （针对语音、词汇、语法、汉字）：**<br>- [Vocabulary/grammar objectives]<br><br>**技能领域（针对听、说、读、写）：**<br>- [Skill-based objectives]|**Sub aim:**<br>次要教学目标|**- 营造包容、开放、有爱的课堂氛围**<br>**- 建立师生信任，培养华文兴趣**<br>**- 建立课堂基本秩序,培养规则意识**|
-|**Type of lesson**<br>课型|[Lesson type]|**Materials required:**<br>教具|[Materials list]|||
-|**Lesson content**<br>教学内容|[Content description]|||||
+|**References:**<br>参考资料||**Lesson aim:**<br>教学目标|**认知领域 （针对语音、词汇、语法、汉字）：**<br>- 通过游戏形式，学生能够掌握重点字词：${analysis.vocabulary.join(", ")}<br>**技能领域（针对听、说、读、写）：**<br>- 在老师的引导下，学生能够模仿（重复）老师的发音，说出本课的重点字词。<br>- 在老师的引导下，能跟老师重复课堂指令：安静、做好、听、洗手间。<br>- 在老师指导下，能模仿（重复）老师的发音，学说课堂问候/礼貌用语:你好、再见。|**Sub aim:**<br>次要教学目标|- 老师需营造出包容，开放，有爱的课堂氛围，让学生慢慢适应华文课堂的上课形式和特点，喜爱课堂、老师和同学。<br>- 在这一阶段，学生能跟老师教师之间建立起信任，逐渐对华文产生兴趣。<br>- 建立课堂基本秩序,初步培养规则意识|
+|**Type of lesson**<br>课型|综合课|**Materials required:**<br>教具|- 学习资料 (links)<br>- 规则闪卡<br>- 魔术盒<br>- 苍蝇拍（3个）|||
+|**Lesson content**<br>教学内容|词汇：${analysis.vocabulary.join(", ")}|||||
 |**Duration:**<br>课时|45 分钟|||||
 
-## LESSON 1: LEARN (综合课 - Comprehensive)
-**Focus**: Vocabulary introduction and basic recognition through interactive games
-
-### Detailed Activities:
 |**Stage & aim**<br>**教学环节与目标**|**Activities ideas & Procedures**<br>**活动设计与教学步骤**|**Materials /**<br>**教具**|
 | :-: | :-: | :-: |
-|**Warm up**<br>**热身**<br>让学生重新适应课堂环境，做好上课准备，并复习之前学过的词汇和语言点。<br>5 分钟|● 老师用"你好"跟学生打招呼。<br>● 播放热身歌曲《如果开心你就跟我拍拍手》<br>● 用"坐好"照片卡组织学生回到座位。|[热身歌曲链接]|
-|**Rules**<br>**规则**<br>提醒学生课堂上的行为规范。<br>8 分钟|老师点名，展示规则闪卡，建立课堂管理体系和奖励制度。|规则闪卡<br>奖励贴纸|
-|**Lead-in**<br>**导入**<br>作为课程的重要引入部分。<br>3 分钟|**魔术盒活动**<br>- 用魔术盒引入主题<br>- 播放相关声音效果<br>- 引导学生猜测和参与|魔术盒<br>道具|
-|**Presentation - Target language**<br>**呈现目标词汇**<br>创设词汇语境，演示词汇用法。<br>8 分钟|- 出示字卡，引导重复<br>- 结合动作演示<br>- 多种感官参与学习|词汇闪卡|
-|**Convey meaning**<br>**传达词义**<br>传达并检查目标词汇的含义<br>15分钟|**课堂活动 - 拍一拍**<br>- 分组游戏<br>- 听词拍图<br>- 竞赛互动|苍蝇拍 x3|
-|**Pronunciation check**<br>**纠正发音**<br>注重发音训练<br>10分钟|**课堂活动 - 蹦蹦跳跳**<br>- 闪卡排列<br>- 跳跃读词<br>- 动作结合|地面闪卡|
-|**Post session - Vocabulary**<br>**课后词汇巩固**<br>复习检查已学词汇<br>5分钟|**课堂活动 - 大家一起来**<br>- 动作配词<br>- 集体模仿<br>- 巩固记忆|幻灯片|
-|**Wrap up & rewards**<br>**总结与奖励**<br>2分钟|课程总结，发放奖励|奖励用品|
+|**Warm up**<br>**热身**<br>让学生重新适应课堂环境，做好上课准备，并复习之前学过的词汇和语言点。<br>5 分钟|● 老师走进教室，用"你好"跟学生打招呼。<br>● 老师播放热身歌曲《如果开心你就跟我拍拍手》，教师跟着音乐跳舞，鼓励学生模仿。<br>● 由于是第一堂课，热身时间可适当延长（可播放两遍音乐），在正式上课前尽量安抚好个别学生情绪。<br>- 热身结束后，老师用照片卡"坐好"组织学生回到座位。|[如果开心你就跟我拍拍手](https://www.youtube.com/watch?v=wAGJVPXaHHk&list=RDwAGJVPXaHHk&start_radio=1)|
+|**Rules**<br>**规则**<br>提醒学生课堂上的行为规范。<br>8 分钟|老师点名，并把学生的名字写在白板一侧，便于老师记住新学生的名字。<br>老师展示闪卡，引导学生重复课堂规定，并确保这些闪卡始终贴在白板上或在墙上，方便在每个活动之后或需要时进行参考。<br>提醒学生课堂奖励制度。<br>记得在每一节课中使用相同的课堂管理系统，以便为学生提供一致性。<br>最重要的是：要始终如一，并尽可能使用积极强化的方法。<br>规则闪卡或规则图示应展示在白板上。|[规则闪卡](https://drive.google.com/file/d/1gx86LrjsOwQJNnHMmxGaKx_mndu3EzYU/view?usp=drive_link)<br>[贴纸奖励表](https://drive.google.com/file/d/1d58aYJm-u_jaPoh82XujyVxfytlJdcFp/view?usp=drive_link)|
+|**Lead-in**<br>**导入**<br>作为课程的重要引入部分。<br>3 分钟|**魔术盒**<br>魔术盒里事先放着主题相关道具，教师在拿着魔术盒时，可以做相关动作，让学生猜一猜里面是什么？打开魔术盒前，播放相关声音，引导学生说出主题词汇。|魔术盒<br>相关声音录音|
+|**Presentation - Target language**<br>**呈现目标词汇**<br>创设词汇语境，然后在该语境中演示词汇的用法。<br>8 分钟|- 老师引导学生说出词汇后，出示字卡，并引导学生重复多遍。<br>- 老师带着小朋友一起做相关动作，引出重点词语。<br>- 老师可以示范动作，出示字卡，带着学生做动作，并引导学生重复多遍。|[闪卡](https://drive.google.com/file/d/1zlXVgwsbVD7vkg27OtJIdEIL2kyuO1UL/view?usp=sharing)|
+|**Convey meaning**<br>**传达词义**<br>传达并检查目标词汇的含义<br>15分钟|**课堂活动 - 拍一拍**<br>- 老师将班级分成2-3个小组。<br>- 老师大声念出一个单词。<br>- 学生认真听，并拍打对应的图片。|苍蝇拍 x3|
+|**Pronunciation check**<br>**纠正发音**<br>注重发音训练，需兼顾单词与句子两个层面。<br>10分钟|**课堂活动 - 蹦蹦跳跳**<br>- 老师在地板上把闪卡贴成一列，闪卡之间的距离为半米。<br>- 老师引导学生每跳过一张闪卡就把生词读出来。|N/A|
+|**Post session - Vocabulary**<br>**课后词汇巩固**<br>复习检查已学词汇<br>5分钟|**课堂活动 - 大家一起来**<br>- 老师轮流展示幻灯片：词汇列表，给每个生词定制一个对应的动作。<br>- 在老师的引导下，学生模仿对应的动作。|N/A|
+|**Wrap up & rewards**<br>**总结与奖励**<br>2分钟|预留几分钟时间，运用课堂管理体系进行课程总结，并为表现良好的学生发放奖励。|Dojo积分/贴纸/印章<br>或其他奖励形式|
 
-## LESSON 2: STORY (听说课 - Listening & Speaking)
-**Focus**: Story comprehension and narrative-based vocabulary reinforcement
+Create the other 3 lessons following the same structure with these variations:
 
-### Detailed Activities:
-[Similar detailed table format for Lesson 2 with story-focused activities including "听故事", "粘球大战" warmup, and narrative comprehension]
+**LESSON 2: STORY (听说课)** - Replace lesson type to 听说课, add story objectives, use 粘球大战 warmup and 听故事 activity
+**LESSON 3: SING (听说课)** - Use Bang Bang warmup, add 儿歌 and 戏剧 activities 
+**LESSON 4: WRITE (写作课)** - Replace lesson type to 写作课, add writing objectives, use 朗读时间, 学笔画, 画一画贴一贴 activities
 
-## LESSON 3: SING (听说课 - Listening & Speaking)  
-**Focus**: Musical learning through songs and chants with performance elements
-
-### Detailed Activities:
-[Similar detailed table format for Lesson 3 with song/chant activities including "Bang Bang" games, "儿歌", and "戏剧：小鸟找朋友"]
-
-## LESSON 4: WRITE (写作课 - Writing)
-**Focus**: Writing practice, stroke learning, and creative hands-on activities
-
-### Detailed Activities:
-[Similar detailed table format for Lesson 4 with writing activities including stroke practice, "朗读时间", "学笔画", and "画一画、贴一贴"]
-
-REQUIREMENTS:
-1. Use the exact vocabulary words: ${analysis.vocabulary.join(", ")}
-2. Maintain 45-minute duration for each lesson
-3. Include specific materials and teaching aids
-4. Provide clear timing for each activity
-5. Ensure age-appropriate content for ${ageGroup}
-6. Include progressive difficulty across the 4 lessons
-7. Use interactive, game-based learning approaches
-8. Maintain consistent classroom management elements
-9. Include both Chinese and Vietnamese cultural elements
-10. Provide specific activity instructions with clear steps
-
-Make it practical for Vietnamese teachers with detailed procedures, timing, and materials lists.`,
+Keep the exact table structure, HTML formatting, timing, and activity details as shown in the example above.`,
         },
       ],
     });

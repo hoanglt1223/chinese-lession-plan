@@ -34,14 +34,13 @@ export interface Lesson {
     detectedLevel: string;
     ageAppropriate: string;
   } | null;
-  lessonPlan: string | null; // Markdown content (legacy single file)
   lessonPlans: Array<{
     lessonNumber: number;
     title: string;
     type: string; // "综合课", "听说课", "写作课"
     content: string;
     filename: string;
-  }> | null; // Individual lesson files
+  }> | null;
   flashcards: Array<{
     word: string;
     pinyin: string;
@@ -49,13 +48,12 @@ export interface Lesson {
     imageUrl: string;
     id: string;
   }> | null;
-  summary: string | null; // DOCX content (legacy single summary)
   summaries: Array<{
     lessonNumber: number;
     title: string;
     content: string;
     filename: string;
-  }> | null; // Individual lesson summaries
+  }> | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -77,7 +75,6 @@ export const insertLessonSchema = z.object({
     detectedLevel: z.string(),
     ageAppropriate: z.string(),
   }).optional(),
-  lessonPlan: z.string().optional(),
   lessonPlans: z.array(z.object({
     lessonNumber: z.number(),
     title: z.string(),
@@ -92,7 +89,6 @@ export const insertLessonSchema = z.object({
     imageUrl: z.string(),
     id: z.string(),
   })).optional(),
-  summary: z.string().optional(),
   summaries: z.array(z.object({
     lessonNumber: z.number(),
     title: z.string(),

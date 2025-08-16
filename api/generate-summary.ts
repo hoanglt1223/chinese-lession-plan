@@ -23,8 +23,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const result = await generateSummary(lessonPlan, vocabulary || []);
     
     return res.json({ 
-      summary: result.fullSummary, // Legacy single summary for backward compatibility
-      summaries: result.individualSummaries, // New individual summary files
+      summaries: result.individualSummaries, // Individual summary files
       fullSummary: result.fullSummary // Full summary for reference
     });
   } catch (error: any) {

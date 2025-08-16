@@ -41,7 +41,6 @@ export function StepCard({
   const { settings: aiSettings } = useAI();
   const [files, setFiles] = useState<File[]>([]);
   const [analysis, setAnalysis] = useState<any>(null);
-  const [lessonPlan, setLessonPlan] = useState<string>("");
   const [lessonPlans, setLessonPlans] = useState<Array<{
     lessonNumber: number;
     title: string;
@@ -51,7 +50,6 @@ export function StepCard({
   }>>([]);
   const [selectedLessonIndex, setSelectedLessonIndex] = useState(0);
   const [flashcards, setFlashcards] = useState<any[]>([]);
-  const [summary, setSummary] = useState<string>("");
   const [summaries, setSummaries] = useState<Array<{
     lessonNumber: number;
     title: string;
@@ -202,11 +200,6 @@ export function StepCard({
         setAnalysis(lesson.aiAnalysis);
       }
       
-      // Initialize lesson plan from lesson data
-      if (lesson.lessonPlan && !lessonPlan) {
-        setLessonPlan(lesson.lessonPlan);
-      }
-      
       // Initialize individual lesson plans from lesson data
       if (lesson.lessonPlans && lesson.lessonPlans.length > 0 && lessonPlans.length === 0) {
         console.log('useEffect: Initializing lessonPlans from lesson data:', lesson.lessonPlans.length);
@@ -218,17 +211,12 @@ export function StepCard({
         setFlashcards(lesson.flashcards);
       }
       
-      // Initialize summary from lesson data
-      if (lesson.summary && !summary) {
-        setSummary(lesson.summary);
-      }
-      
       // Initialize individual summaries from lesson data
       if (lesson.summaries && lesson.summaries.length > 0 && summaries.length === 0) {
         setSummaries(lesson.summaries);
       }
     }
-  }, [lesson, analysis, lessonPlan, lessonPlans.length, flashcards.length, summary, summaries.length]);
+  }, [lesson, analysis, lessonPlans.length, flashcards.length, summaries.length]);
   
   const queryClient = useQueryClient();
 
@@ -332,12 +320,11 @@ export function StepCard({
       return response.json();
     },
     onSuccess: async (data) => {
-      console.log('Plan generation completed:', data.lessonPlan?.substring(0, 100));
+      console.log('Plan generation completed:', data.fullPlan?.substring(0, 100));
       console.log('Individual lessons:', data.lessonPlans?.length);
       console.log('Full response data:', data);
       
-      // Set both legacy and new format
-      setLessonPlan(data.lessonPlan);
+      // Set the new format
       if (data.lessonPlans && data.lessonPlans.length > 0) {
         setLessonPlans(data.lessonPlans);
         console.log('Setting lessonPlans state:', data.lessonPlans.length, 'lessons');
@@ -352,9 +339,8 @@ export function StepCard({
         console.log('Post-update check - lesson object:', lesson?.lessonPlans?.length);
       }, 100);
       
-      // Update lesson with both formats for backward compatibility
+      // Update lesson with new format
       await onStepUpdate(2, { 
-        lessonPlan: data.lessonPlan,
         lessonPlans: data.lessonPlans
       });
       
@@ -392,7 +378,10 @@ export function StepCard({
   const generateSummaryMutation = useMutation({
     mutationFn: async () => {
       const currentAnalysis = analysis || lesson?.aiAnalysis;
-      const currentPlan = lessonPlan || lesson?.lessonPlan;
+      // Use full plan from lessonPlans array
+      const currentPlan = lessonPlans.length > 0 
+        ? lessonPlans.map(l => l.content).join('\n\n')
+        : lesson?.lessonPlans?.map(l => l.content).join('\n\n') || '';
       console.log('Generating summary with:', { 
         planLength: currentPlan?.length, 
         vocabularyCount: currentAnalysis?.vocabulary?.length 
@@ -405,12 +394,11 @@ export function StepCard({
       return response.json();
     },
     onSuccess: async (data) => {
-      console.log('Summary generated:', data.summary?.substring(0, 100));
+      console.log('Summary generated:', data.fullSummary?.substring(0, 100));
       console.log('Individual summaries:', data.summaries?.length);
       console.log('Full summary response:', data);
       
-      // Set both legacy and new format
-      setSummary(data.summary);
+      // Set the new format
       if (data.summaries && data.summaries.length > 0) {
         setSummaries(data.summaries);
         console.log('Setting summaries state:', data.summaries.length, 'summaries');
@@ -418,9 +406,8 @@ export function StepCard({
         console.log('No summaries found in response');
       }
       
-      // Update lesson with both formats for backward compatibility
+      // Update lesson with new format
       await onStepUpdate(4, { 
-        summary: data.summary,
         summaries: data.summaries
       });
       
@@ -609,7 +596,6 @@ export function StepCard({
 
       case 2: // Plan
         // Get lesson plans from lesson or local state
-        const planData = lessonPlan || lesson?.lessonPlan;
         const plansData = lessonPlans.length > 0 ? lessonPlans : (lesson?.lessonPlans || []);
         
         // Force state sync if lesson has plans but local state doesn't
@@ -620,11 +606,8 @@ export function StepCard({
         
         // Debug logging
         console.log('Step 2 - Plan render:', {
-          lessonPlanLocal: lessonPlan?.length || 0,
-          lessonPlanFromLesson: lesson?.lessonPlan?.length || 0,
           lessonPlansLocal: lessonPlans.length,
           lessonPlansFromLesson: lesson?.lessonPlans?.length || 0,
-          planData: planData?.length || 0,
           plansData: plansData.length,
           generationPending: generatePlanMutation.isPending
         });
@@ -718,27 +701,6 @@ export function StepCard({
                   Debug: Sync State
                 </Button>
               </div>
-            ) : (
-              /* Fallback to single lesson plan view */
-              <div className="space-y-4">
-                <MarkdownEditor
-                  value={planData || ""}
-                  onChange={(value) => {
-                    setLessonPlan(value);
-                    if (value && !lessonPlan) {
-                      console.log('Setting lesson plan from workflow data');
-                    }
-                  }}
-                  placeholder="Lesson plan will be generated here..."
-                  readOnly={generatePlanMutation.isPending}
-                />
-                
-                <div className="text-xs text-muted-foreground p-2 bg-muted/20 rounded">
-                  <div>Plan data: {planData ? `✓ ${planData.length} chars` : '✗ null'}</div>
-                  <div>Local state: {lessonPlan ? `✓ ${lessonPlan.length} chars` : '✗ empty'}</div>
-                  <div>Generation: {generatePlanMutation.isPending ? 'in progress' : 'ready'}</div>
-                </div>
-              </div>
             )}
             
             {/* Flashcard Generation */}
@@ -766,7 +728,7 @@ export function StepCard({
                   }
                   generateFlashcardsMutation.mutate();
                 }}
-                disabled={!planData || generateFlashcardsMutation.isPending}
+                disabled={plansData.length === 0 || generateFlashcardsMutation.isPending}
               >
                 {generateFlashcardsMutation.isPending ? (
                   <>
@@ -873,10 +835,8 @@ export function StepCard({
             <Button 
               className="w-full"
               onClick={() => {
-                // Set analysis and lesson plan for summary generation
-                const currentPlan = lessonPlan || lesson?.lessonPlan;
+                // Set analysis for summary generation
                 if (currentAnalysis && !analysis) setAnalysis(currentAnalysis);
-                if (currentPlan && !lessonPlan) setLessonPlan(currentPlan);
                 generateSummaryMutation.mutate();
               }}
               disabled={flashcardsData.length === 0 || generateSummaryMutation.isPending}
@@ -895,16 +855,12 @@ export function StepCard({
 
       case 4: // Summary
         // Get summaries from lesson or local state
-        const summaryData = summary || lesson?.summary || "";
         const summariesData = summaries.length > 0 ? summaries : (lesson?.summaries || []);
         
         // Debug logging
         console.log('Step 4 - Summary render:', {
-          summaryLocal: summary?.length || 0,
-          summaryFromLesson: lesson?.summary?.length || 0,
           summariesLocal: summaries.length,
           summariesFromLesson: lesson?.summaries?.length || 0,
-          summaryData: summaryData?.length || 0,
           summariesData: summariesData.length,
           generationPending: generateSummaryMutation.isPending
         });
@@ -973,26 +929,6 @@ export function StepCard({
                   <div>Individual summaries: {summariesData.length}/4</div>
                   <div>Current summary: {summariesData[selectedSummaryIndex]?.filename || 'None'}</div>
                   <div>Content: {summariesData[selectedSummaryIndex]?.content.length || 0} chars</div>
-                </div>
-              </div>
-            ) : (
-              /* Fallback to single summary view */
-              <div className="space-y-4">
-                <div className="border border-border rounded-lg overflow-hidden">
-                  <div className="bg-muted/50 px-3 py-2 border-b border-border">
-                    <span className="text-xs font-medium text-muted-foreground">Parent/Student Summary</span>
-                  </div>
-                  <div className="p-4 h-64 overflow-y-auto text-xs">
-                    <pre className="whitespace-pre-wrap text-foreground">
-                      {summaryData || "Summary will be generated here..."}
-                    </pre>
-                  </div>
-                </div>
-                
-                <div className="text-xs text-muted-foreground p-2 bg-muted/20 rounded">
-                  <div>Summary data: {summaryData ? `✓ ${summaryData.length} chars` : '✗ empty'}</div>
-                  <div>Local state: {summary ? `✓ ${summary.length} chars` : '✗ empty'}</div>
-                  <div>Generation: {generateSummaryMutation.isPending ? 'in progress' : 'ready'}</div>
                 </div>
               </div>
             )}

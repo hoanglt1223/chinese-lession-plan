@@ -1,7 +1,5 @@
 ﻿**👣 YUEXUELE LESSON PLAN 👣**
 
-.es
-
 |**Level 1**|N1|**Unit 1**|第1课：小鸟|**Lesson 1**|第1节课|
 | :- | :- | :- | :- | :- | :- |
 |||||||
