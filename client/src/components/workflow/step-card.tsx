@@ -172,7 +172,7 @@ export function StepCard({
         setIsAnalyzing(false);
         
         // Update workflow and invalidate cache to refresh UI
-        await onStepUpdate(1, { analysis: analysisData });
+        await onStepUpdate(1, { aiAnalysis: analysisData });
         
         // Trigger DeepL translation for vocabulary
         if (analysisData.vocabulary && analysisData.vocabulary.length > 0) {
