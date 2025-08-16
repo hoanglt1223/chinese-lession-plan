@@ -1,0 +1,148 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@300;400;600;700;800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: hsl(0 0% 100%);
+  --foreground: hsl(210 25% 17.3%);
+  --card: hsl(0 0% 100%);
+  --card-foreground: hsl(210 25% 17.3%);
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(210 25% 17.3%);
+  --primary: hsl(0 85% 69%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(174 38% 57%);
+  --secondary-foreground: hsl(0 0% 100%);
+  --accent: hsl(200 77% 56%);
+  --accent-foreground: hsl(0 0% 100%);
+  --success: hsl(155 34% 71%);
+  --success-foreground: hsl(210 25% 17.3%);
+  --text: hsl(210 25% 17.3%);
+  --muted: hsl(210 40% 98%);
+  --muted-foreground: hsl(215 16% 47%);
+  --border: hsl(214 32% 91%);
+  --input: hsl(214 32% 91%);
+  --ring: hsl(200 77% 56%);
+  --destructive: hsl(0 85% 60%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --radius: 0.75rem;
+  --font-sans: 'Nunito Sans', 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Menlo', 'Monaco', monospace;
+}
+
+.dark {
+  --background: hsl(222 84% 5%);
+  --foreground: hsl(210 40% 98%);
+  --card: hsl(222 84% 5%);
+  --card-foreground: hsl(210 40% 98%);
+  --popover: hsl(222 84% 5%);
+  --popover-foreground: hsl(210 40% 98%);
+  --primary: hsl(0 85% 69%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(174 38% 57%);
+  --secondary-foreground: hsl(0 0% 100%);
+  --accent: hsl(200 77% 56%);
+  --accent-foreground: hsl(0 0% 100%);
+  --success: hsl(155 34% 71%);
+  --success-foreground: hsl(210 25% 17.3%);
+  --text: hsl(210 40% 98%);
+  --muted: hsl(217 33% 17%);
+  --muted-foreground: hsl(215 20% 65%);
+  --border: hsl(217 33% 17%);
+  --input: hsl(217 33% 17%);
+  --ring: hsl(200 77% 56%);
+  --destructive: hsl(0 85% 60%);
+  --destructive-foreground: hsl(0 0% 100%);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold;
+  }
+}
+
+@layer components {
+  .workflow-step {
+    @apply relative transition-all duration-200;
+  }
+  
+  .workflow-step.active {
+    @apply shadow-lg scale-105;
+  }
+  
+  .workflow-step.completed {
+    @apply bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800;
+  }
+  
+  .step-indicator {
+    @apply w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors;
+  }
+  
+  .step-indicator.active {
+    @apply bg-primary text-primary-foreground;
+  }
+  
+  .step-indicator.completed {
+    @apply bg-green-500 text-white dark:bg-green-600;
+  }
+  
+  .step-indicator.pending {
+    @apply bg-muted text-muted-foreground;
+  }
+  
+  .kanban-card {
+    @apply bg-card border border-border rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow;
+  }
+  
+  .export-bar {
+    @apply sticky top-0 z-40 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-border;
+  }
+  
+  .file-upload-zone {
+    @apply border-2 border-dashed border-border rounded-lg p-8 text-center transition-colors hover:border-primary hover:bg-blue-50 dark:hover:bg-blue-950;
+  }
+  
+  .file-upload-zone.dragover {
+    @apply border-primary bg-blue-100 dark:bg-blue-900;
+  }
+  
+  .markdown-editor {
+    @apply border border-border rounded-lg overflow-hidden;
+  }
+  
+  .markdown-editor .toolbar {
+    @apply bg-gray-50 dark:bg-gray-800 px-3 py-2 border-b border-border flex items-center justify-between;
+  }
+  
+  .markdown-editor .content {
+    @apply p-4 min-h-64 max-h-96 overflow-y-auto;
+  }
+  
+  .flashcard-preview {
+    @apply bg-card border border-border rounded-lg p-4 aspect-[3/2] flex flex-col justify-center items-center text-center;
+  }
+  
+  .activity-button {
+    @apply flex items-center space-x-3 p-4 border border-border rounded-lg hover:border-primary hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors;
+  }
+  
+  .activity-icon {
+    @apply w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
