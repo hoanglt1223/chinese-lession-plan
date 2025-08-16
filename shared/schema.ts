@@ -49,7 +49,13 @@ export interface Lesson {
     imageUrl: string;
     id: string;
   }> | null;
-  summary: string | null; // DOCX content
+  summary: string | null; // DOCX content (legacy single summary)
+  summaries: Array<{
+    lessonNumber: number;
+    title: string;
+    content: string;
+    filename: string;
+  }> | null; // Individual lesson summaries
   createdAt: Date;
   updatedAt: Date;
 }
@@ -87,6 +93,12 @@ export const insertLessonSchema = z.object({
     id: z.string(),
   })).optional(),
   summary: z.string().optional(),
+  summaries: z.array(z.object({
+    lessonNumber: z.number(),
+    title: z.string(),
+    content: z.string(),
+    filename: z.string(),
+  })).optional(),
 });
 
 export type InsertLesson = z.infer<typeof insertLessonSchema>;

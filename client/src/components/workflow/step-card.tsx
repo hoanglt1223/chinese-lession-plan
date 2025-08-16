@@ -52,6 +52,13 @@ export function StepCard({
   const [selectedLessonIndex, setSelectedLessonIndex] = useState(0);
   const [flashcards, setFlashcards] = useState<any[]>([]);
   const [summary, setSummary] = useState<string>("");
+  const [summaries, setSummaries] = useState<Array<{
+    lessonNumber: number;
+    title: string;
+    content: string;
+    filename: string;
+  }>>([]);
+  const [selectedSummaryIndex, setSelectedSummaryIndex] = useState(0);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -202,6 +209,7 @@ export function StepCard({
       
       // Initialize individual lesson plans from lesson data
       if (lesson.lessonPlans && lesson.lessonPlans.length > 0 && lessonPlans.length === 0) {
+        console.log('useEffect: Initializing lessonPlans from lesson data:', lesson.lessonPlans.length);
         setLessonPlans(lesson.lessonPlans);
       }
       
@@ -214,8 +222,13 @@ export function StepCard({
       if (lesson.summary && !summary) {
         setSummary(lesson.summary);
       }
+      
+      // Initialize individual summaries from lesson data
+      if (lesson.summaries && lesson.summaries.length > 0 && summaries.length === 0) {
+        setSummaries(lesson.summaries);
+      }
     }
-  }, [lesson, analysis, lessonPlan, lessonPlans.length, flashcards.length, summary]);
+  }, [lesson, analysis, lessonPlan, lessonPlans.length, flashcards.length, summary, summaries.length]);
   
   const queryClient = useQueryClient();
 
@@ -328,9 +341,16 @@ export function StepCard({
       if (data.lessonPlans && data.lessonPlans.length > 0) {
         setLessonPlans(data.lessonPlans);
         console.log('Setting lessonPlans state:', data.lessonPlans.length, 'lessons');
+        console.log('Individual lessons:', data.lessonPlans.map(l => `${l.lessonNumber}: ${l.title} (${l.type})`));
       } else {
         console.log('No lessonPlans found in response');
       }
+      
+      // Force a re-render by updating state after a short delay
+      setTimeout(() => {
+        console.log('Post-update check - lessonPlans state length:', lessonPlans.length);
+        console.log('Post-update check - lesson object:', lesson?.lessonPlans?.length);
+      }, 100);
       
       // Update lesson with both formats for backward compatibility
       await onStepUpdate(2, { 
@@ -382,8 +402,25 @@ export function StepCard({
     },
     onSuccess: async (data) => {
       console.log('Summary generated:', data.summary?.substring(0, 100));
+      console.log('Individual summaries:', data.summaries?.length);
+      console.log('Full summary response:', data);
+      
+      // Set both legacy and new format
       setSummary(data.summary);
-      await onStepUpdate(4, { summary: data.summary });
+      if (data.summaries && data.summaries.length > 0) {
+        setSummaries(data.summaries);
+        console.log('Setting summaries state:', data.summaries.length, 'summaries');
+      } else {
+        console.log('No summaries found in response');
+      }
+      
+      // Update lesson with both formats for backward compatibility
+      await onStepUpdate(4, { 
+        summary: data.summary,
+        summaries: data.summaries
+      });
+      
+      console.log('Updated lesson with new summary data');
     }
   });
 
@@ -829,8 +866,20 @@ export function StepCard({
         );
 
       case 4: // Summary
-        // Get summary from lesson or local state
+        // Get summaries from lesson or local state
         const summaryData = summary || lesson?.summary || "";
+        const summariesData = summaries.length > 0 ? summaries : (lesson?.summaries || []);
+        
+        // Debug logging
+        console.log('Step 4 - Summary render:', {
+          summaryLocal: summary?.length || 0,
+          summaryFromLesson: lesson?.summary?.length || 0,
+          summariesLocal: summaries.length,
+          summariesFromLesson: lesson?.summaries?.length || 0,
+          summaryData: summaryData?.length || 0,
+          summariesData: summariesData.length,
+          generationPending: generateSummaryMutation.isPending
+        });
         
         return (
           <div className="space-y-4">
@@ -838,29 +887,87 @@ export function StepCard({
               <div className="bg-gradient-to-r from-accent/10 to-accent/5 rounded-lg p-4">
                 <div className="flex items-center space-x-2 mb-2">
                   <Loader2 className="w-4 h-4 animate-spin text-accent" />
-                  <span className="text-sm font-medium text-accent">Generating Summary</span>
+                  <span className="text-sm font-medium text-accent">Generating 4 Lesson Summaries</span>
                 </div>
-                <p className="text-sm text-muted-foreground">Creating parent/student summary... This may take 10-20 seconds</p>
+                <p className="text-sm text-muted-foreground">Creating individual parent/student summaries... This may take 30-45 seconds</p>
               </div>
             )}
             
-            <div className="border border-border rounded-lg overflow-hidden">
-              <div className="bg-muted/50 px-3 py-2 border-b border-border">
-                <span className="text-xs font-medium text-muted-foreground">Parent/Student Summary</span>
+            {/* Display individual lesson summaries if available */}
+            {summariesData.length > 0 ? (
+              <div className="space-y-4">
+                {/* Summary selector tabs */}
+                <div className="flex flex-wrap gap-2 border-b border-border pb-2">
+                  {summariesData.map((summaryItem, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setSelectedSummaryIndex(index)}
+                      className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                        selectedSummaryIndex === index
+                          ? 'bg-accent text-accent-foreground'
+                          : 'bg-muted text-muted-foreground hover:bg-muted/70'
+                      }`}
+                    >
+                      Lesson {summaryItem.lessonNumber}: {summaryItem.title}
+                    </button>
+                  ))}
+                </div>
+                
+                {/* Selected summary content */}
+                {summariesData[selectedSummaryIndex] && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-semibold">
+                        {summariesData[selectedSummaryIndex].filename}
+                      </h3>
+                      <div className="text-sm text-muted-foreground">
+                        Parent/Student Summary
+                      </div>
+                    </div>
+                    
+                    <div className="border border-border rounded-lg overflow-hidden">
+                      <div className="bg-muted/50 px-3 py-2 border-b border-border">
+                        <span className="text-xs font-medium text-muted-foreground">
+                          Lesson {summariesData[selectedSummaryIndex].lessonNumber} Summary - {summariesData[selectedSummaryIndex].title}
+                        </span>
+                      </div>
+                      <div className="p-4 h-64 overflow-y-auto text-xs">
+                        <pre className="whitespace-pre-wrap text-foreground">
+                          {summariesData[selectedSummaryIndex].content}
+                        </pre>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Summary info */}
+                <div className="text-xs text-muted-foreground p-2 bg-muted/20 rounded">
+                  <div>Individual summaries: {summariesData.length}/4</div>
+                  <div>Current summary: {summariesData[selectedSummaryIndex]?.filename || 'None'}</div>
+                  <div>Content: {summariesData[selectedSummaryIndex]?.content.length || 0} chars</div>
+                </div>
               </div>
-              <div className="p-4 h-64 overflow-y-auto text-xs">
-                <pre className="whitespace-pre-wrap text-foreground">
-                  {summaryData || "Summary will be generated here..."}
-                </pre>
+            ) : (
+              /* Fallback to single summary view */
+              <div className="space-y-4">
+                <div className="border border-border rounded-lg overflow-hidden">
+                  <div className="bg-muted/50 px-3 py-2 border-b border-border">
+                    <span className="text-xs font-medium text-muted-foreground">Parent/Student Summary</span>
+                  </div>
+                  <div className="p-4 h-64 overflow-y-auto text-xs">
+                    <pre className="whitespace-pre-wrap text-foreground">
+                      {summaryData || "Summary will be generated here..."}
+                    </pre>
+                  </div>
+                </div>
+                
+                <div className="text-xs text-muted-foreground p-2 bg-muted/20 rounded">
+                  <div>Summary data: {summaryData ? `✓ ${summaryData.length} chars` : '✗ empty'}</div>
+                  <div>Local state: {summary ? `✓ ${summary.length} chars` : '✗ empty'}</div>
+                  <div>Generation: {generateSummaryMutation.isPending ? 'in progress' : 'ready'}</div>
+                </div>
               </div>
-            </div>
-            
-            {/* Debug info for summary */}
-            <div className="text-xs text-muted-foreground p-2 bg-muted/20 rounded">
-              <div>Summary data: {summaryData ? `✓ ${summaryData.length} chars` : '✗ empty'}</div>
-              <div>Local state: {summary ? `✓ ${summary.length} chars` : '✗ empty'}</div>
-              <div>Generation: {generateSummaryMutation.isPending ? 'in progress' : 'ready'}</div>
-            </div>
+            )}
             
             <div className="space-y-2 text-xs text-muted-foreground">
               <div className="flex items-center space-x-2">

@@ -55,8 +55,8 @@ export function WorkflowProvider({ children }: WorkflowProviderProps) {
       current = 4;
     }
 
-    // Step 4: Summary - check if summary exists
-    if (lesson.summary) {
+    // Step 4: Summary - check if summary or summaries exist
+    if (lesson.summary || (lesson.summaries && lesson.summaries.length > 0)) {
       completed.push(4);
       current = 5; // All steps completed
     }

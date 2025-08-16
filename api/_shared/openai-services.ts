@@ -281,6 +281,77 @@ ${lessonContent.trim()}`;
   return lessons;
 }
 
+// Function to split the 4-summary response into individual summary files
+export function splitSummaries(fullSummary: string): Array<{
+  lessonNumber: number;
+  title: string;
+  content: string;
+  filename: string;
+}> {
+  console.log('splitSummaries called with content length:', fullSummary.length);
+  
+  const summaries: Array<{
+    lessonNumber: number;
+    title: string;
+    content: string;
+    filename: string;
+  }> = [];
+
+  // Split by lesson summary sections
+  const summarySections = fullSummary.split(/## LESSON \d+ SUMMARY/);
+  
+  // Remove the first section which contains the header
+  summarySections.shift();
+  
+  for (let i = 0; i < summarySections.length; i++) {
+    const summaryContent = summarySections[i];
+    const lessonNumber = i + 1;
+    
+    // Extract lesson type and title from the content
+    let lessonTitle = "";
+    
+    if (summaryContent.includes("Learn") || summaryContent.includes("综合课")) {
+      lessonTitle = "Learn";
+    } else if (summaryContent.includes("Story") || summaryContent.includes("听说课")) {
+      lessonTitle = "Story";
+    } else if (summaryContent.includes("Sing")) {
+      lessonTitle = "Sing";
+    } else if (summaryContent.includes("Write") || summaryContent.includes("写作课")) {
+      lessonTitle = "Write";
+    }
+
+    // Extract theme from the full summary header
+    const themeMatch = fullSummary.match(/Unit 1: ([^*]+)/);
+    const theme = themeMatch ? themeMatch[1].trim() : "小鸟";
+    
+    // Reconstruct individual summary with proper header
+    const individualSummaryContent = `**LESSON SUMMARY**
+
+|**Program:** Yuexuele Little Warriors<br>**Name:** …………………………………………|**Lesson:** ${lessonNumber}<br>**Level:** N1|
+| :- | :- |
+
+|**Lesson overview**|
+| :-: |
+
+|**Unit 1: ${theme}**<br>**Lesson ${lessonNumber}**|
+| :-: |
+
+${summaryContent.trim()}`;
+
+    summaries.push({
+      lessonNumber,
+      title: lessonTitle,
+      content: individualSummaryContent,
+      filename: `Lesson ${lessonNumber} Summary.md`
+    });
+    
+    console.log(`Added summary ${lessonNumber}: ${lessonTitle}`);
+  }
+
+  console.log('splitSummaries returning', summaries.length, 'summaries');
+  return summaries;
+}
+
 export async function generateLessonPlan(
   analysis: LessonAnalysis,
   ageGroup: string,
@@ -742,37 +813,84 @@ Examples:
 export async function generateSummary(
   lessonPlan: string,
   vocabulary: string[],
-): Promise<string> {
+): Promise<{ fullSummary: string; individualSummaries: Array<{
+  lessonNumber: number;
+  title: string;
+  content: string;
+  filename: string;
+}> }> {
   try {
     const response = await openai.chat.completions.create({
       model: model5nano,
       messages: [
         {
           role: "system",
-          content:
-            "You are creating parent/student lesson summaries for Vietnamese families. Include key vocabulary with Vietnamese translations, lesson overview, and homework instructions.",
+          content: "You are creating individual lesson summaries for Vietnamese families following the YUEXUELE methodology. Create 4 separate summaries for each lesson (Learn, Story, Sing, Write) with vocabulary, homework, and practice tips.",
         },
         {
           role: "user",
-          content: `Create a parent/student lesson summary based on this lesson plan:
+          content: `Create 4 individual lesson summaries based on this 4-lesson unit plan:
 
 ${lessonPlan}
 
 Key vocabulary: ${vocabulary.join(", ")}
 
-Format as a structured document with:
-1. LESSON SUMMARY header with lesson details
-2. Vocabulary section with Chinese, pinyin, and Vietnamese translations
-3. What We Learned section
-4. Homework section with clear instructions
-5. Practice Tips for parents
+Create 4 separate lesson summaries, each following this exact format:
 
-Make it family-friendly and include Vietnamese translations for parent understanding.`,
+**LESSON SUMMARY**
+
+|**Program:** Yuexuele Little Warriors<br>**Name:** …………………………………………|**Lesson:** [Lesson Number]<br>**Level:** N1|
+| :- | :- |
+
+|**Lesson overview**|
+| :-: |
+
+|**Unit 1: [Theme Name]**<br>**Lesson [Number]**|
+| :-: |
+
+**Vocabulary**: 
+
+|[Chinese Word]<br>/[pinyin]/|(词性)|[Vietnamese translation]|
+| :- | :-: | :- |
+|[Next word]<br>/[pinyin]/|(词性)|[Vietnamese translation]|
+
+|**Homework**|
+| :-: |
+
+## LESSON 1 SUMMARY (Learn - 综合课)
+[Generate individual summary for Lesson 1 - vocabulary introduction and games]
+
+## LESSON 2 SUMMARY (Story - 听说课)  
+[Generate individual summary for Lesson 2 - story-based learning]
+
+## LESSON 3 SUMMARY (Sing - 听说课)
+[Generate individual summary for Lesson 3 - songs and performance]
+
+## LESSON 4 SUMMARY (Write - 写作课)
+[Generate individual summary for Lesson 4 - writing and hands-on activities]
+
+REQUIREMENTS:
+1. Use the exact vocabulary: ${vocabulary.join(", ")}
+2. Include pinyin and Vietnamese translations for all vocabulary
+3. Provide specific homework for each lesson type
+4. Make it family-friendly for Vietnamese parents
+5. Include practice tips appropriate for each lesson focus
+6. Use proper word types (名词, 动词, etc.) in Chinese
+7. Keep consistent formatting across all 4 summaries
+8. Each summary should reflect the specific lesson's learning objectives
+
+Make each summary practical for Vietnamese families with clear instructions.`,
         },
       ],
     });
 
-    return response.choices[0].message.content || "";
+    const fullSummary = response.choices[0].message.content || "";
+    const individualSummaries = splitSummaries(fullSummary);
+    
+    return {
+      fullSummary,
+      individualSummaries
+    };
   } catch (error) {
     console.error("Failed to generate summary:", error);
     throw new Error("Failed to generate lesson summary with AI");

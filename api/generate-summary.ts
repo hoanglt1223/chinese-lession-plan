@@ -20,8 +20,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ message: "Lesson plan is required" });
     }
 
-    const summary = await generateSummary(lessonPlan, vocabulary || []);
-    return res.json({ summary });
+    const result = await generateSummary(lessonPlan, vocabulary || []);
+    
+    return res.json({ 
+      summary: result.fullSummary, // Legacy single summary for backward compatibility
+      summaries: result.individualSummaries, // New individual summary files
+      fullSummary: result.fullSummary // Full summary for reference
+    });
   } catch (error: any) {
     return handleError(res, error, 'Generate summary API');
   }
