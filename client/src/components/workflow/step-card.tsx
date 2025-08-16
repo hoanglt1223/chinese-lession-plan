@@ -253,21 +253,25 @@ export function StepCard({
     }
   }, [summaries.length, selectedSummaryIndex]);
 
-  // Clear local state when lesson changes to prevent stale data
+  // Clear local state when lesson ID changes (but not when lesson becomes null)
+  const [previousLessonId, setPreviousLessonId] = useState<string | null>(null);
+  
   useEffect(() => {
-    if (lesson?.id) {
-      // Don't clear if we're switching to the same lesson
-      return;
+    const currentLessonId = lesson?.id || null;
+    
+    // Only clear state if we're switching to a different lesson (not on updates to same lesson)
+    if (previousLessonId && currentLessonId && previousLessonId !== currentLessonId) {
+      console.log('Lesson switched, resetting local state from', previousLessonId, 'to', currentLessonId);
+      setAnalysis(null);
+      setLessonPlans([]);
+      setFlashcards([]);
+      setSummaries([]);
+      setSelectedLessonIndex(0);
+      setSelectedSummaryIndex(0);
     }
     
-    console.log('Lesson cleared, resetting local state');
-    setAnalysis(null);
-    setLessonPlans([]);
-    setFlashcards([]);
-    setSummaries([]);
-    setSelectedLessonIndex(0);
-    setSelectedSummaryIndex(0);
-  }, [lesson?.id]);
+    setPreviousLessonId(currentLessonId);
+  }, [lesson?.id, previousLessonId]);
   
   const queryClient = useQueryClient();
 
@@ -642,8 +646,9 @@ export function StepCard({
         );
 
       case 2: // Plan
-        // Get lesson plans - prioritize lesson data over local state for consistency
-        const plansData = lesson?.lessonPlans?.length ? lesson.lessonPlans : lessonPlans;
+        // Get lesson plans - prioritize local state if it has data, otherwise use lesson data
+        const plansData = lessonPlans.length > 0 ? lessonPlans : (lesson?.lessonPlans || []);
+        console.log('Step 2 render - local lessonPlans:', lessonPlans.length, 'lesson.lessonPlans:', lesson?.lessonPlans?.length || 0, 'using plansData:', plansData.length);
         
         
         return (

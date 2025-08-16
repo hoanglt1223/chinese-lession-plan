@@ -21,7 +21,9 @@ export class TranslationCacheService {
   private maxAge: number = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
 
   constructor() {
-    this.cacheDir = join(process.cwd(), 'data');
+    // Use /tmp directory in serverless environments, otherwise use local data directory
+    const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NETLIFY;
+    this.cacheDir = isServerless ? '/tmp' : join(process.cwd(), 'data');
     this.cacheFile = join(this.cacheDir, 'translation-cache.json');
     this.ensureCacheDir();
     this.loadCache();
@@ -32,8 +34,13 @@ export class TranslationCacheService {
       if (!existsSync(this.cacheDir)) {
         await mkdir(this.cacheDir, { recursive: true });
       }
-    } catch (error) {
-      console.error('Failed to create cache directory:', error);
+    } catch (error: any) {
+      // Gracefully handle read-only filesystem in serverless environments
+      if (error.code === 'EROFS') {
+        console.warn('⚠️ Cannot create cache directory: read-only filesystem (serverless environment)');
+      } else {
+        console.error('Failed to create cache directory:', error);
+      }
     }
   }
 
@@ -60,8 +67,13 @@ export class TranslationCacheService {
       await this.ensureCacheDir();
       await writeFile(this.cacheFile, JSON.stringify(this.cache, null, 2), 'utf-8');
       console.log(`💾 Saved translation cache with ${Object.keys(this.cache).length} entries`);
-    } catch (error) {
-      console.error('Failed to save translation cache:', error);
+    } catch (error: any) {
+      // Gracefully handle read-only filesystem in serverless environments
+      if (error.code === 'EROFS') {
+        console.warn('⚠️ Cannot save translation cache: read-only filesystem (serverless environment)');
+      } else {
+        console.error('Failed to save translation cache:', error);
+      }
     }
   }
 
