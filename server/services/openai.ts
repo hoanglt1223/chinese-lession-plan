@@ -287,7 +287,14 @@ Return a JSON object with this exact structure:
   ]
 }
 
-Create one flashcard for each vocabulary word. Use accurate translations and clear image descriptions that relate to the theme "${theme}" when possible. Make image queries specific and contextual to help students connect the vocabulary to the lesson theme.`,
+Create one flashcard for each vocabulary word. Use accurate translations and clear image descriptions that relate to the theme "${theme}" when possible. 
+
+IMPORTANT GUIDELINES FOR IMAGE QUERIES:
+- For action words/verbs (like "gật đầu" - nod head), describe static objects or characters WITHOUT showing the action being performed
+- For action words, focus on the subject performing the action in a neutral pose (e.g., "two birds standing together" instead of "birds nodding")
+- For nouns and adjectives, describe the object or concept directly
+- Make image queries specific and contextual to help students connect the vocabulary to the lesson theme
+- Always use simple, child-friendly descriptions suitable for educational illustrations`,
         },
       ],
       response_format: { type: "json_object" },
