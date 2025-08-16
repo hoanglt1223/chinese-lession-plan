@@ -414,7 +414,8 @@ export async function translateChineseToVietnamese(
     const deepLApiKey = process.env.DEEPL_API_KEY;
     
     if (!deepLApiKey) {
-      throw new Error("DEEPL_API_KEY not configured");
+      console.log("DEEPL_API_KEY not configured, falling back to OpenAI translation");
+      return await translateWithOpenAI(words);
     }
 
     console.log('Testing DeepL API connection with key:', deepLApiKey ? `${deepLApiKey.substring(0, 8)}...` : 'undefined');
@@ -427,7 +428,8 @@ export async function translateChineseToVietnamese(
       console.log('DeepL API connection successful');
     } catch (testError: any) {
       console.error('DeepL API test failed:', testError);
-      throw new Error(`DeepL API connection failed: ${testError?.message || 'Unknown error'}`);
+      console.log('Falling back to OpenAI translation');
+      return await translateWithOpenAI(words);
     }
 
     const translations: Record<string, string> = {};
@@ -439,7 +441,9 @@ export async function translateChineseToVietnamese(
         return { [word]: result.text };
       } catch (error: any) {
         console.error(`DeepL translation error for word "${word}":`, error);
-        throw error;
+        // Fall back to OpenAI for this word
+        const fallbackTranslation = await translateWithOpenAI([word]);
+        return { [word]: fallbackTranslation[word] || word };
       }
     });
 
@@ -450,16 +454,51 @@ export async function translateChineseToVietnamese(
     return translations;
   } catch (error: any) {
     console.error("DeepL translation error:", error);
+    console.log('Falling back to OpenAI translation');
+    return await translateWithOpenAI(words);
+  }
+}
+
+// Fallback translation using OpenAI
+async function translateWithOpenAI(words: string[]): Promise<Record<string, string>> {
+  try {
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY || process.env.OPENAI_KEY || "your-api-key-here",
+    });
+
+    const prompt = `Translate these Chinese words to Vietnamese. Return only a JSON object with Chinese words as keys and Vietnamese translations as values:
+${words.join(', ')}
+
+Format: {"word1": "translation1", "word2": "translation2"}`;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-5-nano",
+      messages: [
+        {
+          role: "system",
+          content: "You are a professional Chinese-Vietnamese translator. Return only valid JSON."
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.1,
+    });
+
+    const result = JSON.parse(response.choices[0].message.content || "{}");
+    console.log('OpenAI fallback translations completed:', result);
+    return result;
+  } catch (error) {
+    console.error("OpenAI translation fallback failed:", error);
     
-    // Provide specific error messages based on error type
-    const errorMessage = error?.message || 'Unknown error';
-    if (errorMessage.includes('Authorization failure') || errorMessage.includes('Forbidden')) {
-      throw new Error("DeepL API key is invalid or unauthorized. Please provide a valid API key.");
-    } else if (errorMessage.includes('Quota exceeded')) {
-      throw new Error("DeepL API quota exceeded. Please upgrade your plan or wait for quota renewal.");
-    } else {
-      throw new Error(`Translation service error: ${errorMessage}`);
-    }
+    // Final fallback - return words as-is with placeholder translations
+    const fallbackTranslations: Record<string, string> = {};
+    words.forEach(word => {
+      fallbackTranslations[word] = `[Tiếng Việt: ${word}]`;
+    });
+    return fallbackTranslations;
   }
 }
 

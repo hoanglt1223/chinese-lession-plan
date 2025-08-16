@@ -1,7 +1,7 @@
 import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
-import { analyzePDFContent, generateLessonPlan, generateFlashcards, generateSummary, generateWithOpenAI } from "./services/openai";
+import { storage } from "./storage-fs";
+import { analyzePDFContent, generateLessonPlan, generateFlashcards, generateSummary, generateWithOpenAI, translateChineseToVietnamese } from "./services/openai";
 import { fileProcessor } from "./services/fileProcessor";
 import multer from "multer";
 import { insertLessonSchema, insertWorkflowSchema } from "@shared/schema";
@@ -269,7 +269,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get DeepL translations
-      const { translateChineseToVietnamese } = await import("./services/openai.js");
       const translations = await translateChineseToVietnamese(words);
       res.json({ translations });
     } catch (error) {
@@ -702,7 +701,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/auth/me", async (req, res) => {
     try {
       // Check if login is bypassed via environment variable
-      if (process.env.SKIP_LOGIN === 'true' || process.env.NODE_ENV === 'development' && process.env.SKIP_AUTH === 'true') {
+      if (process.env.VITE_SKIP_LOGIN === 'true' || process.env.NODE_ENV === 'development' && process.env.VITE_SKIP_AUTH === 'true') {
         // Return a default user for development
         const defaultUser = {
           id: "dev-user",

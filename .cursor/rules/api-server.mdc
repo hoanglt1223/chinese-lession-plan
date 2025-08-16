@@ -1,0 +1,79 @@
+---
+globs: server/**/*.ts
+description: API routes, server patterns, and backend architecture guidelines
+---
+
+# API Routes and Server Architecture
+
+## Server Structure
+
+- **Entry point**: [server/index.ts](mdc:server/index.ts) - Express app setup and middleware
+- **Routes**: [server/routes.ts](mdc:server/routes.ts) - API endpoint definitions
+- **Database**: [server/db.ts](mdc:server/db.ts) - Database connection and queries
+- **Services**: `server/services/` - Business logic and external integrations
+
+## API Conventions
+
+- All API routes are prefixed with `/api`
+- Use RESTful conventions where appropriate
+- Return JSON responses with consistent error handling
+- Use proper HTTP status codes
+
+```typescript
+// ✅ Good API route pattern
+app.get("/api/lessons", async (req, res) => {
+  try {
+    const lessons = await db.select().from(lessonsTable);
+    res.json(lessons);
+  } catch (error) {
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+```
+
+## Middleware
+
+- **Session management**: Express sessions configured in [server/index.ts](mdc:server/index.ts)
+- **Request logging**: Custom middleware for API request logging
+- **Error handling**: Global error handler for consistent error responses
+- **Body parsing**: JSON and URL-encoded body parsing
+
+## Authentication
+
+- Session-based authentication using express-session
+- Environment variable `VITE_SKIP_LOGIN` for development bypass
+- User authentication logic in routes and middleware
+
+## File Handling
+
+- **Upload directory**: `uploads/` for temporary file storage
+- **File processing**: [server/services/fileProcessor.ts](mdc:server/services/fileProcessor.ts)
+- **Storage**: Cloud storage integration via Google Cloud Storage
+
+## External Services
+
+- **OpenAI Integration**: [server/services/openai.ts](mdc:server/services/openai.ts)
+- **File Processing**: PDF extraction, DOCX parsing, image generation
+- **API Keys**: Managed through environment variables
+
+## Environment Configuration
+
+Required environment variables:
+- `DATABASE_URL`: PostgreSQL connection string
+- `SESSION_SECRET`: Session encryption secret
+- `OPENAI_API_KEY`: OpenAI API access
+- `GOOGLE_CLOUD_*`: Google Cloud Storage credentials
+
+## Error Handling
+
+- Use try-catch blocks in all async route handlers
+- Return meaningful error messages to the client
+- Log errors for debugging while keeping sensitive data secure
+- Use appropriate HTTP status codes (400, 401, 404, 500, etc.)
+
+## Database Queries
+
+- Use Drizzle ORM for all database operations
+- Import database connection from [server/db.ts](mdc:server/db.ts)
+- Use transactions for multi-table operations
+- Implement proper error handling for database operations
