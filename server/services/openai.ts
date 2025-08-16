@@ -61,8 +61,9 @@ export async function analyzePDFContent(
 
     // Handle case where PDF content extraction failed or is minimal
     if (!content || content.length < 20) {
-      content =
-        "Chinese lesson: 第一课-小鸟找朋友. Content includes vocabulary: 小鸟, 朋友, 飞, 点点头. Activities: Listen & Repeat, Listen & Pick Image, See Image & Speak. Duration: 75分钟.";
+      console.log("Warning: PDF content is too short or empty, vocabulary detection may be limited");
+      // Don't use hardcoded fallback content as it can contaminate vocabulary detection
+      content = "Chinese lesson content extracted from PDF. Please analyze the available content.";
     }
 
     // Debug level detection
@@ -89,7 +90,7 @@ export async function analyzePDFContent(
       messages: [
         {
           role: "system",
-          content: `You are an expert Chinese language education analyst. Extract ONLY vocabulary words that are explicitly mentioned in the lesson content. Never add words that aren't present in the source material. ${langInstruction}. Respond with valid JSON only.`,
+          content: `You are an expert Chinese language education analyst. Your task is to analyze the exact content provided and extract ONLY vocabulary words that are explicitly mentioned in the lesson text. Do not add, infer, or assume any vocabulary words that are not clearly present in the source material. Do not use examples from your training data. ${langInstruction}. Respond with valid JSON only.`,
         },
         {
           role: "user",
@@ -118,7 +119,7 @@ Provide JSON response with:
 - mainTheme: main lesson topic/title from content
 - duration: lesson duration from content
 
-Example: If content has "重点词掌握：小鸟 朋友 飞 点点头" and "N1", extract those 4 words and N1 level.`,
+IMPORTANT: Only extract vocabulary that actually appears in the lesson content - do not use examples or assume any specific words.`,
         },
       ],
       response_format: { type: "json_object" },
