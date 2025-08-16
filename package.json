@@ -4,11 +4,10 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "dev": "cross-env NODE_ENV=development tsx server/index.ts",
-    "build": "vite build && tsc server/index.ts --outDir dist/server --target es2020 --module nodenext --moduleResolution nodenext",
+    "dev": "vite dev",
+    "build": "vite build",
     "build:vercel": "vite build",
-    "start": "cross-env NODE_ENV=production node dist/server/index.js",
-    "start:serverless": "cross-env NODE_ENV=production tsx server/index.ts",
+    "start": "vite preview",
     "check": "tsc",
     "type-check": "tsc --noEmit"
   },
