@@ -208,31 +208,66 @@ export function StepCard({
     }
   }, [analysis]);
 
-  // Initialize state from lesson data if available
+  // Step 1: Initialize analysis from lesson data
   useEffect(() => {
-    if (lesson) {
-      // Initialize analysis from lesson data
-      if (lesson.aiAnalysis && !analysis) {
-        setAnalysis(lesson.aiAnalysis);
-      }
-      
-      // Initialize individual lesson plans from lesson data
-      if (lesson.lessonPlans && lesson.lessonPlans.length > 0 && lessonPlans.length === 0) {
-        console.log('useEffect: Initializing lessonPlans from lesson data:', lesson.lessonPlans.length);
-        setLessonPlans(lesson.lessonPlans);
-      }
-      
-      // Initialize flashcards from lesson data
-      if (lesson.flashcards && lesson.flashcards.length > 0 && flashcards.length === 0) {
-        setFlashcards(lesson.flashcards);
-      }
-      
-      // Initialize individual summaries from lesson data
-      if (lesson.summaries && lesson.summaries.length > 0 && summaries.length === 0) {
-        setSummaries(lesson.summaries);
-      }
+    if (lesson?.aiAnalysis && !analysis) {
+      console.log('Step 1 useEffect: Initializing analysis from lesson data');
+      setAnalysis(lesson.aiAnalysis);
     }
-  }, [lesson?.id, lesson?.aiAnalysis, lesson?.lessonPlans, lesson?.flashcards, lesson?.summaries]);
+  }, [lesson?.id, lesson?.aiAnalysis, analysis]);
+
+  // Step 2: Initialize lesson plans from lesson data  
+  useEffect(() => {
+    if (lesson?.lessonPlans?.length && lessonPlans.length === 0) {
+      console.log('Step 2 useEffect: Initializing lessonPlans from lesson data:', lesson.lessonPlans.length);
+      setLessonPlans(lesson.lessonPlans);
+    }
+  }, [lesson?.id, lesson?.lessonPlans, lessonPlans.length]);
+
+  // Step 3: Initialize flashcards from lesson data
+  useEffect(() => {
+    if (lesson?.flashcards?.length && flashcards.length === 0) {
+      console.log('Step 3 useEffect: Initializing flashcards from lesson data:', lesson.flashcards.length);
+      setFlashcards(lesson.flashcards);
+    }
+  }, [lesson?.id, lesson?.flashcards, flashcards.length]);
+
+  // Step 4: Initialize summaries from lesson data
+  useEffect(() => {
+    if (lesson?.summaries?.length && summaries.length === 0) {
+      console.log('Step 4 useEffect: Initializing summaries from lesson data:', lesson.summaries.length);
+      setSummaries(lesson.summaries);
+    }
+  }, [lesson?.id, lesson?.summaries, summaries.length]);
+
+  // Reset selected indexes when data changes
+  useEffect(() => {
+    if (lessonPlans.length > 0 && selectedLessonIndex >= lessonPlans.length) {
+      setSelectedLessonIndex(0);
+    }
+  }, [lessonPlans.length, selectedLessonIndex]);
+
+  useEffect(() => {
+    if (summaries.length > 0 && selectedSummaryIndex >= summaries.length) {
+      setSelectedSummaryIndex(0);
+    }
+  }, [summaries.length, selectedSummaryIndex]);
+
+  // Clear local state when lesson changes to prevent stale data
+  useEffect(() => {
+    if (lesson?.id) {
+      // Don't clear if we're switching to the same lesson
+      return;
+    }
+    
+    console.log('Lesson cleared, resetting local state');
+    setAnalysis(null);
+    setLessonPlans([]);
+    setFlashcards([]);
+    setSummaries([]);
+    setSelectedLessonIndex(0);
+    setSelectedSummaryIndex(0);
+  }, [lesson?.id]);
   
   const queryClient = useQueryClient();
 
