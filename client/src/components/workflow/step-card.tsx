@@ -341,7 +341,7 @@ export function StepCard({
       if (data.lessonPlans && data.lessonPlans.length > 0) {
         setLessonPlans(data.lessonPlans);
         console.log('Setting lessonPlans state:', data.lessonPlans.length, 'lessons');
-        console.log('Individual lessons:', data.lessonPlans.map(l => `${l.lessonNumber}: ${l.title} (${l.type})`));
+        console.log('Individual lessons:', data.lessonPlans.map((l: any) => `${l.lessonNumber}: ${l.title} (${l.type})`));
       } else {
         console.log('No lessonPlans found in response');
       }
@@ -359,6 +359,10 @@ export function StepCard({
       });
       
       console.log('Updated lesson with new data, triggering state refresh');
+      
+      // Force query invalidation to refresh lesson data
+      queryClient.invalidateQueries({ queryKey: ["/api/lessons", selectedLesson] });
+      queryClient.invalidateQueries({ queryKey: ["/api/lessons"] });
     }
   });
 
@@ -608,6 +612,12 @@ export function StepCard({
         const planData = lessonPlan || lesson?.lessonPlan;
         const plansData = lessonPlans.length > 0 ? lessonPlans : (lesson?.lessonPlans || []);
         
+        // Force state sync if lesson has plans but local state doesn't
+        if (lesson?.lessonPlans && lesson.lessonPlans.length > 0 && lessonPlans.length === 0) {
+          console.log('Force syncing lessonPlans from lesson object');
+          setLessonPlans(lesson.lessonPlans);
+        }
+        
         // Debug logging
         console.log('Step 2 - Plan render:', {
           lessonPlanLocal: lessonPlan?.length || 0,
@@ -688,7 +698,25 @@ export function StepCard({
                   <div>Individual lessons: {plansData.length}/4</div>
                   <div>Current lesson: {plansData[selectedLessonIndex]?.filename || 'None'}</div>
                   <div>Content: {plansData[selectedLessonIndex]?.content.length || 0} chars</div>
+                  <div>Local state: {lessonPlans.length} | Lesson object: {lesson?.lessonPlans?.length || 0}</div>
                 </div>
+                
+                {/* Debug sync button */}
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => {
+                    console.log('Manual sync - lesson.lessonPlans:', lesson?.lessonPlans?.length);
+                    console.log('Manual sync - lessonPlans state:', lessonPlans.length);
+                    if (lesson?.lessonPlans && lesson.lessonPlans.length > 0) {
+                      setLessonPlans(lesson.lessonPlans);
+                      console.log('Manually synced lessonPlans');
+                    }
+                  }}
+                  className="text-xs"
+                >
+                  Debug: Sync State
+                </Button>
               </div>
             ) : (
               /* Fallback to single lesson plan view */
