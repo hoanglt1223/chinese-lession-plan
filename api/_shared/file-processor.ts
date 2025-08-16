@@ -8,89 +8,87 @@ export interface ProcessedFile {
 export class FileProcessor {
   async processPDF(buffer: Buffer, filename: string): Promise<ProcessedFile> {
     try {
-      // Try to use pdf-parse for better serverless compatibility
-      try {
-        const pdfParse = require('pdf-parse');
-        const data = await pdfParse(buffer);
-        
-        if (data && data.text && data.text.trim().length > 0) {
-          const cleanText = data.text
-            .replace(/\s+/g, ' ')
-            .replace(/\n+/g, '\n')
-            .trim();
-          
-          console.log('Extracted PDF text length:', cleanText.length);
-          console.log('Sample text:', cleanText.substring(0, 500));
-          
-          return {
-            name: filename,
-            content: cleanText,
-            type: 'pdf',
-            size: buffer.length
-          };
-        } else {
-          throw new Error('No text content extracted from PDF');
-        }
-      } catch (parseError) {
-        console.error('pdf-parse failed, trying pdf.js-extract:', parseError);
-        
-        // Fallback to pdf.js-extract
+      console.log('Processing PDF with pdfjs-serverless...');
+      
+      // Use pdfjs-serverless which is specifically designed for serverless environments
+      const { getDocument } = await import('pdfjs-serverless');
+      
+      const document = await getDocument({
+        data: new Uint8Array(buffer),
+        useSystemFonts: true,
+      }).promise;
+      
+      console.log(`PDF loaded successfully. Pages: ${document.numPages}`);
+      
+      let extractedText = '';
+      const maxPages = Math.min(document.numPages, 50); // Limit for performance
+      
+      // Extract text from all pages
+      for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
         try {
-          const PDFExtract = require('pdf.js-extract').PDFExtract;
-          const pdfExtract = new PDFExtract();
+          const page = await document.getPage(pageNum);
+          const textContent = await page.getTextContent();
           
-          return new Promise((resolve, reject) => {
-            pdfExtract.extractBuffer(buffer, {}, (err: any, data: any) => {
-              if (err) {
-                console.error('PDF extraction error:', err);
-                reject(new Error(`PDF extraction failed: ${err.message}`));
-                return;
-              }
-              
-              // Extract text from all pages
-              let extractedText = '';
-              if (data && data.pages) {
-                for (const page of data.pages) {
-                  if (page.content) {
-                    for (const item of page.content) {
-                      if (item.str && item.str.trim()) {
-                        extractedText += item.str + ' ';
-                      }
-                    }
-                  }
-                }
-              }
-              
-              // Clean up the text
-              const cleanText = extractedText
-                .replace(/\s+/g, ' ')
-                .replace(/\n+/g, '\n')
-                .trim();
-              
-              console.log('Extracted PDF text length:', cleanText.length);
-              console.log('Sample text:', cleanText.substring(0, 500));
-              
-              if (cleanText.length === 0) {
-                reject(new Error('No text content extracted from PDF'));
-                return;
-              }
-              
-              resolve({
-                name: filename,
-                content: cleanText,
-                type: 'pdf',
-                size: buffer.length
-              });
-            });
-          });
-        } catch (extractError) {
-          console.error('pdf.js-extract failed:', extractError);
-          throw new Error(`All PDF processing methods failed. Last error: ${extractError.message}`);
+          // Extract text from each item on the page
+          for (const item of textContent.items) {
+            if ('str' in item && item.str && item.str.trim()) {
+              extractedText += item.str + ' ';
+            }
+          }
+          
+          console.log(`Processed page ${pageNum}/${maxPages}`);
+        } catch (pageError) {
+          console.warn(`Failed to extract text from page ${pageNum}:`, pageError);
         }
       }
+      
+      // Clean up the extracted text
+      const cleanText = extractedText
+        .replace(/\s+/g, ' ')
+        .replace(/\n+/g, '\n')
+        .trim();
+      
+      console.log('PDF text extraction completed:');
+      console.log(`- Extracted text length: ${cleanText.length} characters`);
+      console.log(`- Sample text: ${cleanText.substring(0, 500)}${cleanText.length > 500 ? '...' : ''}`);
+      
+      if (cleanText.length < 10) {
+        throw new Error('PDF appears to contain no readable text content');
+      }
+      
+      return {
+        name: filename,
+        content: cleanText,
+        type: 'pdf',
+        size: buffer.length
+      };
+      
     } catch (error) {
-      console.error('PDF processing error:', error);
-      throw new Error(`Failed to process PDF file ${filename}: ${error.message}`);
+      console.error('PDF processing failed:', error);
+      
+      // Provide helpful error information
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      // Create a fallback response with helpful guidance
+      const fallbackContent = `PDF file "${filename}" was uploaded successfully but text extraction failed.
+
+File size: ${Math.round(buffer.length / 1024)}KB
+Error: ${errorMessage}
+
+Possible solutions:
+1. Try uploading a different PDF file
+2. Ensure the PDF contains selectable text (not just images)
+3. Convert the PDF to text externally and paste the content
+4. Upload a Word document (.docx) instead
+
+Note: Some PDFs with complex formatting or scanned images may not process correctly in serverless environments. - Technical Note`;
+
+      return {
+        name: filename,
+        content: fallbackContent,
+        type: 'pdf',
+        size: buffer.length
+      };
     }
   }
 

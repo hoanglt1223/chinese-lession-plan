@@ -1,7 +1,7 @@
 import { writeFile, readFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
-import crypto from 'crypto';
+import { createHash } from 'crypto';
 
 interface CacheEntry {
   word: string;
@@ -84,7 +84,7 @@ export class TranslationCacheService {
 
   private generateCacheKey(word: string, sourceLang: string = 'zh', targetLang: string = 'vi'): string {
     const keyString = `${word.toLowerCase().trim()}_${sourceLang}_${targetLang}`;
-    return crypto.createHash('md5').update(keyString).digest('hex');
+    return createHash('md5').update(keyString).digest('hex');
   }
 
   async get(word: string, sourceLang: string = 'zh', targetLang: string = 'vi'): Promise<string | null> {

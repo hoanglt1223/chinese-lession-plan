@@ -135,11 +135,11 @@ export function FlashcardEditor({ flashcards, onChange }: FlashcardEditorProps) 
                 <span className="text-muted-foreground">Word:</span>
                 {editingCard?.id === selectedCard.id ? (
                   <Input
-                    value={editingCard.word}
-                    onChange={(e) => setEditingCard({
+                    value={editingCard?.word || ''}
+                    onChange={(e) => setEditingCard(editingCard ? {
                       ...editingCard,
                       word: e.target.value
-                    })}
+                    } : null)}
                     className="h-6 text-xs w-20"
                     onBlur={() => {
                       if (editingCard && editingCard.id) {
