@@ -32,16 +32,32 @@ export function useWorkflow(lessonId: string | null) {
     mutationFn: async ({ step, data }: { step: number; data?: any }) => {
       if (!lessonId) throw new Error("No lesson ID provided");
       
+      console.log('🚀 updateStep mutation - Step:', step, 'Data keys:', Object.keys(data || {}));
+      console.log('🚀 updateStep mutation - lessonId:', lessonId);
+      
       // Update lesson with the new data using body parameters
       const response = await apiRequest('PUT', '/api/lessons', {
         id: lessonId,
         ...data
       });
-      return response.json();
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ PUT request failed:', response.status, errorText);
+        throw new Error(`PUT request failed: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log('✅ updateStep mutation successful:', result);
+      return result;
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
+      console.log('✅ updateStep onSuccess - invalidating queries');
       queryClient.invalidateQueries({ queryKey: ["/api/lessons", lessonId] });
       queryClient.invalidateQueries({ queryKey: ["/api/lessons"] });
+    },
+    onError: (error) => {
+      console.error('❌ updateStep mutation error:', error);
     }
   });
 

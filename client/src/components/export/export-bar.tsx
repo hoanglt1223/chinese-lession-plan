@@ -61,7 +61,7 @@ export function ExportBar({ lessonId, lesson, disabled = false }: ExportBarProps
 
   const exportDocxMutation = useMutation({
     mutationFn: async () => {
-      const content = lesson?.lessonPlan || lesson?.summary || "";
+      const content = lesson?.lessonPlans || lesson?.summaries || "";
       const response = await fetch('/api/export/docx', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -97,7 +97,7 @@ export function ExportBar({ lessonId, lesson, disabled = false }: ExportBarProps
 
   const exportMarkdownMutation = useMutation({
     mutationFn: async () => {
-      const content = lesson?.lessonPlan || "";
+      const content = lesson?.lessonPlans || "";
       const blob = new Blob([content], { type: 'text/markdown' });
       
       // Download file

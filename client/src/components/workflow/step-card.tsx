@@ -432,7 +432,7 @@ export function StepCard({
       // Use full plan from lessonPlans array
       const currentPlan = lessonPlans.length > 0 
         ? lessonPlans.map(l => l.content).join('\n\n')
-        : lesson?.lessonPlans?.map(l => l.content).join('\n\n') || '';
+        : lesson?.lessonPlans?.map((l: { content: any; }) => l.content).join('\n\n') || '';
       console.log('Generating summary with:', { 
         planLength: currentPlan?.length, 
         vocabularyCount: currentAnalysis?.vocabulary?.length 
@@ -671,7 +671,7 @@ export function StepCard({
               <div className="space-y-4">
                 {/* Lesson selector tabs */}
                 <div className="flex flex-wrap gap-2 border-b border-border pb-2">
-                  {plansData.map((plan, index) => (
+                  {plansData.map((plan: any, index: any) => (
                     <button
                       key={index}
                       onClick={() => setSelectedLessonIndex(index)}
@@ -918,7 +918,7 @@ export function StepCard({
               <div className="space-y-4">
                 {/* Summary selector tabs */}
                 <div className="flex flex-wrap gap-2 border-b border-border pb-2">
-                  {summariesData.map((summaryItem, index) => (
+                  {summariesData.map((summaryItem: any, index: any) => (
                     <button
                       key={index}
                       onClick={() => setSelectedSummaryIndex(index)}

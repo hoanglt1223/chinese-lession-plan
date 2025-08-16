@@ -44,7 +44,7 @@ export function WorkflowProvider({ children }: WorkflowProviderProps) {
     }
 
     // Step 2: Plan - check if lesson plan or lesson plans exist
-    if (lesson.lessonPlan || (lesson.lessonPlans && lesson.lessonPlans.length > 0)) {
+    if (lesson.lessonPlans && lesson.lessonPlans.length > 0) {
       completed.push(2);
       current = 3;
     }
@@ -56,7 +56,7 @@ export function WorkflowProvider({ children }: WorkflowProviderProps) {
     }
 
     // Step 4: Summary - check if summary or summaries exist
-    if (lesson.summary || (lesson.summaries && lesson.summaries.length > 0)) {
+    if (lesson.summaries && lesson.summaries.length > 0) {
       completed.push(4);
       current = 5; // All steps completed
     }
