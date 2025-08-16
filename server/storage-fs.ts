@@ -3,8 +3,8 @@ import { randomUUID } from "crypto";
 import { promises as fs } from "fs";
 import { join } from "path";
 
-// Storage paths
-const DATA_DIR = process.env.DATA_DIR || join(process.cwd(), 'data');
+// Storage paths - use /tmp in serverless environments or memory storage as fallback
+const DATA_DIR = process.env.DATA_DIR || (process.env.VERCEL ? '/tmp/data' : join(process.cwd(), 'data'));
 const USERS_FILE = join(DATA_DIR, 'users.json');
 const LESSONS_FILE = join(DATA_DIR, 'lessons.json');
 const WORKFLOWS_FILE = join(DATA_DIR, 'workflows.json');

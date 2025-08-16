@@ -1,10 +1,10 @@
 import type { Express, Request, Response } from "express";
-import { createServer, type Server } from "http";
-import { storage } from "./storage-fs";
+import { storage } from "./storage-serverless";
 import { analyzePDFContent, generateLessonPlan, generateFlashcards, generateSummary, generateWithOpenAI, translateChineseToVietnamese } from "./services/openai";
 import { fileProcessor } from "./services/fileProcessor";
 import multer from "multer";
 import { insertLessonSchema, insertWorkflowSchema } from "@shared/schema";
+import { randomUUID } from "crypto";
 
 interface MulterRequest extends Request {
   files?: Express.Multer.File[];
@@ -16,7 +16,7 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
 });
 
-export async function registerRoutes(app: Express): Promise<Server> {
+export function registerServerlessRoutes(app: Express): void {
   
   // Upload and process files
   app.post("/api/upload", upload.array('files'), async (req: Request, res: Response) => {
@@ -147,13 +147,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Keep the DALL-E generated imageUrl from OpenAI service
             return {
               ...card,
-              id: crypto.randomUUID(),
+              id: randomUUID(),
               imageUrl: card.imageUrl // Use the DALL-E 3 generated image URL
             };
           } catch (error: any) {
             return {
               ...card,
-              id: crypto.randomUUID(),
+              id: randomUUID(),
               imageUrl: "https://via.placeholder.com/400x300?text=No+Image"
             };
           }
@@ -307,7 +307,4 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Authentication check failed" });
     }
   });
-
-  const httpServer = createServer(app);
-  return httpServer;
 }

@@ -226,7 +226,7 @@ export default function Home() {
           </div>
           
           {/* Progress Bar */}
-          <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 lg:gap-4 mb-6">
+          <div className="flex flex-wrap items-center gap-2 mb-6">
             {["Input", "Review", "Plan", "Flashcards", "Summary"].map((step, index) => (
               <div key={step} className="flex items-center space-x-1 lg:space-x-2">
                 <div className={`step-indicator ${
