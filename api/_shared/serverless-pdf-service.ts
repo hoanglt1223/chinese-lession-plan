@@ -28,6 +28,7 @@ export interface FlashcardPDFOptions {
 
 // External API function for Chinese text conversion
 async function callChineseTextAPI(text: string, options: {
+  method?: 'ultimate-text-to-image' | 'text-to-image' | 'pdf' | 'svg' | 'png' | 'canvas' | 'jpg' | 'webp' | 'html' | 'json';
   fontSize?: number;
   fontFamily?: string;
   fontWeight?: "100" | "200" | "300" | "400" | "500" | "600" | "700" | "800" | "900" | "normal" | "bold" | "lighter" | "bolder";
@@ -37,7 +38,7 @@ async function callChineseTextAPI(text: string, options: {
   textColor?: string;
   padding?: number;
   lineHeight?: number;
-  textAlign?: string;
+  textAlign?: 'left' | 'center' | 'right' | 'justify';
   quality?: number;
 } = {}): Promise<string> {
   try {
@@ -48,8 +49,8 @@ async function callChineseTextAPI(text: string, options: {
       },
       body: JSON.stringify({
         text,
-        method: 'svg',
-        fontSize: options.fontSize || 100,
+        method: options.method || 'png',
+        fontSize: options.fontSize || 24,
         fontFamily: options.fontFamily || 'NotoSansTC',
         fontWeight: options.fontWeight || '400',
         width: options.width || 800,
@@ -67,20 +68,42 @@ async function callChineseTextAPI(text: string, options: {
       throw new Error(`API request failed: ${response.status}`);
     }
 
-    const result = await response.text();
-    // The API returns SVG data directly, so we need to convert it to a data URI
-    if (result.startsWith('<svg')) {
-      // It's raw SVG, convert to data URI
-      const base64 = Buffer.from(result).toString('base64');
-      return `data:image/svg+xml;base64,${base64}`;
-    } else if (result.startsWith('data:image/svg+xml')) {
-      // It's already a data URI
-      return result;
-    } else {
-      // Unknown format, treat as raw SVG
-      const base64 = Buffer.from(result).toString('base64');
-      return `data:image/svg+xml;base64,${base64}`;
+    // Get the response as binary data since API returns image file
+    const arrayBuffer = await response.arrayBuffer();
+    const imageBuffer = Buffer.from(arrayBuffer);
+    
+    // Get content type from response headers or determine based on method
+    let contentType = response.headers.get('content-type');
+    if (!contentType) {
+      // Default content type based on method
+      const method = options.method || 'png';
+      switch (method) {
+        case 'png':
+        case 'canvas':
+        case 'ultimate-text-to-image':
+        case 'text-to-image':
+          contentType = 'image/png';
+          break;
+        case 'jpg':
+          contentType = 'image/jpeg';
+          break;
+        case 'webp':
+          contentType = 'image/webp';
+          break;
+        case 'svg':
+          contentType = 'image/svg+xml';
+          break;
+        case 'pdf':
+          contentType = 'application/pdf';
+          break;
+        default:
+          contentType = 'image/png';
+      }
     }
+    
+    // Convert to data URI
+    const base64 = imageBuffer.toString('base64');
+    return `data:${contentType};base64,${base64}`;
   } catch (error) {
     console.error('Chinese text API call failed:', error);
     // Fallback to simple SVG generation
@@ -211,21 +234,27 @@ export class ServerlessPDFService {
     const height = opts?.height ?? 180;
     
     try {
-      // Use external API for Chinese text rendering
-      const svgDataUri = await callChineseTextAPI(text, {
-        fontSize: opts?.fontSize || 100,
-        fontFamily: 'NotoSansTC',
-        fontWeight: opts?.fontWeight || '400',
-        width,
-        height,
-        backgroundColor: opts?.background || '#ffffff',
-        textColor: opts?.textColor || '#000000',
-        textAlign: 'center'
-      });
+             // Use external API for Chinese text rendering with high quality
+       const svgDataUri = await callChineseTextAPI(text, {
+         method: 'png',
+         fontSize: opts?.fontSize || 24,
+         fontFamily: 'NotoSansTC',
+         fontWeight: opts?.fontWeight || '400',
+         width,
+         height,
+         backgroundColor: opts?.background || '#ffffff',
+         textColor: opts?.textColor || '#000000',
+         textAlign: 'center',
+         padding: 20,
+         lineHeight: 1.5,
+         quality: 95
+       });
       
-      // Convert SVG to PNG using our existing method
-      const { dataUri, buffer } = await this.svgToPngDataUri(svgDataUri, width, height);
-      return { buffer, dataUri, contentType: 'image/png', width, height };
+             // The API already returns binary image data as data URI, no need to convert
+       // Extract buffer from data URI for compatibility
+       const base64Data = svgDataUri.split(',')[1];
+       const buffer = Buffer.from(base64Data, 'base64');
+       return { buffer, dataUri: svgDataUri, contentType: 'image/png', width, height };
       
     } catch (error) {
       console.error('External API failed, using fallback SVG method:', error);
@@ -555,40 +584,52 @@ export class ServerlessPDFService {
     
     console.log(`🚀 Generating flashcard back for: "${card.word}" with pinyin: "${card.pinyin}"`);
     
-    try {
-      // Generate Chinese text image using external API
-      const chineseImageData = await callChineseTextAPI(card.word || '朋友', {
-        fontSize: 120,
-        fontFamily: 'NotoSansTC',
-        fontWeight: '700',
-        width: 400,
-        height: 200,
-        backgroundColor: '#ffffff',
-        textColor: '#000000',
-        textAlign: 'center'
-      });
-      
-      // Generate Pinyin text image using external API
-      const pinyinImageData = await callChineseTextAPI(card.pinyin || 'péngyǒu', {
-        fontSize: 60,
-        fontFamily: 'NotoSansTC',
-        fontWeight: '400',
-        width: 200,
-        height: 100,
-        backgroundColor: '#ffffff',
-        textColor: '#666666',
-        textAlign: 'center'
-      });
-      
-      // Position Chinese text in center-top
-      const chineseX = (pageWidth - 100) / 2;
-      const chineseY = pageHeight / 2 - 60;
-      pdf.addImage(chineseImageData, 'SVG', chineseX, chineseY, 100, 40);
-      
-      // Position Pinyin text below Chinese
-      const pinyinX = (pageWidth - 100) / 2;
-      const pinyinY = pageHeight / 2 - 10;
-      pdf.addImage(pinyinImageData, 'SVG', pinyinX, pinyinY, 100, 25);
+         try {
+       // Generate Chinese text image using external API with high-quality method
+       const chineseImageData = await callChineseTextAPI(card.word || '朋友', {
+         method: 'ultimate-text-to-image',
+         fontSize: 48,
+         fontFamily: 'NotoSansTC',
+         fontWeight: '700',
+         width: 600,
+         height: 200,
+         backgroundColor: '#ffffff',
+         textColor: '#000000',
+         textAlign: 'center',
+         padding: 30,
+         lineHeight: 1.2,
+         quality: 95
+       });
+       
+       // Generate Pinyin text image using external API with clean method
+       const pinyinImageData = await callChineseTextAPI(card.pinyin || 'péngyǒu', {
+         method: 'text-to-image',
+         fontSize: 24,
+         fontFamily: 'NotoSansTC',
+         fontWeight: '400',
+         width: 400,
+         height: 100,
+         backgroundColor: '#ffffff',
+         textColor: '#666666',
+         textAlign: 'center',
+         padding: 20,
+         lineHeight: 1.4,
+         quality: 90
+       });
+       
+       // Position Chinese text in center-top (adjust for image format)
+       const chineseWidth = 120; // Larger width for Chinese text
+       const chineseHeight = 50; // Proportional height
+       const chineseX = (pageWidth - chineseWidth) / 2;
+       const chineseY = pageHeight / 2 - 60;
+       pdf.addImage(chineseImageData, 'PNG', chineseX, chineseY, chineseWidth, chineseHeight);
+       
+       // Position Pinyin text below Chinese (adjust for image format)
+       const pinyinWidth = 80; // Smaller width for pinyin
+       const pinyinHeight = 30; // Proportional height
+       const pinyinX = (pageWidth - pinyinWidth) / 2;
+       const pinyinY = pageHeight / 2 - 5;
+       pdf.addImage(pinyinImageData, 'PNG', pinyinX, pinyinY, pinyinWidth, pinyinHeight);
       
       // Add Vietnamese translation if available
       if (card.vietnamese) {

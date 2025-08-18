@@ -75,9 +75,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const imageResult = await serverlessPDFService.generateChineseTextImage(text, {
             width: width || 600,
             height: height || 180,
-            fontSize: fontSize || 64,
+            fontSize: fontSize || 24,
             background: background || '#ffffff',
-            textColor: textColor || '#111111',
+            textColor: textColor || '#000000',
             fontWeight: fontWeight || '400'
           });
           
