@@ -1,17 +1,7 @@
 import path from 'path';
 import fs from 'fs/promises';
 
-/*
- * FONT SETUP FOR ULTIMATE TEXT TO IMAGE:
- * 
- * Using existing Noto Sans TC font located at:
- * - data/NotoSansTC-Regular.ttf
- * 
- * This font supports Traditional Chinese characters and will be used by
- * Methods 1, 4, and 6 for Ultimate Text To Image rendering.
- * 
- * Methods will gracefully fallback to system fonts if the file is not found.
- */
+
 
 export interface FlashcardData {
   word: string;
@@ -96,101 +86,7 @@ export class ServerlessPDFService {
     this.templateBackPath = path.join(process.cwd(), 'client/public/templates', 'flashcard-back.png');
   }
 
-  /**
-   * Build an SVG string for Chinese text with optional embedded Noto Sans TC font.
-   * Embedding the font ensures glyph coverage on serverless platforms lacking CJK fonts.
-   */
-  private async buildChineseTextSVG(text: string, opts?: { width?: number; height?: number; fontSize?: number; background?: string; textColor?: string; fontFamilyFallback?: string; }): Promise<string> {
-    const width = opts?.width ?? 600; // px
-    const height = opts?.height ?? 180; // px
-    const fontSize = opts?.fontSize ?? 64; // px
-    const background = opts?.background ?? '#ffffff';
-    const textColor = opts?.textColor ?? '#111111';
-    const fallback = opts?.fontFamilyFallback ?? "'Noto Sans TC', Arial, sans-serif";
 
-    // Escape XML special chars
-    const safeText = (text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-    // Try to embed Noto Sans TC
-    let embeddedStyle = '';
-    try {
-      const fontPath = path.join(process.cwd(), 'data', 'NotoSansTC-Regular.ttf');
-      const exists = await fs
-        .access(fontPath)
-        .then(() => true)
-        .catch(() => false);
-      if (exists) {
-        const fontBuf = await fs.readFile(fontPath);
-        const fontBase64 = fontBuf.toString('base64');
-        embeddedStyle = `<style>@font-face { font-family: 'NotoSansTC-Embedded'; src: url(data:font/truetype;base64,${fontBase64}) format('truetype'); font-weight: normal; font-style: normal; }</style>`;
-      }
-    } catch (e) {
-      // Non-fatal; fall back to system fonts
-    }
-
-    const fontFamily = embeddedStyle ? "'NotoSansTC-Embedded'" : fallback;
-
-    const svg = `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">\n  <defs>${embeddedStyle}</defs>\n  <rect width="100%" height="100%" fill="${background}"/>\n  <text x="50%" y="50%" font-size="${fontSize}" font-family=${fontFamily} fill="${textColor}" text-anchor="middle" dominant-baseline="middle">${safeText}</text>\n</svg>`;
-    return svg;
-  }
-
-  /**
-   * Convert an SVG XML string (or SVG data URI) to a PNG data URI using sharp.
-   * Falls back to node-canvas if sharp fails for any reason.
-   */
-  private async svgToPngDataUri(svgInput: string, width?: number, height?: number): Promise<{ dataUri: string; buffer: Buffer }> {
-    const isDataUri = svgInput.startsWith('data:image/svg');
-    const svgBuffer = isDataUri ? Buffer.from(svgInput.split(',')[1] || '', 'base64') : Buffer.from(svgInput, 'utf8');
-
-    // Try sharp first (fast and serverless-friendly)
-    try {
-      const sharpMod = (await import('sharp')) as any;
-      const sharpFn = sharpMod.default || sharpMod;
-      let instance = sharpFn(svgBuffer);
-      if (width || height) {
-        instance = instance.resize({ width, height, fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 1 } });
-      }
-      const pngBuffer: Buffer = await instance.png().toBuffer();
-      const dataUri = `data:image/png;base64,${pngBuffer.toString('base64')}`;
-      return { dataUri, buffer: pngBuffer };
-    } catch (e) {
-      // Fallback to node-canvas rendering
-      try {
-        const canvasModule: any = await import('canvas');
-        const createCanvas = canvasModule.createCanvas || canvasModule.default?.createCanvas;
-        const registerFont = canvasModule.registerFont || canvasModule.default?.registerFont;
-        const w = width ?? 600;
-        const h = height ?? 180;
-        if (registerFont) {
-          try {
-            const fontPath = path.join(process.cwd(), 'data', 'NotoSansTC-Regular.ttf');
-            const exists = await fs
-              .access(fontPath)
-              .then(() => true)
-              .catch(() => false);
-            if (exists) registerFont(fontPath, { family: 'Noto Sans TC' });
-          } catch {}
-        }
-        const canvas = createCanvas(w, h);
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, w, h);
-        ctx.fillStyle = '#111111';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.font = '64px "Noto Sans TC", Arial, sans-serif';
-        const text = 'SVG render failed';
-        ctx.fillText(text, w / 2, h / 2);
-        const buf = canvas.toBuffer('image/png');
-        const du = `data:image/png;base64,${buf.toString('base64')}`;
-        return { dataUri: du, buffer: buf };
-      } catch (e2) {
-        // Last resort tiny transparent PNG
-        const tiny = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==', 'base64');
-        return { dataUri: `data:image/png;base64,${tiny.toString('base64')}` , buffer: tiny };
-      }
-    }
-  }
 
   /**
    * Public: Generate a PNG image for the given Chinese text using external API.
@@ -223,11 +119,16 @@ export class ServerlessPDFService {
        return { buffer, dataUri: svgDataUri, contentType: 'image/png', width, height };
       
     } catch (error) {
-      console.error('External API failed, using fallback SVG method:', error);
-      // Fallback to local SVG generation
-    const svg = await this.buildChineseTextSVG(text, { width, height, fontSize: opts?.fontSize });
-    const { dataUri, buffer } = await this.svgToPngDataUri(svg, width, height);
-    return { buffer, dataUri, contentType: 'image/png', width, height };
+      console.error('External API failed, using minimal fallback:', error);
+      // Simple fallback: return a basic placeholder image
+      const tiny = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==', 'base64');
+      return { 
+        buffer: tiny, 
+        dataUri: `data:image/png;base64,${tiny.toString('base64')}`, 
+        contentType: 'image/png', 
+        width, 
+        height 
+      };
     }
   }
 
