@@ -45,12 +45,12 @@ async function callChineseTextAPI(
         fontSize,
         fontFamily: 'NotoSansTC',
         fontWeight,
-        width: 800,
-        height: 300,
+        width: 200,
+        height: 80,
         backgroundColor: 'transparent',
         textColor: '#000000',
-        padding: 30,
-        lineHeight: 1.8,
+        padding: 10,
+        lineHeight: 1.2,
         textAlign: 'center',
         quality: 100
       })
@@ -75,8 +75,8 @@ async function callChineseTextAPI(
     // Fallback to simple SVG generation
   const safeText = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const svg = `
-      <svg width="800" height="300" xmlns="http://www.w3.org/2000/svg">
-        <rect width="800" height="300" fill="#fff"/>
+      <svg width="200" height="80" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="80" fill="#fff"/>
         <text x="50%" y="50%" font-size="${fontSize}" font-family="Noto Sans TC, Arial, sans-serif" fill="#000" text-anchor="middle" alignment-baseline="middle" dominant-baseline="middle">${safeText}</text>
     </svg>
   `;
@@ -563,24 +563,24 @@ export class ServerlessPDFService {
        const chineseSvg = await callChineseTextAPI(
          card.word || '朋友',
          'svg',
-         64,
-         '800'
+         48,
+         'bold'
        );
        
        // Method 2: text-to-image  
        const chineseTextToImage = await callChineseTextAPI(
          card.word || '朋友',
          'text-to-image',
-         64,
-         '800'
+         48,
+         'bold'
        );
        
        // Method 3: png
        const chinesePng = await callChineseTextAPI(
          card.word || '朋友',
          'png',
-         64,
-         '800'
+         48,
+         'bold'
        );
        
        // PINYIN TEXT - 3 methods (columns 4-6)
@@ -588,30 +588,30 @@ export class ServerlessPDFService {
        const pinyinSvg = await callChineseTextAPI(
          card.pinyin || 'péngyǒu',
          'svg',
-         36,
-         '600'
+         24,
+         '500'
        );
        
        // Method 2: text-to-image
        const pinyinTextToImage = await callChineseTextAPI(
          card.pinyin || 'péngyǒu',
          'text-to-image',
-         36,
-         '600'
+         24,
+         '500'
        );
        
        // Method 3: png
        const pinyinPng = await callChineseTextAPI(
          card.pinyin || 'péngyǒu',
          'png',
-         36,
-         '600'
+         24,
+         '500'
        );
        
-       // Display all 6 columns with better sizing
-       const imageWidth = colWidth * 0.9;
-       const imageHeight = 50;
-       const imageY = startY + 30;
+       // Display all 6 columns with compact sizing for single words
+       const imageWidth = colWidth * 0.8;
+       const imageHeight = 30;
+       const imageY = startY + 25;
        
        // Column 1: Chinese SVG
        pdf.addImage(chineseSvg, 'PNG', 
@@ -673,7 +673,7 @@ export class ServerlessPDFService {
        
        for (let i = 0; i < labels.length; i++) {
          const x = i * colWidth + colWidth / 2;
-         const y = imageY + imageHeight + 15;
+         const y = imageY + imageHeight + 10;
          pdf.text(labels[i], x, y, { align: 'center' });
        }
       
