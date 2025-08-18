@@ -68,3 +68,45 @@ export const insertWorkflowSchema = z.object({
 });
 
 export type InsertWorkflow = z.infer<typeof insertWorkflowSchema>;
+
+// Flashcard Image types
+export interface FlashcardImage {
+  id: string;
+  url: string;
+  alt: string;
+  description: string;
+  credit: string;
+  sourceUrl: string;
+  type: 'photo' | 'illustration';
+}
+
+// Freepik Icon types
+export interface FreepikIcon {
+  id: string;
+  url: string;
+  alt: string;
+  description: string;
+  credit: string;
+  sourceUrl: string;
+  type: 'icon';
+}
+
+// Enhanced Flashcard Data types
+export interface FlashcardData {
+  id?: string;
+  word: string;
+  pinyin: string;
+  vietnamese: string;
+  partOfSpeech?: string;
+  imageQuery?: string;
+  imageUrl?: string;
+  // New Unsplash image options
+  imageOptions?: {
+    photos: FlashcardImage[];
+    illustrations: FlashcardImage[];
+    icons: FreepikIcon[]; // Add Freepik icons
+    autoSelected: FlashcardImage | FreepikIcon | null;
+    all: (FlashcardImage | FreepikIcon)[];
+  };
+  selectedImageId?: string; // Track which image user selected
+}

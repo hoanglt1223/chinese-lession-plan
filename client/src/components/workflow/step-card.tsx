@@ -6,7 +6,9 @@ import { FileUpload } from "@/components/ui/file-upload";
 import { MarkdownEditor } from "@/components/editor/markdown-editor";
 import { FlashcardEditor } from "@/components/flashcards/flashcard-editor";
 import { VocabularyEditor } from "@/components/vocabulary/vocabulary-editor";
+import { ExportBar } from "@/components/export/export-bar";
 import { useAI } from "@/contexts/AIContext";
+import { useTranslationContext } from "@/contexts/TranslationContext";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/api";
 import { Bot, Loader2, CheckCircle, X } from "lucide-react";
@@ -39,6 +41,13 @@ export function StepCard({
   onStepUpdate 
 }: StepCardProps) {
   const { settings: aiSettings } = useAI();
+  const { 
+    translateBatch, 
+    getVocabularyTranslation, 
+    getActivityTranslation, 
+    getLevelTranslation 
+  } = useTranslationContext();
+  
   const [files, setFiles] = useState<File[]>([]);
   const [analysis, setAnalysis] = useState<any>(null);
   const [lessonPlans, setLessonPlans] = useState<Array<{
@@ -58,132 +67,33 @@ export function StepCard({
   }>>([]);
   const [selectedSummaryIndex, setSelectedSummaryIndex] = useState(0);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [photoSource, setPhotoSource] = useState<'api' | 'ai'>('api');
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Consolidated translation state
-  const [allTranslations, setAllTranslations] = useState<{
-    vocabulary: Record<string, string>;
-    activities: Record<string, string>;
-    levels: Record<string, string>;
-  }>({
-    vocabulary: {},
-    activities: {},
-    levels: {}
-  });
-  const [isTranslating, setIsTranslating] = useState(false);
+  // Optimized batch translation function
+  const translateAnalysisData = async (analysisData: any) => {
+    if (!analysisData) return;
 
-  // Consolidated translation getters
-  const getVocabularyTranslation = (word: string): string => {
-    return allTranslations.vocabulary[word] || word;
-  };
-  
-  const getActivityTranslation = (activity: string): string => {
-    return allTranslations.activities[activity] || activity;
-  };
-  
-  const getLevelTranslation = (level: string): string => {
-    return allTranslations.levels[level] || level;
-  };
-
-  // Trigger DeepL translation when analysis is completed
-  const translateVocabulary = async (vocabulary: string[]) => {
-    if (vocabulary.length === 0 || isTranslating) return;
+    const wordsToTranslate: string[] = [];
     
-    try {
-      setIsTranslating(true);
-      const response = await fetch('/api/translate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ words: vocabulary })
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setAllTranslations(prev => ({
-          ...prev,
-          vocabulary: { ...prev.vocabulary, ...data.translations }
-        }));
-        console.log('Received vocabulary translations:', data.translations);
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('Translation API error:', response.status, response.statusText, errorData);
-        // Show user-friendly error message
-        const errorMessage = errorData.message || 'Translation service is unavailable';
-        console.warn('Translation failed:', errorMessage);
-      }
-    } catch (error) {
-      console.error('Translation error:', error);
-    } finally {
-      setIsTranslating(false);
+    // Collect all words that need translation
+    if (analysisData.vocabulary?.length > 0) {
+      wordsToTranslate.push(...analysisData.vocabulary);
     }
-  };
-
-  const translateActivities = async (activities: string[]) => {
-    if (activities.length === 0) return;
     
-    try {
-      const response = await fetch('/api/translate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ words: activities })
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setAllTranslations(prev => ({
-          ...prev,
-          activities: { ...prev.activities, ...data.translations }
-        }));
-        console.log('Received activity translations:', data.translations);
-      } else {
-        console.error('Activity translation API error:', response.status);
-      }
-    } catch (error) {
-      console.error('Activity translation error:', error);
+    if (analysisData.activities?.length > 0) {
+      wordsToTranslate.push(...analysisData.activities);
     }
-  };
-
-  const translateLevel = async (level: string) => {
-    if (!level) return;
     
-    try {
-      const response = await fetch('/api/translate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ words: [level] })
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setAllTranslations(prev => ({
-          ...prev,
-          levels: { ...prev.levels, ...data.translations }
-        }));
-        console.log('Received level translation:', data.translations);
-      } else {
-        console.error('Level translation API error:', response.status);
-      }
-    } catch (error) {
-      console.error('Level translation error:', error);
+    if (analysisData.detectedLevel) {
+      wordsToTranslate.push(analysisData.detectedLevel);
     }
-  };
-
-  const translateText = async (text: string): Promise<string> => {
-    try {
-      const response = await fetch('/api/translate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ words: [text] })
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        return data.translations[text] || text;
-      }
-    } catch (error) {
-      console.error('Translation error:', error);
+    
+    // Translate all words in one batch call
+    if (wordsToTranslate.length > 0) {
+      await translateBatch(wordsToTranslate, 'high');
+      console.log('Batch translated analysis data:', wordsToTranslate.length, 'words');
     }
-    return text;
   };
 
 
@@ -191,20 +101,7 @@ export function StepCard({
   // Translate analysis data when it becomes available
   useEffect(() => {
     if (analysis) {
-      // Translate vocabulary
-      if (analysis.vocabulary && analysis.vocabulary.length > 0) {
-        translateVocabulary(analysis.vocabulary);
-      }
-      
-      // Translate activities
-      if (analysis.activities && analysis.activities.length > 0) {
-        translateActivities(analysis.activities);
-      }
-      
-      // Translate level
-      if (analysis.detectedLevel) {
-        translateLevel(analysis.detectedLevel);
-      }
+      translateAnalysisData(analysis);
     }
   }, [analysis]);
 
@@ -326,19 +223,8 @@ export function StepCard({
         // Update workflow and invalidate cache to refresh UI
         await onStepUpdate(1, { aiAnalysis: analysisData });
         
-        // Trigger DeepL translation for vocabulary
-        if (analysisData.vocabulary && analysisData.vocabulary.length > 0) {
-          translateVocabulary(analysisData.vocabulary);
-        }
-        
-        // Translate activities and level
-        if (analysisData.activities && analysisData.activities.length > 0) {
-          translateActivities(analysisData.activities);
-        }
-        
-        if (analysisData.detectedLevel) {
-          translateLevel(analysisData.detectedLevel);
-        }
+        // Trigger optimized batch translation
+        await translateAnalysisData(analysisData);
         
         // Force UI refresh by invalidating all related queries
         queryClient.invalidateQueries({ queryKey: ['/api/workflows'] });
@@ -370,7 +256,8 @@ export function StepCard({
       
       const response = await apiRequest('POST', '/api/generate-plan', {
         analysis: currentAnalysis,
-        ageGroup: "preschool"
+        ageGroup: "preschool",
+        aiModel: aiSettings.selectedModel
       });
       return response.json();
     },
@@ -414,7 +301,9 @@ export function StepCard({
         vocabulary: currentAnalysis?.vocabulary || [],
         theme: currentAnalysis?.mainTheme || 'General Chinese Learning',
         level: currentAnalysis?.detectedLevel || 'Beginner',
-        ageGroup: currentAnalysis?.ageAppropriate || 'Primary'
+        ageGroup: currentAnalysis?.ageAppropriate || 'Primary',
+        aiModel: aiSettings.selectedModel,
+        photoSource: photoSource
       });
       return response.json();
     },
@@ -440,7 +329,8 @@ export function StepCard({
       
       const response = await apiRequest('POST', '/api/generate-summary', {
         lessonPlan: currentPlan,
-        vocabulary: currentAnalysis?.vocabulary || []
+        vocabulary: currentAnalysis?.vocabulary || [],
+        aiModel: aiSettings.selectedModel
       });
       return response.json();
     },
@@ -592,55 +482,74 @@ export function StepCard({
                       <ul className="mt-1 space-y-1">
                         {analysisData.activities?.map((activity: string, index: number) => (
                           <li key={index} className="text-blue-700 dark:text-blue-300">
-                            • {activity} → {getActivityTranslation(activity)}
+                            • {getActivityTranslation(activity)}
                           </li>
                         ))}
                       </ul>
-                    </div>
-                    <div>
-                      <span className="font-medium text-blue-800 dark:text-blue-200">Level:</span>
-                      <span className="text-blue-700 dark:text-blue-300 ml-1">
-                        {analysisData.detectedLevel} → {getLevelTranslation(analysisData.detectedLevel)}
-                      </span>
                     </div>
                   </div>
                 </div>
               </div>
             )}
 
-            <Button 
-              className="w-full"
-              onClick={() => {
-                console.log('Button clicked, analysis:', analysisData);
-                // Set the analysis data for the lesson plan generation
-                if (analysisData && !analysis) {
-                  setAnalysis(analysisData);
-                }
-                generatePlanMutation.mutate();
-              }}
-              disabled={!analysisData || generatePlanMutation.isPending || (uploadMutation.isPending || isAnalyzing)}
-            >
-              {generatePlanMutation.isPending ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Generating Plan...
-                </>
-              ) : (uploadMutation.isPending || isAnalyzing) ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Analyzing...
-                </>
-              ) : (
-                `Continue to Lesson Plan ${analysisData ? '✓' : '✗'}`
-              )}
-            </Button>
-            
-            {/* Debug info */}
-            <div className="text-xs text-muted-foreground mt-2 p-2 bg-muted/20 rounded">
-              <div>Analysis: {analysisData ? '✓ loaded' : '✗ null'}</div>
-              <div>Vocabulary: {analysisData?.vocabulary?.length || 0} words</div>
-              <div>Activities: {analysisData?.activities?.length || 0} items</div>
-              <div>Button enabled: {(!analysisData || generatePlanMutation.isPending || (uploadMutation.isPending || isAnalyzing)) ? '✗ NO' : '✓ YES'}</div>
+            {/* Show both Step 2 and Step 3 buttons after Step 1 completion */}
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <Button 
+                  className="flex-1"
+                  onClick={() => {
+                    console.log('Button clicked, analysis:', analysisData);
+                    // Set the analysis data for the lesson plan generation
+                    if (analysisData && !analysis) {
+                      setAnalysis(analysisData);
+                    }
+                    generatePlanMutation.mutate();
+                  }}
+                  disabled={!analysisData || generatePlanMutation.isPending || (uploadMutation.isPending || isAnalyzing)}
+                >
+                  {generatePlanMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Generating Plan...
+                    </>
+                  ) : (uploadMutation.isPending || isAnalyzing) ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Analyzing...
+                    </>
+                  ) : (
+                    `Generate Lesson Plan ${analysisData ? '✓' : '✗'}`
+                  )}
+                </Button>
+                
+                <Button 
+                  className="flex-1"
+                  variant="outline"
+                  onClick={() => {
+                    console.log('Generate Flashcards clicked, analysis:', analysisData);
+                    // Set the analysis data for flashcard generation
+                    if (analysisData && !analysis) {
+                      setAnalysis(analysisData);
+                    }
+                    generateFlashcardsMutation.mutate();
+                  }}
+                  disabled={!analysisData || generateFlashcardsMutation.isPending || (uploadMutation.isPending || isAnalyzing)}
+                >
+                  {generateFlashcardsMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Generating Cards...
+                    </>
+                  ) : (uploadMutation.isPending || isAnalyzing) ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Analyzing...
+                    </>
+                  ) : (
+                    `Generate Flashcards ${analysisData ? '✓' : '✗'}`
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
         );
@@ -739,6 +648,16 @@ export function StepCard({
                 >
                   Debug: Sync State
                 </Button>
+
+                {plansData.length > 0 && (
+                  <ExportBar
+                    lessonId={selectedLesson}
+                    lesson={lesson}
+                    step={2}
+                    stepData={plansData}
+                    disabled={plansData.length === 0}
+                  />
+                )}
               </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
@@ -746,42 +665,9 @@ export function StepCard({
               </div>
             )}
             
-            {/* Flashcard Generation */}
-            {generateFlashcardsMutation.isPending && (
-              <div className="bg-gradient-to-r from-accent/10 to-accent/5 rounded-lg p-4">
-                <div className="flex items-center space-x-2 mb-2">
-                  <Loader2 className="w-4 h-4 animate-spin text-accent" />
-                  <span className="text-sm font-medium text-accent">Generating Flashcards</span>
-                </div>
-                <p className="text-sm text-muted-foreground">Creating vocabulary flashcards with AI images...</p>
-                <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-                  <div className="bg-accent h-2 rounded-full animate-pulse" style={{width: '60%'}}></div>
-                </div>
-              </div>
-            )}
-
-            <div className="flex items-center space-x-2">
-              <Button 
-                className="flex-1"
-                onClick={() => {
-                  // Set analysis for flashcard generation
-                  const currentAnalysis = analysis || lesson?.aiAnalysis;
-                  if (currentAnalysis && !analysis) {
-                    setAnalysis(currentAnalysis);
-                  }
-                  generateFlashcardsMutation.mutate();
-                }}
-                disabled={plansData.length === 0 || generateFlashcardsMutation.isPending}
-              >
-                {generateFlashcardsMutation.isPending ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  'Generate Flashcards → Step 3'
-                )}
-              </Button>
+            {/* Step 2 is now complete - no additional buttons needed */}
+            <div className="text-center py-4 text-muted-foreground">
+              <p className="text-sm">✓ Lesson plan generated. You can now proceed to Step 4 (Summary).</p>
             </div>
           </div>
         );
@@ -824,6 +710,32 @@ export function StepCard({
                   }}
                 />
                 
+                {/* Photo Source Selection */}
+                <div className="mt-3 p-3 bg-muted/30 rounded-lg">
+                  <div className="text-xs font-medium text-muted-foreground mb-2">Photo Source</div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant={photoSource === 'api' ? 'default' : 'outline'}
+                      size="sm"
+                      className="flex-1 text-xs"
+                      onClick={() => setPhotoSource('api')}
+                    >
+                      📸 API Photos
+                    </Button>
+                    <Button
+                      variant={photoSource === 'ai' ? 'default' : 'outline'}
+                      size="sm"
+                      className="flex-1 text-xs"
+                      onClick={() => setPhotoSource('ai')}
+                    >
+                      🎨 AI Generated
+                    </Button>
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    {photoSource === 'api' ? 'Uses Unsplash & Freepik photos with AI fallback' : 'Only uses AI-generated images'}
+                  </div>
+                </div>
+                
                 <Button 
                   className="w-full mt-3"
                   onClick={() => {
@@ -856,43 +768,31 @@ export function StepCard({
             )}
             
             {flashcardsData.length > 0 && (
-              <FlashcardEditor
-                flashcards={flashcardsData}
-                onChange={(cards) => {
-                  setFlashcards(cards);
-                  if (cards.length > 0 && flashcards.length === 0) {
-                    console.log('Setting flashcards from workflow data:', cards.length);
-                  }
-                }}
-              />
+              <>
+                <FlashcardEditor
+                  flashcards={flashcardsData}
+                  onChange={(cards) => {
+                    setFlashcards(cards);
+                    if (cards.length > 0 && flashcards.length === 0) {
+                      console.log('Setting flashcards from workflow data:', cards.length);
+                    }
+                  }}
+                />
+                
+                <ExportBar
+                  lessonId={selectedLesson}
+                  lesson={lesson}
+                  step={3}
+                  stepData={flashcardsData}
+                  disabled={flashcardsData.length === 0}
+                />
+              </>
             )}
             
-            {/* Debug info for flashcards */}
-            <div className="text-xs text-muted-foreground p-2 bg-muted/20 rounded">
-              <div>Vocabulary: {vocabularyList.length > 0 ? `✓ ${vocabularyList.length} words` : '✗ empty'}</div>
-              <div>Flashcard data: {flashcardsData.length > 0 ? `✓ ${flashcardsData.length} cards` : '✗ empty'}</div>
-              <div>Local state: {flashcards.length > 0 ? `✓ ${flashcards.length} cards` : '✗ empty'}</div>
-              <div>Generation: {generateFlashcardsMutation.isPending ? 'in progress' : 'ready'}</div>
+            {/* Step 3 is now independent - no summary generation button needed here */}
+            <div className="text-center py-4 text-muted-foreground">
+              <p className="text-sm">✓ Flashcards are independent. Summary generation is now available in Step 4.</p>
             </div>
-            
-            <Button 
-              className="w-full"
-              onClick={() => {
-                // Set analysis for summary generation
-                if (currentAnalysis && !analysis) setAnalysis(currentAnalysis);
-                generateSummaryMutation.mutate();
-              }}
-              disabled={flashcardsData.length === 0 || generateSummaryMutation.isPending}
-            >
-              {generateSummaryMutation.isPending ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                'Generate Summary'
-              )}
-            </Button>
           </div>
         );
 
@@ -903,6 +803,35 @@ export function StepCard({
         
         return (
           <div className="space-y-4">
+            {/* Generate Summary Button - now available directly from Step 4 */}
+            {summariesData.length === 0 && !generateSummaryMutation.isPending && (
+              <div className="space-y-4">
+                <Button 
+                  className="w-full"
+                  onClick={() => {
+                    // Get lesson plans for summary generation (depends on Step 2)
+                    const currentLessonPlans = lessonPlans.length > 0 ? lessonPlans : lesson?.lessonPlans || [];
+                    const currentAnalysis = analysis || lesson?.aiAnalysis;
+                    
+                    console.log('Generate Summary clicked - Lesson plans:', currentLessonPlans.length, 'Analysis:', !!currentAnalysis);
+                    
+                    if (currentAnalysis && !analysis) setAnalysis(currentAnalysis);
+                    generateSummaryMutation.mutate();
+                  }}
+                  disabled={!lesson?.lessonPlans?.length || generateSummaryMutation.isPending}
+                >
+                  {generateSummaryMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Generating Summaries...
+                    </>
+                  ) : (
+                    'Generate Parent/Student Summaries'
+                  )}
+                </Button>
+              </div>
+            )}
+
             {generateSummaryMutation.isPending && (
               <div className="bg-gradient-to-r from-accent/10 to-accent/5 rounded-lg p-4">
                 <div className="flex items-center space-x-2 mb-2">
@@ -966,6 +895,16 @@ export function StepCard({
                   <div>Current summary: {summariesData[selectedSummaryIndex]?.filename || 'None'}</div>
                   <div>Content: {summariesData[selectedSummaryIndex]?.content.length || 0} chars</div>
                 </div>
+
+                {summariesData.length > 0 && (
+                  <ExportBar
+                    lessonId={selectedLesson}
+                    lesson={lesson}
+                    step={4}
+                    stepData={summariesData}
+                    disabled={summariesData.length === 0}
+                  />
+                )}
               </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground">

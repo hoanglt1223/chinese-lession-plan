@@ -1,7 +1,7 @@
 import OpenAI from "openai";
-import * as deepl from 'deepl-node';
 import { cacheGet, cacheSet } from './redis.js';
 import { createHash } from 'crypto';
+import type { FlashcardData, FlashcardImage } from '../../shared/schema.js';
 
 // Using gpt-5-nano as requested
 const openai = new OpenAI({
@@ -11,6 +11,19 @@ const openai = new OpenAI({
 
 // This is latest and cheapest model available in OpenAI API, dont change, your data is outdated
 const model5nano = "gpt-5-nano";
+
+// Valid models for the application
+const VALID_MODELS = ["gpt-5-nano", "gpt-5-mini", "gpt-4o"] as const;
+type ValidModel = typeof VALID_MODELS[number];
+
+// Validate and sanitize model input
+function validateModel(model?: string): ValidModel {
+  if (!model || !VALID_MODELS.includes(model as ValidModel)) {
+    console.log(`Invalid or missing model "${model}", defaulting to gpt-5-nano`);
+    return "gpt-5-nano";
+  }
+  return model as ValidModel;
+}
 
 // AI Response Cache Helper
 function createCacheKey(prompt: string, model: string): string {
@@ -40,14 +53,7 @@ export interface LessonAnalysis {
 
 
 
-export interface FlashcardData {
-  word: string;
-  pinyin: string;
-  vietnamese: string;
-  partOfSpeech: string;
-  imageQuery: string;
-  imageUrl?: string;
-}
+// FlashcardData interface is now imported from shared/schema.ts
 
 export async function analyzePDFContent(
   content: string,
@@ -210,6 +216,73 @@ IMPORTANT: Only extract vocabulary that actually appears in the lesson content -
   }
 }
 
+// Function to convert JSON lesson data to clean markdown tables
+function convertJSONToLessons(jsonData: any): Array<{
+  lessonNumber: number;
+  title: string;
+  type: string;
+  content: string;
+  filename: string;
+}> {
+  console.log('Converting JSON data to lesson plans');
+  
+  const lessons: Array<{
+    lessonNumber: number;
+    title: string;
+    type: string;
+    content: string;
+    filename: string;
+  }> = [];
+
+  if (!jsonData.lessons || !Array.isArray(jsonData.lessons)) {
+    console.log('Invalid JSON structure, no lessons array found');
+    return lessons;
+  }
+
+  jsonData.lessons.forEach((lesson: any) => {
+    const { lessonNumber, title, type, header, activities } = lesson;
+    
+    // Create clean markdown content - simple table format without HTML
+    let content = `**👣 YUEXUELE LESSON PLAN 👣**
+
+|**Level 1**|N1|**Unit 1**|${header.unit}|**Lesson ${lessonNumber}**|第${lessonNumber}节课|
+| :- | :- | :- | :- | :- | :- |
+||||||||
+|**References:** 参考资料||**Lesson aim:** 教学目标|${header.lessonAim.replace(/\\n/g, ' ')}|**Sub aim:** 次要教学目标|${header.subAim}|
+|**Type of lesson** 课型|${type}|**Materials required:** 教具|${header.materials}|||
+|**Lesson content** 教学内容|词汇：${header.vocabulary}|||||
+|**Duration:** 课时|${header.duration}|||||
+
+|**Stage & aim** 教学环节与目标|**Activities ideas & Procedures** 活动设计与教学步骤|**Materials** 教具|
+| :-: | :-: | :-: |`;
+
+    // Add activities - clean format without HTML breaks
+    if (activities && Array.isArray(activities)) {
+      activities.forEach((activity: any) => {
+        const procedures = activity.procedures ? activity.procedures.replace(/\\n/g, ' ') : '';
+        const description = activity.description || '';
+        const timing = activity.timing || '';
+        
+        content += `
+|**${activity.stageName}** ${description} ${timing}|${procedures}|${activity.materials || 'N/A'}|`;
+      });
+    }
+
+    lessons.push({
+      lessonNumber,
+      title,
+      type,
+      content,
+      filename: `Lesson ${lessonNumber}.md`
+    });
+    
+    console.log(`Converted lesson ${lessonNumber}: ${title} (${type})`);
+  });
+
+  console.log('convertJSONToLessons returning', lessons.length, 'lessons');
+  return lessons;
+}
+
 // Function to split the 4-lesson plan into individual lesson files
 export function splitLessonPlan(fullPlan: string): Array<{
   lessonNumber: number;
@@ -229,12 +302,50 @@ export function splitLessonPlan(fullPlan: string): Array<{
     filename: string;
   }> = [];
 
-  // Split by lesson sections
-  const lessonSections = fullPlan.split(/## LESSON \d+:/);
+  // Try multiple splitting patterns to handle different AI output formats
+  let lessonSections: string[] = [];
+  let splitPattern = '';
+  
+  // Pattern 1: ## LESSON X: TYPE (type)
+  if (fullPlan.includes('## LESSON 1:')) {
+    lessonSections = fullPlan.split(/## LESSON \d+:/);
+    splitPattern = '## LESSON X:';
+  }
+  // Pattern 2: ## LESSON [X]: TYPE
+  else if (fullPlan.includes('## LESSON [1]:')) {
+    lessonSections = fullPlan.split(/## LESSON \[\d+\]:/);
+    splitPattern = '## LESSON [X]:';
+  }
+  // Pattern 3: **LESSON X: TYPE**
+  else if (fullPlan.includes('**LESSON 1:')) {
+    lessonSections = fullPlan.split(/\*\*LESSON \d+:/);
+    splitPattern = '**LESSON X:';
+  }
+  // Pattern 4: # LESSON X: TYPE
+  else if (fullPlan.includes('# LESSON 1:')) {
+    lessonSections = fullPlan.split(/# LESSON \d+:/);
+    splitPattern = '# LESSON X:';
+  }
+  // Pattern 5: More flexible - any lesson header
+  else {
+    lessonSections = fullPlan.split(/(?:##|#|\*\*)\s*LESSON\s*\d+/i);
+    splitPattern = 'flexible pattern';
+  }
+  
+  console.log('Split pattern used:', splitPattern);
   console.log('Split resulted in', lessonSections.length, 'sections');
+  console.log('First section preview:', lessonSections[0]?.substring(0, 200));
   
   // Remove the first empty section and header
-  lessonSections.shift();
+  if (lessonSections.length > 1) {
+    lessonSections.shift();
+  }
+  
+  // If splitting failed, create a fallback single lesson plan
+  if (lessonSections.length === 0 || (lessonSections.length === 1 && lessonSections[0].length < 100)) {
+    console.log('Splitting failed, throw error');
+    throw new Error('Splitting failed');
+  }
   
   for (let i = 0; i < lessonSections.length; i++) {
     const lessonContent = lessonSections[i];
@@ -258,24 +369,11 @@ export function splitLessonPlan(fullPlan: string): Array<{
       lessonTitle = "Write";
     }
 
-    // Extract theme/title from the full plan header
-    const themeMatch = fullPlan.match(/第\d+课：([^|]+)/);
-    const theme = themeMatch ? themeMatch[1].trim() : "小鸟";
-    
-    // Reconstruct individual lesson plan with proper header
-    const individualLessonContent = `**👣 YUEXUELE LESSON PLAN 👣**
-
-|**Level 1**|N1|**Unit 1**|第1课：${theme}|**Lesson ${lessonNumber}**|第${lessonNumber}节课|
-| :- | :- | :- | :- | :- | :- |
-||||||
-
-${lessonContent.trim()}`;
-
     lessons.push({
       lessonNumber,
       title: lessonTitle,
       type: lessonType,
-      content: individualLessonContent,
+      content: lessonContent.trim(),
       filename: `Lesson ${lessonNumber}.md`
     });
     
@@ -360,6 +458,7 @@ ${summaryContent.trim()}`;
 export async function generateLessonPlan(
   analysis: LessonAnalysis,
   ageGroup: string,
+  aiModel?: string,
 ): Promise<{ fullPlan: string; individualLessons: Array<{
   lessonNumber: number;
   title: string;
@@ -368,62 +467,126 @@ export async function generateLessonPlan(
   filename: string;
 }> }> {
   try {
+    const validatedModel = validateModel(aiModel);
+    console.log(`Generating lesson plan with model: ${validatedModel}`);
+    
     const response = await openai.chat.completions.create({
-      model: model5nano,
+      model: validatedModel,
       messages: [
         {
           role: "system",
-          content: `You are an expert Chinese language curriculum developer for Vietnamese students. Create a comprehensive 4-lesson unit plan following the YUEXUELE methodology with clear pedagogical progression: Learn → Story → Sing → Write.`,
+          content: `You are an expert Chinese language curriculum developer for Vietnamese students. Create a comprehensive 4-lesson unit plan following the YUEXUELE methodology with detailed teacher instructions and student activities. Each lesson plan must be extremely detailed and practical for classroom implementation, including:
+
+1. SPECIFIC teacher actions and verbal instructions
+2. DETAILED student activities and expected responses  
+3. COMPLETE materials list with preparation instructions
+4. STEP-BY-STEP procedures with timing
+5. ASSESSMENT criteria and observation points
+6. DIFFERENTIATION strategies for various learning levels
+7. TROUBLESHOOTING tips for common classroom challenges
+
+The lesson plans should be detailed enough that any teacher can follow them successfully without additional preparation.`,
         },
-        {
-          role: "user",
-          content: `Create 4 lesson plans based on this analysis:
+                 {
+           role: "user",
+           content: `Create 4 detailed lesson plans based on this analysis:
 
 Vocabulary: ${analysis.vocabulary.join(", ")}
 Theme: ${analysis.mainTheme}
 Age Group: ${ageGroup}
 
-Follow this EXACT structure for each lesson (example for Lesson 1):
+CRITICAL: Return the response as structured JSON data for each lesson plan. DO NOT use HTML tags or complex markdown tables.
 
-## LESSON 1: LEARN (综合课)
+Return this EXACT JSON structure:
 
-**👣 YUEXUELE LESSON PLAN 👣**
+{
+  "lessons": [
+    {
+      "lessonNumber": 1,
+      "title": "Learn",
+      "type": "综合课",
+      "header": {
+        "level": "N1",
+        "unit": "第1课：${analysis.mainTheme}",
+        "lesson": "第1节课",
+        "references": "参考资料",
+        "lessonAim": "教学目标：\\n认知领域：通过游戏形式，学生能够掌握重点字词：${analysis.vocabulary.join("、")}\\n技能领域：在老师的引导下，学生能够模仿老师的发音，说出本课的重点字词。",
+        "subAim": "营造包容开放有爱的课堂氛围，让学生适应华文课堂，建立师生信任，培养规则意识",
+        "materials": "学习资料、规则闪卡、魔术盒、苍蝇拍",
+        "duration": "45 分钟",
+        "vocabulary": "${analysis.vocabulary.join("、")}"
+      },
+      "activities": [
+        {
+          "stageName": "Warm up 热身",
+          "description": "让学生重新适应课堂环境，做好上课准备",
+          "timing": "5分钟",
+          "procedures": "● 老师走进教室，用\\"你好\\"跟学生打招呼\\n● 老师播放热身歌曲《如果开心你就跟我拍拍手》\\n● 教师跟着音乐跳舞，鼓励学生模仿",
+          "materials": "如果开心你就跟我拍拍手音乐"
+        }
+      ]
+    }
+  ]
+}
 
-es
+**LESSON-SPECIFIC REQUIREMENTS:**
 
-|**Level 1**|N1|**Unit 1**|第1课：${analysis.mainTheme}|**Lesson 1**|第1节课|
-| :- | :- | :- | :- | :- | :- |
-|||||||
+**LESSON 1: LEARN (综合课)** - Vocabulary introduction through games and activities
+- Type: 综合课
+- Activities: Warm up (5min), Rules (8min), Lead-in 魔术盒 (3min), Presentation 呈现目标词汇 (8min), Practice 拍一拍 (15min), Production 蹦蹦跳跳 (6min)
 
-|**References:**<br>参考资料||**Lesson aim:**<br>教学目标|**认知领域 （针对语音、词汇、语法、汉字）：**<br>- 通过游戏形式，学生能够掌握重点字词：${analysis.vocabulary.join(", ")}<br>**技能领域（针对听、说、读、写）：**<br>- 在老师的引导下，学生能够模仿（重复）老师的发音，说出本课的重点字词。<br>- 在老师的引导下，能跟老师重复课堂指令：安静、做好、听、洗手间。<br>- 在老师指导下，能模仿（重复）老师的发音，学说课堂问候/礼貌用语:你好、再见。|**Sub aim:**<br>次要教学目标|- 老师需营造出包容，开放，有爱的课堂氛围，让学生慢慢适应华文课堂的上课形式和特点，喜爱课堂、老师和同学。<br>- 在这一阶段，学生能跟老师教师之间建立起信任，逐渐对华文产生兴趣。<br>- 建立课堂基本秩序,初步培养规则意识|
-|**Type of lesson**<br>课型|综合课|**Materials required:**<br>教具|- 学习资料 (links)<br>- 规则闪卡<br>- 魔术盒<br>- 苍蝇拍（3个）|||
-|**Lesson content**<br>教学内容|词汇：${analysis.vocabulary.join(", ")}|||||
-|**Duration:**<br>课时|45 分钟|||||
+**LESSON 2: STORY (听说课)** - Story-based listening and speaking practice  
+- Type: 听说课  
+- Activities: Warm up 粘球大战 (15min), Rules (7min), Lead-in (3min), Presentation 主旨听力 (7min), Practice (8min), Production (5min)
 
-|**Stage & aim**<br>**教学环节与目标**|**Activities ideas & Procedures**<br>**活动设计与教学步骤**|**Materials /**<br>**教具**|
-| :-: | :-: | :-: |
-|**Warm up**<br>**热身**<br>让学生重新适应课堂环境，做好上课准备，并复习之前学过的词汇和语言点。<br>5 分钟|● 老师走进教室，用"你好"跟学生打招呼。<br>● 老师播放热身歌曲《如果开心你就跟我拍拍手》，教师跟着音乐跳舞，鼓励学生模仿。<br>● 由于是第一堂课，热身时间可适当延长（可播放两遍音乐），在正式上课前尽量安抚好个别学生情绪。<br>- 热身结束后，老师用照片卡"坐好"组织学生回到座位。|[如果开心你就跟我拍拍手](https://www.youtube.com/watch?v=wAGJVPXaHHk&list=RDwAGJVPXaHHk&start_radio=1)|
-|**Rules**<br>**规则**<br>提醒学生课堂上的行为规范。<br>8 分钟|老师点名，并把学生的名字写在白板一侧，便于老师记住新学生的名字。<br>老师展示闪卡，引导学生重复课堂规定，并确保这些闪卡始终贴在白板上或在墙上，方便在每个活动之后或需要时进行参考。<br>提醒学生课堂奖励制度。<br>记得在每一节课中使用相同的课堂管理系统，以便为学生提供一致性。<br>最重要的是：要始终如一，并尽可能使用积极强化的方法。<br>规则闪卡或规则图示应展示在白板上。|[规则闪卡](https://drive.google.com/file/d/1gx86LrjsOwQJNnHMmxGaKx_mndu3EzYU/view?usp=drive_link)<br>[贴纸奖励表](https://drive.google.com/file/d/1d58aYJm-u_jaPoh82XujyVxfytlJdcFp/view?usp=drive_link)|
-|**Lead-in**<br>**导入**<br>作为课程的重要引入部分。<br>3 分钟|**魔术盒**<br>魔术盒里事先放着主题相关道具，教师在拿着魔术盒时，可以做相关动作，让学生猜一猜里面是什么？打开魔术盒前，播放相关声音，引导学生说出主题词汇。|魔术盒<br>相关声音录音|
-|**Presentation - Target language**<br>**呈现目标词汇**<br>创设词汇语境，然后在该语境中演示词汇的用法。<br>8 分钟|- 老师引导学生说出词汇后，出示字卡，并引导学生重复多遍。<br>- 老师带着小朋友一起做相关动作，引出重点词语。<br>- 老师可以示范动作，出示字卡，带着学生做动作，并引导学生重复多遍。|[闪卡](https://drive.google.com/file/d/1zlXVgwsbVD7vkg27OtJIdEIL2kyuO1UL/view?usp=sharing)|
-|**Convey meaning**<br>**传达词义**<br>传达并检查目标词汇的含义<br>15分钟|**课堂活动 - 拍一拍**<br>- 老师将班级分成2-3个小组。<br>- 老师大声念出一个单词。<br>- 学生认真听，并拍打对应的图片。|苍蝇拍 x3|
-|**Pronunciation check**<br>**纠正发音**<br>注重发音训练，需兼顾单词与句子两个层面。<br>10分钟|**课堂活动 - 蹦蹦跳跳**<br>- 老师在地板上把闪卡贴成一列，闪卡之间的距离为半米。<br>- 老师引导学生每跳过一张闪卡就把生词读出来。|N/A|
-|**Post session - Vocabulary**<br>**课后词汇巩固**<br>复习检查已学词汇<br>5分钟|**课堂活动 - 大家一起来**<br>- 老师轮流展示幻灯片：词汇列表，给每个生词定制一个对应的动作。<br>- 在老师的引导下，学生模仿对应的动作。|N/A|
-|**Wrap up & rewards**<br>**总结与奖励**<br>2分钟|预留几分钟时间，运用课堂管理体系进行课程总结，并为表现良好的学生发放奖励。|Dojo积分/贴纸/印章<br>或其他奖励形式|
+**LESSON 3: SING (听说课)** - Song and rhythm-based phonetic practice
+- Type: 听说课
+- Activities: Warm up Bang Bang (10min), Rules (5min), Lead-in 导入与范例呈现 (5min), Presentation 口语准备 (10min), Practice 儿歌 (10min), Production 戏剧表演 (5min)
 
-Create the other 3 lessons following the same structure with these variations:
+**LESSON 4: WRITE (写作课)** - Character writing and fine motor skills  
+- Type: 写作课
+- Activities: Warm up 朗读时间 (10min), Rules (5min), Lead-in 深度理解 (8min), Presentation 写作准备 (7min), Practice 学笔画 (7min), Production 画一画贴一贴 (8min)
 
-**LESSON 2: STORY (听说课)** - Replace lesson type to 听说课, add story objectives, use 粘球大战 warmup and 听故事 activity
-**LESSON 3: SING (听说课)** - Use Bang Bang warmup, add 儿歌 and 戏剧 activities 
-**LESSON 4: WRITE (写作课)** - Replace lesson type to 写作课, add writing objectives, use 朗读时间, 学笔画, 画一画贴一贴 activities
+CRITICAL REQUIREMENTS FOR ALL LESSONS:
+1. **Extremely detailed procedures** with step-by-step teacher and student actions
+2. **Each activity must include:**
+   - **教师说：** "[EXACT CHINESE DIALOGUE]" - 老师具体说什么话
+   - **教师做：** [SPECIFIC PHYSICAL ACTIONS] - 老师具体做什么动作  
+   - **学生听到：** [WHAT STUDENTS HEAR] - 学生听到什么
+   - **学生看到：** [WHAT STUDENTS SEE] - 学生看到什么
+   - **学生做：** [STUDENT PHYSICAL RESPONSE] - 学生具体做什么
+   - **学生说：** [STUDENT VERBAL RESPONSE] - 学生说什么话
+3. **问题应对策略** for each step: 如果学生不反应怎么办
+4. **个别差异处理**: 能力强的学生做什么, 需要帮助的学生怎么办
+5. **成功标准** with specific percentages and observable behaviors
+6. **备用方案** for equipment failure or student difficulties
 
-Keep the exact table structure, HTML formatting, timing, and activity details as shown in the example above.`,
-        },
+**SUBSTITUTE TEACHER TEST:** 
+A substitute teacher with no Chinese teaching experience should be able to follow these plans successfully just by reading the step-by-step instructions.
+
+Generate extremely detailed, practical lesson plans in clean JSON format. Each activity should have complete step-by-step instructions that any teacher can follow.`,
+         },
       ],
     });
 
     const fullPlan = response.choices[0].message.content || "";
-    const individualLessons = splitLessonPlan(fullPlan);
+    console.log('Generated plan length:', fullPlan.length);
+    console.log('Plan starts with:', fullPlan.substring(0, 200));
+    
+    // Try to parse JSON response
+    let jsonData = null;
+    try {
+      // Extract JSON from response if it's wrapped in markdown
+      const jsonMatch = fullPlan.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/) || [null, fullPlan];
+      const jsonString = jsonMatch[1] || fullPlan;
+      jsonData = JSON.parse(jsonString);
+      console.log('Successfully parsed JSON data:', jsonData.lessons?.length, 'lessons');
+    } catch (error) {
+      console.log('Failed to parse JSON, falling back to text splitting');
+    }
+    
+    const individualLessons = jsonData ? convertJSONToLessons(jsonData) : splitLessonPlan(fullPlan);
+    console.log('Individual lessons created:', individualLessons.length);
     
     return {
       fullPlan,
@@ -440,20 +603,18 @@ export async function generateFlashcards(
   theme?: string,
   level?: string,
   ageGroup?: string,
+  aiModel?: string,
+  photoSource?: 'api' | 'ai'
 ): Promise<FlashcardData[]> {
   try {
     console.log("Generating flashcards for vocabulary:", vocabulary);
 
-    // Check cache first
-    const cacheKey = `flashcards_${vocabulary.join('_')}_${theme || 'default'}_${level || 'default'}_${ageGroup || 'default'}`;
-    const cachedResult = await getCachedAIResponse<FlashcardData[]>(cacheKey, model5nano);
-    if (cachedResult) {
-      console.log('🎯 Flashcard generation cache hit!');
-      return cachedResult;
-    }
+    // Always generate fresh flashcards and images (no cache)
+    const validatedModel = validateModel(aiModel);
+    console.log(`Generating flashcards with model: ${validatedModel}`);
 
     const response = await openai.chat.completions.create({
-      model: model5nano,
+      model: validatedModel,
       messages: [
         {
           role: "system",
@@ -477,19 +638,21 @@ Return a JSON object with this exact structure:
       "pinyin": "pinyin with tone marks", 
       "vietnamese": "Vietnamese translation",
       "partOfSpeech": "grammatical category (名词, 动词, etc.)",
-      "imageQuery": "descriptive English phrase for image generation related to ${theme}"
+      "imageQuery": "descriptive English phrase for direct image generation"
     }
   ]
 }
 
-Create one flashcard for each vocabulary word. Use accurate translations and clear image descriptions that relate to the theme "${theme}" when possible. 
+Create one flashcard for each vocabulary word. Use accurate translations and clear, direct image descriptions that immediately show the word's meaning. 
 
 IMPORTANT GUIDELINES FOR IMAGE QUERIES:
-- For action words/verbs (like "gật đầu" - nod head), describe static objects or characters WITHOUT showing the action being performed
-- For action words, focus on the subject performing the action in a neutral pose (e.g., "two birds standing together" instead of "birds nodding")
-- For nouns and adjectives, describe the object or concept directly
-- Make image queries specific and contextual to help students connect the vocabulary to the lesson theme
-- Always use simple, child-friendly descriptions suitable for educational illustrations`,
+- Create direct, clear descriptions that immediately represent the word's meaning
+- For nouns: describe the exact object (e.g., "red apple", "wooden table", "running dog")
+- For verbs: describe the action clearly and simply (e.g., "person eating", "child running", "bird flying")  
+- For adjectives: show the quality clearly (e.g., "big elephant", "small mouse", "red car")
+- Make descriptions specific and unambiguous - students should instantly recognize the word
+- Focus on recognizable representations rather than abstract or themed illustrations
+- Only 1 object per image`,
         },
       ],
       response_format: { type: "json_object" },
@@ -509,12 +672,31 @@ IMPORTANT GUIDELINES FOR IMAGE QUERIES:
       return [];
     }
 
-    // Generate AI images for all flashcards in parallel with rate limiting
+    // Generate images based on photoSource parameter
     console.log(
-      `Starting parallel image generation for ${flashcards.length} flashcards`,
+      `Starting image generation for ${flashcards.length} flashcards with source: ${photoSource || 'api'}`,
     );
 
-    // Process in batches of 3 to avoid rate limits
+    let unsplashResults: any = {};
+    let freepikResults: any = {};
+    
+    if (photoSource !== 'ai') {
+      // Import Unsplash and Freepik services only when needed
+      const { batchGetFlashcardImages } = await import('./unsplash-service.js');
+      const { batchGetFlashcardIcons } = await import('./freepik-service.js');
+      
+      // Extract image queries for search
+      const imageQueries = flashcards.map((card: FlashcardData) => card.imageQuery || card.word);
+      
+      // Get images from both Unsplash and Freepik in parallel
+      console.log('🔍 Fetching Unsplash images and Freepik icons...');
+      [unsplashResults, freepikResults] = await Promise.all([
+        batchGetFlashcardImages(imageQueries),
+        batchGetFlashcardIcons(imageQueries)
+      ]);
+    }
+    
+    // Process in batches of 3 to avoid rate limits for AI images
     const batchSize = 3;
     const batches: FlashcardData[][] = [];
     for (let i = 0; i < flashcards.length; i += batchSize) {
@@ -531,37 +713,147 @@ IMPORTANT GUIDELINES FOR IMAGE QUERIES:
 
       const batchPromises = batch.map(
         async (flashcard: FlashcardData, batchIndex: number) => {
+          let aiImageUrl = '';
+          
           try {
-            const imagePrompt = `A simple, clear, educational illustration for children learning Chinese: ${flashcard.imageQuery}. Clean, bright, cartoon-style suitable for preschool flashcards, less background. No text or characters in the image.`;
+            // Only generate AI images if photoSource is 'ai'
+            if (photoSource === 'ai') {
+              // Translate Chinese to English for safer image generation
+              let englishImageQuery = flashcard.imageQuery || flashcard.word;
+              
+              // Check if imageQuery contains Chinese characters
+              const containsChinese = /[\u4e00-\u9fff]/.test(englishImageQuery);
+              
+              if (containsChinese) {
+                console.log(`Translating Chinese "${englishImageQuery}" to English for safer image generation`);
+                
+                try {
+                  // Import the unified DeepL service for translation
+                  const { deeplService } = await import('./deepl-service.js');
+                  englishImageQuery = await deeplService.translateChineseToEnglish(englishImageQuery);
+                  console.log(`Translated "${flashcard.imageQuery || flashcard.word}" to "${englishImageQuery}"`);
+                } catch (translationError) {
+                  console.warn(`Translation failed for "${englishImageQuery}", using original:`, translationError);
+                  // Keep original query if translation fails
+                }
+              }
 
-            console.log(`Generating image for ${flashcard.word}`);
+              const imagePrompt = `A cute, child-friendly illustration of ${englishImageQuery}. Bright colors, simple and clean style, appealing to children from preschool to secondary level. Minimal colors, plain white or very simple background, focused only on the main object. Clear, recognizable subject that kids will love and easily understand. Cartoon-style but realistic enough to immediately identify the word. No detailed background, text, words, or characters in the image.`;
 
-            const imageResponse = await openai.images.generate({
-              model: "dall-e-3",
-              prompt: imagePrompt,
-              n: 1,
-              size: "1024x1024",
-              quality: "standard",
-            });
+              console.log(`Generating AI image for ${flashcard.word} using English query: "${englishImageQuery}"`);
 
-            const imageUrl =
-              imageResponse.data?.[0]?.url ||
-              `https://via.placeholder.com/400x300/FFE5E5/FF6B6B?text=${encodeURIComponent(flashcard.word)}`;
+              const imageResponse = await openai.images.generate({
+                model: "dall-e-3",
+                prompt: imagePrompt,
+                n: 1,
+                size: "1024x1024",
+                quality: "standard",
+              });
 
-            console.log(`Image generated successfully for ${flashcard.word}`);
+              aiImageUrl = imageResponse.data?.[0]?.url || aiImageUrl;
+              console.log(`✅ AI image generated successfully for ${flashcard.word}`);
+            } else {
+              console.log(`Skipping AI image generation for ${flashcard.word} (photoSource: ${photoSource})`);
+            }
 
+            // Get Unsplash images and Freepik icons for this flashcard (only if using API source)
+            const unsplashImages = photoSource !== 'ai' ? unsplashResults[flashcard.imageQuery || flashcard.word] : null;
+            const freepikIcons = photoSource !== 'ai' ? (freepikResults[flashcard.imageQuery || flashcard.word] || []) : [];
+            
+            // Combine all image options (only if using API source) - icons first
+            const allImages = photoSource !== 'ai' ? [
+              ...freepikIcons,
+              ...(unsplashImages?.illustrations || []),
+              ...(unsplashImages?.photos || [])
+            ] : [];
+            
+            // Choose the auto-selected image URL based on photoSource
+            let selectedImageUrl = aiImageUrl;
+            let autoSelected = null;
+            
+            if (photoSource !== 'ai') {
+              // Prefer icons first, then unsplash images (illustrations > photos)
+              if (freepikIcons.length > 0) {
+                autoSelected = freepikIcons[0];
+              } else if (unsplashImages?.autoSelected) {
+                autoSelected = unsplashImages.autoSelected;
+              }
+              selectedImageUrl = autoSelected?.url || aiImageUrl;
+            }
+            
+            const combinedImageOptions = {
+              photos: photoSource !== 'ai' ? (unsplashImages?.photos || []) : [],
+              illustrations: photoSource !== 'ai' ? (unsplashImages?.illustrations || []) : [],
+              icons: photoSource !== 'ai' ? freepikIcons : [],
+              autoSelected,
+              all: allImages,
+            };
+
+            // Only include AI image in illustrations if it was generated
+            if (photoSource === 'ai') {
+              combinedImageOptions.illustrations.push({
+                id: 'ai-image',
+                url: aiImageUrl,
+                alt: flashcard.word,
+                description: `AI generated image for ${flashcard.word}`,
+                credit: 'AI generated',
+                sourceUrl: aiImageUrl,
+                type: 'illustration' as const,
+              } as FlashcardImage);
+            }
+            
+            // Update all images array to include AI image if generated (icons first)
+            combinedImageOptions.all = [
+              ...combinedImageOptions.icons,
+              ...combinedImageOptions.illustrations,
+              ...combinedImageOptions.photos
+            ];
+            
             return {
               ...flashcard,
-              imageUrl,
+              imageUrl: selectedImageUrl,
+              imageOptions: combinedImageOptions,
+              selectedImageId: autoSelected?.id,
             };
           } catch (imageError) {
             console.error(
               `Failed to generate image for ${flashcard.word}:`,
               imageError,
             );
+            
+            // Get Unsplash images and Freepik icons even if AI fails (only if using API source)
+            const unsplashImages = photoSource !== 'ai' ? unsplashResults[flashcard.imageQuery || flashcard.word] : null;
+            const freepikIcons = photoSource !== 'ai' ? (freepikResults[flashcard.imageQuery || flashcard.word] || []) : [];
+            
+            // Combine all image options (only if using API source)
+            const allImages = photoSource !== 'ai' ? [
+              ...(unsplashImages?.photos || []),
+              ...(unsplashImages?.illustrations || []),
+              ...freepikIcons
+            ] : [];
+            
+            // Choose the auto-selected image URL based on photoSource
+            let autoSelected = null;
+            let fallbackUrl = '';
+            
+            if (photoSource !== 'ai' && unsplashImages) {
+              autoSelected = unsplashImages?.autoSelected || (freepikIcons.length > 0 ? freepikIcons[0] : null);
+              fallbackUrl = autoSelected?.url || '';
+            }
+            
+            const combinedImageOptions = {
+              photos: photoSource !== 'ai' ? (unsplashImages?.photos || []) : [],
+              illustrations: photoSource !== 'ai' ? (unsplashImages?.illustrations || []) : [],
+              icons: photoSource !== 'ai' ? freepikIcons : [],
+              autoSelected,
+              all: allImages,
+            };
+            
             return {
               ...flashcard,
-              imageUrl: `https://via.placeholder.com/400x300/FFE5E5/FF6B6B?text=${encodeURIComponent(flashcard.word)}`,
+              imageUrl: fallbackUrl,
+              imageOptions: combinedImageOptions,
+              selectedImageId: autoSelected?.id,
             };
           }
         },
@@ -581,9 +873,8 @@ IMPORTANT GUIDELINES FOR IMAGE QUERIES:
       `Parallel image generation completed for ${allFlashcardsWithImages.length} flashcards`,
     );
 
-    // Cache the flashcards for future use (cache for 4 hours)
-    await setCachedAIResponse(cacheKey, model5nano, allFlashcardsWithImages, 14400);
-    console.log('💾 Flashcards result cached');
+    // No caching - always generate fresh flashcards and images
+    console.log('✨ Fresh flashcards generated without cache');
 
     return allFlashcardsWithImages;
   } catch (error) {
@@ -613,196 +904,10 @@ export async function generateWithOpenAI(
   }
 }
 
-// Real-time Chinese to Vietnamese translation using DeepL Node.js SDK with caching
-export async function translateChineseToVietnamese(
-  words: string[],
-): Promise<Record<string, string>> {
-  console.log('🇻🇳 Starting Vietnamese translation for words:', words);
-  
-  try {
-    // Import cache service
-    const { translationCache } = await import('./translation-cache.js');
-    
-    // Check cache first
-    const { cached, missing } = await translationCache.getMultiple(words);
-    
-    if (missing.length === 0) {
-      console.log('🎯 All translations found in cache!');
-      return cached;
-    }
-    
-    console.log(`📊 Cache results - Found: ${Object.keys(cached).length}, Need to translate: ${missing.length}`);
-    
-    const deepLApiKey = process.env.DEEPL_API_KEY;
-    
-    if (!deepLApiKey) {
-      console.log("🚨 DEEPL_API_KEY not configured, falling back to OpenAI translation");
-      const openaiTranslations = await translateWithOpenAI(missing);
-      
-      // Cache OpenAI translations
-      await translationCache.setMultiple(openaiTranslations, 'openai');
-      
-      return { ...cached, ...openaiTranslations };
-    }
-
-    console.log('🔑 DeepL API key found:', deepLApiKey ? `${deepLApiKey.substring(0, 8)}...` : 'undefined');
-
-    const translator = new deepl.Translator(deepLApiKey);
-    
-    // Test the connection first with a simple word (only if not cached)
-    try {
-      const testCached = await translationCache.get('test', 'en', 'vi');
-      if (!testCached) {
-        const testResult = await translator.translateText('test', 'en', 'vi');
-        console.log('✅ DeepL API connection successful. Test result:', testResult.text);
-        await translationCache.set('test', testResult.text, 'deepl', 'en', 'vi');
-      } else {
-        console.log('✅ DeepL API test skipped (cached)');
-      }
-    } catch (testError: any) {
-      console.error('❌ DeepL API test failed:', testError.message);
-      console.log('🔄 Falling back to OpenAI translation');
-      const openaiTranslations = await translateWithOpenAI(missing);
-      await translationCache.setMultiple(openaiTranslations, 'openai');
-      return { ...cached, ...openaiTranslations };
-    }
-
-    const newTranslations: Record<string, string> = {};
-
-    // Translate missing words individually for better accuracy
-    const translationPromises = missing.map(async (word) => {
-      try {
-        console.log(`🔤 Translating "${word}" with DeepL...`);
-        const result = await translator.translateText(word, 'zh', 'vi');
-        console.log(`✅ DeepL translation: "${word}" → "${result.text}"`);
-        
-        // Cache the result
-        await translationCache.set(word, result.text, 'deepl');
-        
-        return { [word]: result.text };
-      } catch (error: any) {
-        console.error(`❌ DeepL translation error for word "${word}":`, error.message);
-        console.log(`🔄 Falling back to OpenAI for word: "${word}"`);
-        // Fall back to OpenAI for this word
-        const fallbackTranslation = await translateWithOpenAI([word]);
-        const translation = fallbackTranslation[word] || word;
-        
-        // Cache the OpenAI fallback result
-        await translationCache.set(word, translation, 'openai');
-        
-        return { [word]: translation };
-      }
-    });
-
-    const results = await Promise.all(translationPromises);
-    results.forEach((result) => Object.assign(newTranslations, result));
-
-    const allTranslations = { ...cached, ...newTranslations };
-    console.log('🎉 All translations completed:', allTranslations);
-    
-    // Log cache stats
-    const stats = await translationCache.getCacheStats();
-    console.log(`📈 Cache stats: ${stats.totalEntries} total (${stats.deeplEntries} DeepL, ${stats.openaiEntries} OpenAI)`);
-    
-    return allTranslations;
-  } catch (error: any) {
-    console.error("💥 DeepL translation error:", error.message);
-    console.log('🔄 Falling back to OpenAI translation');
-    return await translateWithOpenAI(words);
-  }
-}
-
-// Fallback translation using OpenAI
-async function translateWithOpenAI(words: string[]): Promise<Record<string, string>> {
-  console.log('🤖 Using OpenAI fallback translation for words:', words);
-  
-  try {
-    const openaiKey = process.env.OPENAI_API_KEY || process.env.OPENAI_KEY;
-    
-    if (!openaiKey || openaiKey === "your-api-key-here") {
-      console.error('❌ OpenAI API key not configured properly');
-      throw new Error('OpenAI API key not configured');
-    }
-
-    const openai = new OpenAI({
-      apiKey: openaiKey,
-    });
-
-    const prompt = `Translate these Chinese words to Vietnamese. Return only a JSON object with Chinese words as keys and Vietnamese translations as values:
-${words.join(', ')}
-
-Format: {"word1": "translation1", "word2": "translation2"}
-
-Examples:
-{"小鸟": "chim nhỏ", "朋友": "bạn bè", "飞": "bay", "点点头": "gật đầu"}`;
-
-    console.log('🔄 Sending request to OpenAI...');
-    
-    const response = await openai.chat.completions.create({
-      model: "gpt-5-nano",
-      messages: [
-        {
-          role: "system",
-          content: "You are a professional Chinese-Vietnamese translator. Return only valid JSON with accurate Vietnamese translations."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      response_format: { type: "json_object" },
-    });
-
-    const content = response.choices[0].message.content;
-    console.log('📝 OpenAI response content:', content);
-    
-    if (!content) {
-      throw new Error('Empty response from OpenAI');
-    }
-
-    const result = JSON.parse(content);
-    console.log('✅ OpenAI fallback translations completed:', result);
-    return result;
-  } catch (error: any) {
-    console.error("💥 OpenAI translation fallback failed:", error.message);
-    
-    // Final fallback - return actual Vietnamese translations instead of placeholders
-    console.log('🆘 Using final fallback with basic translations');
-    const fallbackTranslations: Record<string, string> = {};
-    
-    // Basic translation mappings
-    const basicTranslations: Record<string, string> = {
-      '小鸟': 'chim nhỏ',
-      '朋友': 'bạn bè', 
-      '飞': 'bay',
-      '点点头': 'gật đầu',
-      '故事环节': 'phần kể chuyện',
-      '戏剧': 'kịch',
-      '律动': 'vận động',
-      '习题时间': 'thời gian làm bài tập',
-      '课本': 'sách giáo khoa',
-      '学生': 'học sinh',
-      '老师': 'giáo viên',
-      '学笔画': 'học nét chữ',
-      '下课': 'hết giờ học',
-      '字卡': 'thẻ từ',
-      '儿歌': 'bài hát thiếu nhi',
-      '贴纸': 'nhãn dán',
-      'N1': 'cấp độ N1'
-    };
-    
-    words.forEach(word => {
-      fallbackTranslations[word] = basicTranslations[word] || `[Cần dịch: ${word}]`;
-    });
-    
-    console.log('🎯 Final fallback translations:', fallbackTranslations);
-    return fallbackTranslations;
-  }
-}
-
 export async function generateSummary(
   lessonPlan: string,
   vocabulary: string[],
+  aiModel?: string,
 ): Promise<{ fullSummary: string; individualSummaries: Array<{
   lessonNumber: number;
   title: string;
@@ -810,8 +915,11 @@ export async function generateSummary(
   filename: string;
 }> }> {
   try {
+    const validatedModel = validateModel(aiModel);
+    console.log(`Generating summary with model: ${validatedModel}`);
+    
     const response = await openai.chat.completions.create({
-      model: model5nano,
+      model: validatedModel,
       messages: [
         {
           role: "system",

@@ -81,7 +81,7 @@
   }
   
   .workflow-step.completed {
-    @apply bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800;
+    @apply border-green-200 dark:bg-green-950 dark:border-green-800;
   }
   
   .step-indicator {

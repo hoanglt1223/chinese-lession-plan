@@ -15,12 +15,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { lessonPlan, vocabulary } = req.body;
+    const { lessonPlan, vocabulary, aiModel } = req.body;
     if (!lessonPlan) {
       return res.status(400).json({ message: "Lesson plan is required" });
     }
 
-    const result = await generateSummary(lessonPlan, vocabulary || []);
+    const result = await generateSummary(lessonPlan, vocabulary || [], aiModel);
     
     return res.json({ 
       summaries: result.individualSummaries, // Individual summary files

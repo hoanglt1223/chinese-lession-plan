@@ -118,7 +118,7 @@ function HomeContent() {
                 <Badge variant="secondary" className="flex items-center gap-1 text-xs sm:text-sm px-2 py-1">
                   <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                   <span className="font-medium">
-                    ${user.creditBalance}
+                    {user.creditBalance}
                   </span>
                   <span className="hidden lg:inline text-xs">Credits</span>
                 </Badge>
@@ -146,8 +146,8 @@ function HomeContent() {
                   onChange={(e) => updateModel(e.target.value)}
                 >
                   <option value="gpt-5-nano">GPT-5-nano</option>
+                  <option value="gpt-5-mini">GPT-5-mini</option>
                   <option value="gpt-4o">GPT-4o</option>
-                  <option value="gpt-4o-mini">GPT-4o-mini</option>
                 </select>
                 <select 
                   className="px-2 py-1 border rounded-md text-xs bg-background hover:bg-accent transition-colors min-w-0"
@@ -218,8 +218,8 @@ function HomeContent() {
                     onChange={(e) => updateModel(e.target.value)}
                   >
                     <option value="gpt-5-nano">5-nano</option>
+                    <option value="gpt-5-mini">5-mini</option>
                     <option value="gpt-4o">4o</option>
-                    <option value="gpt-4o-mini">4o-mini</option>
                   </select>
                   <select 
                     className="px-2 py-1 border rounded text-xs bg-background w-20"
@@ -236,15 +236,6 @@ function HomeContent() {
               </div>
             </div>
           )}
-          
-          {/* Desktop Export Bar */}
-          <div className="hidden lg:flex items-center justify-center mt-3 pt-3 border-t border-border/50">
-            <ExportBar 
-              lessonId={selectedLesson}
-              lesson={lesson || null}
-              disabled={!selectedLesson || currentStep === 0}
-            />
-          </div>
         </div>
       </header>
 
@@ -264,13 +255,6 @@ function HomeContent() {
                 <option value="vietnamese">Tiếng Việt</option>
                 <option value="english">English</option>
               </select>
-            </div>
-            <div className="flex-1 flex justify-end">
-              <ExportBar 
-                lessonId={selectedLesson}
-                lesson={lesson || null}
-                disabled={!selectedLesson || currentStep === 0}
-              />
             </div>
           </div>
         </div>
@@ -498,13 +482,6 @@ function HomeContent() {
           Thanh Hoàng tặng vợ iu Thu Thảo
         </p>
       </footer>
-
-      {/* Floating Help */}
-      <div className="fixed bottom-6 right-6 z-50">
-        <Button size="lg" className="w-12 h-12 rounded-full bg-accent hover:bg-accent/90">
-          ?
-        </Button>
-      </div>
     </div>
   );
 }

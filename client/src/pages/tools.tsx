@@ -25,16 +25,19 @@ import {
   DollarSign,
   LogOut,
   Mic,
-  FileAudio
+  FileAudio,
+  Plus
 } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useAI } from "@/contexts/AIContext";
 
 export default function Tools() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({});
+  const { settings: aiSettings } = useAI();
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
@@ -49,10 +52,6 @@ export default function Tools() {
     },
   });
 
-  // Global AI Settings
-  const [aiModel, setAiModel] = useState("gpt-5-nano");
-  const [outputLanguage, setOutputLanguage] = useState("auto");
-
   // Convert Tool States
   const [convertInput, setConvertInput] = useState("");
   const [convertFrom, setConvertFrom] = useState("markdown");
@@ -64,6 +63,19 @@ export default function Tools() {
   const [imageDescription, setImageDescription] = useState("");
   const [imageStyle, setImageStyle] = useState("educational");
   const [generatedImageUrl, setGeneratedImageUrl] = useState("");
+
+  // Text-to-Image States
+  const [textToImageText, setTextToImageText] = useState("");
+  const [textToImageLibrary, setTextToImageLibrary] = useState("ultimate");
+  const [textToImageStyle, setTextToImageStyle] = useState("default");
+  const [generatedTextImageUrl, setGeneratedTextImageUrl] = useState("");
+  const [textImageOptions, setTextImageOptions] = useState({
+    width: 400,
+    height: 200,
+    fontSize: 24,
+    fontColor: "#000000",
+    backgroundColor: "#ffffff"
+  });
 
   // Translation States
   const [translationText, setTranslationText] = useState("");
@@ -99,6 +111,21 @@ export default function Tools() {
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [uploadMethod, setUploadMethod] = useState<"record" | "upload">("upload");
 
+  // Flashcard Creator States
+  const [flashcardItems, setFlashcardItems] = useState<Array<{
+    id: string;
+    type: 'text' | 'image';
+    content: string;
+    chineseWord: string;
+    pinyin: string;
+    imageFile?: File;
+  }>>([]);
+  const [currentChineseWord, setCurrentChineseWord] = useState("");
+  const [currentPinyin, setCurrentPinyin] = useState("");
+  const [currentContent, setCurrentContent] = useState("");
+  const [currentType, setCurrentType] = useState<'text' | 'image'>('text');
+  const [currentImageFile, setCurrentImageFile] = useState<File | null>(null);
+
   const copyToClipboard = async (text: string, id: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -121,8 +148,6 @@ export default function Tools() {
         formData.append('file', convertFile);
         formData.append('from', convertFrom);
         formData.append('to', convertTo);
-        formData.append('aiModel', aiModel);
-        formData.append('outputLanguage', outputLanguage);
         
         const response = await fetch('/api/tools/convert-file', {
           method: 'POST',
@@ -138,8 +163,8 @@ export default function Tools() {
             content: convertInput,
             from: convertFrom,
             to: convertTo,
-            aiModel,
-            outputLanguage
+            aiModel: aiSettings.selectedModel,
+            outputLanguage: aiSettings.outputLanguage
           })
         });
         return response.json();
@@ -163,8 +188,8 @@ export default function Tools() {
         body: JSON.stringify({
           description: imageDescription,
           style: imageStyle,
-          aiModel,
-          outputLanguage
+          aiModel: aiSettings.selectedModel,
+          outputLanguage: aiSettings.outputLanguage
         })
       });
       return response.json();
@@ -178,6 +203,31 @@ export default function Tools() {
     }
   });
 
+  // Text-to-Image Mutation
+  const textToImageMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch('/api/tools/text-to-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: textToImageText,
+          library: textToImageLibrary,
+          style: textToImageStyle,
+          options: textImageOptions
+        })
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setGeneratedTextImageUrl(data.imageUrl);
+      toast({ title: `Text image generated with ${textToImageLibrary}!` });
+    },
+    onError: (error) => {
+      console.error('Text-to-image error:', error);
+      toast({ title: "Text-to-image generation failed", variant: "destructive" });
+    }
+  });
+
   // Translation Mutation
   const translationMutation = useMutation({
     mutationFn: async () => {
@@ -188,8 +238,8 @@ export default function Tools() {
           text: translationText,
           from: translationFrom,
           to: translationTo,
-          aiModel,
-          outputLanguage
+          aiModel: aiSettings.selectedModel,
+          outputLanguage: aiSettings.outputLanguage
         })
       });
       return response.json();
@@ -212,8 +262,8 @@ export default function Tools() {
         body: JSON.stringify({
           text: vocabularyText,
           level: vocabularyLevel,
-          aiModel,
-          outputLanguage
+          aiModel: aiSettings.selectedModel,
+          outputLanguage: aiSettings.outputLanguage
         })
       });
       return response.json();
@@ -257,8 +307,8 @@ export default function Tools() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           content: analysisText,
-          aiModel,
-          outputLanguage
+          aiModel: aiSettings.selectedModel,
+          outputLanguage: aiSettings.outputLanguage
         })
       });
       return response.json();
@@ -281,8 +331,8 @@ export default function Tools() {
         body: JSON.stringify({
           originalPrompt,
           purpose: promptPurpose,
-          aiModel,
-          outputLanguage
+          aiModel: aiSettings.selectedModel,
+          outputLanguage: aiSettings.outputLanguage
         })
       });
       return response.json();
@@ -342,7 +392,7 @@ export default function Tools() {
       } else {
         formData.append('audio', audioBlob!, 'recording.wav');
       }
-      formData.append('language', outputLanguage);
+      formData.append('language', aiSettings.outputLanguage);
 
       const response = await fetch('/api/speech-to-text', {
         method: 'POST',
@@ -371,6 +421,116 @@ export default function Tools() {
       setAudioBlob(null); // Clear any recorded audio
     }
   };
+
+  // Flashcard Functions
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        toast({ title: "Please select an image file", variant: "destructive" });
+        return;
+      }
+      setCurrentImageFile(file);
+      setCurrentContent(file.name);
+    }
+  };
+
+  const addFlashcardItem = () => {
+    if (!currentChineseWord.trim() || !currentPinyin.trim()) {
+      toast({ title: "Please fill in Chinese word and pinyin", variant: "destructive" });
+      return;
+    }
+
+    if (currentType === 'image' && !currentImageFile) {
+      toast({ title: "Please select an image for this flashcard", variant: "destructive" });
+      return;
+    }
+
+    if (currentType === 'text' && !currentContent.trim()) {
+      toast({ title: "Please enter text content for this flashcard", variant: "destructive" });
+      return;
+    }
+
+    const newItem = {
+      id: crypto.randomUUID(),
+      type: currentType,
+      content: currentContent,
+      chineseWord: currentChineseWord,
+      pinyin: currentPinyin,
+      imageFile: currentType === 'image' && currentImageFile ? currentImageFile : undefined
+    };
+
+    setFlashcardItems([...flashcardItems, newItem]);
+
+    // Clear form
+    setCurrentChineseWord("");
+    setCurrentPinyin("");
+    setCurrentContent("");
+    setCurrentImageFile(null);
+
+    toast({ title: "Flashcard added successfully" });
+  };
+
+  const removeFlashcardItem = (id: string) => {
+    setFlashcardItems(flashcardItems.filter(item => item.id !== id));
+    toast({ title: "Flashcard removed" });
+  };
+
+  const clearAllFlashcards = () => {
+    setFlashcardItems([]);
+    toast({ title: "All flashcards cleared" });
+  };
+
+  // Flashcard PDF Generation Mutation
+  const flashcardPDFMutation = useMutation({
+    mutationFn: async () => {
+      if (flashcardItems.length === 0) {
+        throw new Error("No flashcards to generate");
+      }
+
+      // Convert flashcard items to the format expected by the API
+      const flashcards = flashcardItems.map(item => ({
+        word: item.chineseWord,
+        pinyin: item.pinyin,
+        vietnamese: "", // No Vietnamese as requested
+        partOfSpeech: "",
+        imageQuery: item.type === 'image' ? item.content : item.chineseWord,
+        imageUrl: ""
+      }));
+
+      const response = await fetch('/api/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          documentType: 'flashcard-pdf',
+          flashcards
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return response.blob();
+    },
+    onSuccess: (blob) => {
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = `Custom_Flashcards_${Date.now()}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({ title: "Flashcard PDF generated successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to generate flashcard PDF", variant: "destructive" });
+    }
+  });
 
   return (
     <div className="min-h-screen bg-background">
@@ -402,7 +562,6 @@ export default function Tools() {
                   <Badge variant="secondary" className="flex items-center gap-1 text-xs lg:text-sm">
                     <DollarSign className="h-3 w-3 lg:h-4 lg:w-4" />
                     <span className="hidden sm:inline">${user.creditBalance}</span>
-                    <span className="sm:hidden">${user.creditBalance.split('.')[0]}</span>
                     <span className="hidden lg:inline">Credits</span>
                   </Badge>
                   <span className="text-xs lg:text-sm text-muted-foreground hidden md:block">
@@ -426,36 +585,6 @@ export default function Tools() {
           </div>
         </div>
       </header>
-
-      {/* Mobile AI Settings */}
-      <div className="lg:hidden border-b bg-background">
-        <div className="max-w-7xl mx-auto px-2 sm:px-4">
-          <div className="flex items-center justify-between py-2">
-            <div className="flex items-center space-x-2 text-sm">
-              <select 
-                className="p-1 border rounded text-xs bg-background"
-                value={aiModel}
-                onChange={(e) => setAiModel(e.target.value)}
-              >
-                <option value="gpt-5-nano">GPT-5-nano</option>
-                <option value="gpt-4o">GPT-4o</option>
-                <option value="gpt-4o-mini">GPT-4o-mini</option>
-              </select>
-              <select 
-                className="p-1 border rounded text-xs bg-background"
-                value={outputLanguage}
-                onChange={(e) => setOutputLanguage(e.target.value)}
-              >
-                <option value="auto">Auto</option>
-                <option value="chinese">中文</option>
-                <option value="vietnamese">Tiếng Việt</option>
-                <option value="english">English</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <div className="max-w-6xl mx-auto p-2 sm:p-4 lg:p-8">
         <div className="mb-6 lg:mb-8">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -465,44 +594,6 @@ export default function Tools() {
                 Standalone tools to enhance your Chinese language teaching workflow
               </p>
             </div>
-            
-            {/* Desktop AI Settings */}
-            <Card className="w-full lg:w-80 hidden lg:block">
-              <CardContent className="p-4">
-                <Label className="text-sm font-medium mb-3 block">AI Settings</Label>
-                <div className="space-y-3">
-                  <div>
-                    <Label htmlFor="ai-model" className="text-xs">AI Model</Label>
-                    <select 
-                      id="ai-model"
-                      className="w-full mt-1 p-2 text-sm border rounded"
-                      value={aiModel}
-                      onChange={(e) => setAiModel(e.target.value)}
-                    >
-                      <option value="gpt-5-nano">GPT-5-nano (Fast & Efficient)</option>
-                      <option value="gpt-4o">GPT-4o (Most Capable)</option>
-                      <option value="gpt-4o-mini">GPT-4o-mini (Balanced)</option>
-                      <option value="gpt-3.5-turbo">GPT-3.5-turbo (Budget)</option>
-                    </select>
-                  </div>
-                  <div>
-                    <Label htmlFor="output-language" className="text-xs">Output Language</Label>
-                    <select 
-                      id="output-language"
-                      className="w-full mt-1 p-2 text-sm border rounded"
-                      value={outputLanguage}
-                      onChange={(e) => setOutputLanguage(e.target.value)}
-                    >
-                      <option value="auto">Auto-detect</option>
-                      <option value="chinese">Chinese (中文)</option>
-                      <option value="vietnamese">Vietnamese (Tiếng Việt)</option>
-                      <option value="english">English</option>
-                      <option value="bilingual">Bilingual (Chinese + Vietnamese)</option>
-                    </select>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
           </div>
         </div>
 
@@ -514,6 +605,7 @@ export default function Tools() {
             <TabsTrigger value="vocabulary" className="text-sm">Vocabulary</TabsTrigger>
             <TabsTrigger value="audio" className="text-sm">Audio</TabsTrigger>
             <TabsTrigger value="speech" className="text-sm">Speech</TabsTrigger>
+            <TabsTrigger value="flashcards" className="text-sm">Flashcards</TabsTrigger>
             <TabsTrigger value="analyze" className="text-sm">Analyze</TabsTrigger>
             <TabsTrigger value="prompt" className="text-sm">Prompt</TabsTrigger>
             <TabsTrigger value="links" className="text-sm">Links</TabsTrigger>
@@ -636,14 +728,18 @@ export default function Tools() {
             </Card>
           </TabsContent>
 
-          {/* Image Generation Tool */}
-          <TabsContent value="image">
+          {/* Image Generation Tools */}
+          <TabsContent value="image" className="space-y-6">
+            {/* AI Image Generator Card */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <ImageIcon className="w-5 h-5" />
                   AI Image Generator
                 </CardTitle>
+                <CardDescription>
+                  Generate images from text descriptions using AI
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
@@ -693,6 +789,155 @@ export default function Tools() {
                     <Button 
                       className="w-full mt-2"
                       onClick={() => window.open(generatedImageUrl, '_blank')}
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Download Image
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Text-to-Image Generator Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileImage className="w-5 h-5" />
+                  Text-to-Image Generator
+                </CardTitle>
+                <CardDescription>
+                  Convert text into images with customizable styling - perfect for Chinese characters
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="text-to-image-text">Text Content</Label>
+                  <Textarea
+                    id="text-to-image-text"
+                    placeholder="Enter Chinese text, vocabulary words, or any text to convert to image..."
+                    value={textToImageText}
+                    onChange={(e) => setTextToImageText(e.target.value)}
+                    className="min-h-[80px]"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="text-image-library">Library</Label>
+                    <select 
+                      id="text-image-library"
+                      className="w-full mt-1 p-2 border rounded"
+                      value={textToImageLibrary}
+                      onChange={(e) => setTextToImageLibrary(e.target.value)}
+                    >
+                      <option value="ultimate">Ultimate Text-to-Image</option>
+                      <option value="text-to-image">Text-to-Image</option>
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="text-image-style">Style</Label>
+                    <select 
+                      id="text-image-style"
+                      className="w-full mt-1 p-2 border rounded"
+                      value={textToImageStyle}
+                      onChange={(e) => setTextToImageStyle(e.target.value)}
+                    >
+                      <option value="default">Default</option>
+                      <option value="bold">Bold</option>
+                      <option value="colorful">Colorful</option>
+                      <option value="minimal">Minimal</option>
+                      <option value="large">Large Text</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div>
+                    <Label htmlFor="text-width">Width</Label>
+                    <Input
+                      id="text-width"
+                      type="number"
+                      value={textImageOptions.width}
+                      onChange={(e) => setTextImageOptions(prev => ({
+                        ...prev,
+                        width: parseInt(e.target.value) || 400
+                      }))}
+                      min="100"
+                      max="1200"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="text-height">Height</Label>
+                    <Input
+                      id="text-height"
+                      type="number"
+                      value={textImageOptions.height}
+                      onChange={(e) => setTextImageOptions(prev => ({
+                        ...prev,
+                        height: parseInt(e.target.value) || 200
+                      }))}
+                      min="50"
+                      max="800"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="text-font-size">Font Size</Label>
+                    <Input
+                      id="text-font-size"
+                      type="number"
+                      value={textImageOptions.fontSize}
+                      onChange={(e) => setTextImageOptions(prev => ({
+                        ...prev,
+                        fontSize: parseInt(e.target.value) || 24
+                      }))}
+                      min="8"
+                      max="100"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="text-bg-color">Background</Label>
+                    <Input
+                      id="text-bg-color"
+                      type="color"
+                      value={textImageOptions.backgroundColor}
+                      onChange={(e) => setTextImageOptions(prev => ({
+                        ...prev,
+                        backgroundColor: e.target.value
+                      }))}
+                    />
+                  </div>
+                </div>
+
+                <Button 
+                  onClick={() => textToImageMutation.mutate()}
+                  disabled={textToImageMutation.isPending || !textToImageText.trim()}
+                  className="w-full"
+                >
+                  {textToImageMutation.isPending ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Converting Text...</>
+                  ) : (
+                    <><FileImage className="w-4 h-4 mr-2" /> Convert to Image</>
+                  )}
+                </Button>
+
+                {generatedTextImageUrl && (
+                  <div className="border rounded p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge variant="secondary">{textToImageLibrary}</Badge>
+                      <Badge variant="outline">{textImageOptions.width}×{textImageOptions.height}</Badge>
+                    </div>
+                    <img 
+                      src={generatedTextImageUrl} 
+                      alt="Generated text image"
+                      className="w-full max-w-md mx-auto rounded border"
+                    />
+                    <Button 
+                      className="w-full mt-2"
+                      onClick={() => window.open(generatedTextImageUrl, '_blank')}
                     >
                       <Download className="w-4 h-4 mr-2" />
                       Download Image
@@ -910,6 +1155,208 @@ export default function Tools() {
                     </audio>
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Flashcard Creator Tool */}
+          <TabsContent value="flashcards">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileImage className="w-5 h-5" />
+                  Custom Flashcard Creator
+                </CardTitle>
+                <CardDescription>
+                  Create custom flashcards with images and text, then generate PDF for printing
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Flashcard Input Form */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="flashcard-type">Content Type</Label>
+                      <select 
+                        id="flashcard-type"
+                        className="w-full mt-1 p-2 border rounded"
+                        value={currentType}
+                        onChange={(e) => setCurrentType(e.target.value as 'text' | 'image')}
+                      >
+                        <option value="text">Text Only</option>
+                        <option value="image">Image</option>
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="chinese-word">Chinese Word</Label>
+                        <Input
+                          id="chinese-word"
+                          placeholder="例: 小鸟"
+                          value={currentChineseWord}
+                          onChange={(e) => setCurrentChineseWord(e.target.value)}
+                          className="text-lg"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="pinyin">Pinyin</Label>
+                        <Input
+                          id="pinyin"
+                          placeholder="例: xiǎo niǎo"
+                          value={currentPinyin}
+                          onChange={(e) => setCurrentPinyin(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    {currentType === 'image' ? (
+                      <div>
+                        <Label htmlFor="flashcard-image">Upload Image</Label>
+                        <Input
+                          id="flashcard-image"
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageUpload}
+                          className="mt-1"
+                        />
+                        {currentImageFile && (
+                          <div className="mt-2 p-2 border rounded bg-muted/50">
+                            <div className="flex items-center gap-2">
+                              <ImageIcon className="w-4 h-4" />
+                              <span className="text-sm">{currentImageFile.name}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div>
+                        <Label htmlFor="text-content">Text Content</Label>
+                        <Textarea
+                          id="text-content"
+                          placeholder="Enter descriptive text for this flashcard..."
+                          value={currentContent}
+                          onChange={(e) => setCurrentContent(e.target.value)}
+                          className="min-h-20"
+                        />
+                      </div>
+                    )}
+
+                    <Button 
+                      onClick={addFlashcardItem}
+                      disabled={!currentChineseWord.trim() || !currentPinyin.trim() || 
+                        (currentType === 'image' && !currentImageFile) ||
+                        (currentType === 'text' && !currentContent.trim())}
+                      className="w-full"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Flashcard
+                    </Button>
+                  </div>
+
+                  {/* Preview & List */}
+                  <div className="space-y-4">
+                    <div>
+                      <div className="flex justify-between items-center">
+                        <Label>Flashcards Collection ({flashcardItems.length} cards, {flashcardItems.length * 2} pages)</Label>
+                        {flashcardItems.length > 0 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={clearAllFlashcards}
+                            className="text-xs text-muted-foreground hover:text-destructive"
+                          >
+                            Clear All
+                          </Button>
+                        )}
+                      </div>
+                      <div className="max-h-64 overflow-y-auto border rounded-lg">
+                        {flashcardItems.length === 0 ? (
+                          <div className="p-4 text-center text-muted-foreground">
+                            <div className="mb-2">No flashcards added yet</div>
+                            <div className="text-xs">Add multiple flashcards to create one PDF with all cards</div>
+                          </div>
+                        ) : (
+                          <div className="space-y-2 p-2">
+                            {flashcardItems.map((item) => (
+                              <div key={item.id} className="flex items-center gap-3 p-3 border rounded bg-background">
+                                <div className="flex-1">
+                                  <div className="font-medium text-lg">{item.chineseWord}</div>
+                                  <div className="text-sm text-muted-foreground">{item.pinyin}</div>
+                                  <div className="text-xs text-muted-foreground mt-1">
+                                    {item.type === 'image' ? (
+                                      <span className="flex items-center gap-1">
+                                        <ImageIcon className="w-3 h-3" />
+                                        {item.content}
+                                      </span>
+                                    ) : (
+                                      <span>{item.content}</span>
+                                    )}
+                                  </div>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeFlashcardItem(item.id)}
+                                  className="text-destructive hover:text-destructive"
+                                >
+                                  ×
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {flashcardItems.length > 0 && (
+                      <div className="space-y-3">
+                        <div className="text-sm bg-blue-50 border border-blue-200 rounded p-3">
+                          <div className="font-medium text-blue-900">📄 PDF Output:</div>
+                          <div className="text-blue-700 text-xs mt-1">
+                            • {flashcardItems.length} flashcard{flashcardItems.length !== 1 ? 's' : ''} = {flashcardItems.length * 2} pages total
+                            <br />
+                            • Each card has front side (Chinese + content) and back side (Chinese + pinyin)
+                            <br />
+                            • All cards will be combined into one PDF file
+                          </div>
+                        </div>
+                        
+                        <Button 
+                          onClick={() => flashcardPDFMutation.mutate()}
+                          disabled={flashcardPDFMutation.isPending}
+                          className="w-full"
+                          size="lg"
+                        >
+                          {flashcardPDFMutation.isPending ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Generating PDF with {flashcardItems.length} cards...
+                            </>
+                          ) : (
+                            <>
+                              <Download className="w-4 h-4 mr-2" />
+                              Generate PDF ({flashcardItems.length} cards, {flashcardItems.length * 2} pages)
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Instructions */}
+                <div className="bg-muted/30 p-4 rounded-lg border">
+                  <h4 className="font-medium mb-2">📋 Instructions:</h4>
+                  <ul className="text-sm space-y-1 list-disc list-inside">
+                    <li><strong>Add Multiple Cards:</strong> Create as many flashcards as you want - they'll all be in one PDF</li>
+                    <li><strong>Chinese & Pinyin:</strong> Enter Chinese characters and their pinyin pronunciation</li>
+                    <li><strong>Content Options:</strong> Choose text description OR upload an image for each card</li>
+                    <li><strong>PDF Layout:</strong> Each flashcard = 2 pages (front: Chinese + content, back: Chinese + pinyin)</li>
+                    <li><strong>Perfect for Printing:</strong> Print, cut along lines, and fold for physical flashcards</li>
+                    <li><strong>Batch Processing:</strong> All your flashcards will be combined into one convenient PDF file</li>
+                  </ul>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

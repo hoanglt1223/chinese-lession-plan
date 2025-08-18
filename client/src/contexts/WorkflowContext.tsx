@@ -12,6 +12,7 @@ interface WorkflowContextType {
   getStepProgress: (lesson: Lesson | null) => WorkflowState;
   isStepCompleted: (step: number, lesson: Lesson | null) => boolean;
   isStepActive: (step: number, lesson: Lesson | null) => boolean;
+  isStepAvailable: (step: number, lesson: Lesson | null) => boolean;
 }
 
 const WorkflowContext = createContext<WorkflowContextType | undefined>(undefined);
@@ -40,22 +41,25 @@ export function WorkflowProvider({ children }: WorkflowProviderProps) {
     // Step 1: Review - check if AI analysis exists
     if (lesson.aiAnalysis) {
       completed.push(1);
+      // After step 1, both steps 2 and 3 become available simultaneously
       current = 2;
     }
 
     // Step 2: Plan - check if lesson plan or lesson plans exist
     if (lesson.lessonPlans && lesson.lessonPlans.length > 0) {
       completed.push(2);
-      current = 3;
+      // Step 4 becomes available after step 2 (independent of step 3)
+      if (!completed.includes(4)) {
+        current = Math.max(current, 4);
+      }
     }
 
-    // Step 3: Flashcards - check if flashcards exist
+    // Step 3: Flashcards - check if flashcards exist (independent of step 2)
     if (lesson.flashcards?.length) {
       completed.push(3);
-      current = 4;
     }
 
-    // Step 4: Summary - check if summary or summaries exist
+    // Step 4: Summary - check if summary or summaries exist (depends only on step 2)
     if (lesson.summaries && lesson.summaries.length > 0) {
       completed.push(4);
       current = 5; // All steps completed
@@ -74,12 +78,35 @@ export function WorkflowProvider({ children }: WorkflowProviderProps) {
     return progress.currentStep === step;
   };
 
+  const isStepAvailable = (step: number, lesson: Lesson | null): boolean => {
+    if (!lesson) return step === 0; // Only step 0 is available without a lesson
+    
+    const progress = getStepProgress(lesson);
+    const completed = progress.completedSteps;
+    
+    switch (step) {
+      case 0:
+        return true; // Always available
+      case 1:
+        return completed.includes(0); // Depends on step 0
+      case 2:
+        return completed.includes(1); // Depends on step 1
+      case 3:
+        return completed.includes(1); // Depends on step 1 (not step 2)
+      case 4:
+        return completed.includes(2); // Depends on step 2 (not step 3)
+      default:
+        return false;
+    }
+  };
+
   const value: WorkflowContextType = {
     currentStep,
     setCurrentStep,
     getStepProgress,
     isStepCompleted,
     isStepActive,
+    isStepAvailable,
   };
 
   return (

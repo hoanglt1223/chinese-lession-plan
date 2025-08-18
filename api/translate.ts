@@ -1,5 +1,4 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { translateChineseToVietnamese } from './_shared/openai-services.js';
 import { setCorsHeaders, handleOptions } from './_shared/cors.js';
 import { handleError } from './_shared/error-handler.js';
 
@@ -21,7 +20,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Get DeepL translations
-    const translations = await translateChineseToVietnamese(words);
+    const { deeplService } = await import('./_shared/deepl-service.js');
+    const translations = await deeplService.translateChineseToVietnamese(words);
     return res.json({ translations });
   } catch (error: any) {
     return handleError(res, error, 'Translation API');

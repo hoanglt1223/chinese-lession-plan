@@ -26,7 +26,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const defaultUser = {
         id: "dev-user",
         username: "developer",
-        creditBalance: "9999.00"
+        creditBalance: "520.1314"
       };
       return res.json({ user: defaultUser });
     }

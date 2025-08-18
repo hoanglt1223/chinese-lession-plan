@@ -16,18 +16,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { vocabulary, theme, level, ageGroup } = req.body;
+    const { vocabulary, theme, level, ageGroup, aiModel, photoSource } = req.body;
     if (!vocabulary || !Array.isArray(vocabulary)) {
       return res.status(400).json({ message: "Vocabulary array is required" });
     }
 
-    const flashcards = await generateFlashcards(vocabulary, theme, level, ageGroup);
+    const flashcards = await generateFlashcards(vocabulary, theme, level, ageGroup, aiModel, photoSource);
     
     // Add IDs to flashcards
     const flashcardsWithImages = flashcards.map((card) => ({
       ...card,
       id: randomUUID(),
-      imageUrl: card.imageUrl || "https://via.placeholder.com/400x300?text=No+Image"
+      imageUrl: card.imageUrl || ""
     }));
 
     return res.json({ flashcards: flashcardsWithImages });

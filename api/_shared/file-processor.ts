@@ -146,20 +146,32 @@ Note: Some PDFs with complex formatting or scanned images may not process correc
   }
 
   async generateFlashcardPDF(flashcards: any[]): Promise<Buffer> {
-    // For serverless, return text format instead of PDF
-    let content = `FLASHCARDS PDF\n${'='.repeat(50)}\n\n`;
-    
-    flashcards.forEach((card, index) => {
-      content += `Card ${index + 1}:\n`;
-      content += `Chinese: ${card.word || '???'}\n`;
-      content += `Pinyin: ${card.pinyin || ''}\n`;
-      content += `Vietnamese: ${card.vietnamese || ''}\n`;
-      content += `Part of Speech: ${card.partOfSpeech || ''}\n`;
-      content += `Image: ${card.imageUrl ? 'Generated' : 'Not available'}\n`;
-      content += `${'-'.repeat(30)}\n\n`;
-    });
-    
-    return Buffer.from(content, 'utf-8');
+    try {
+      // Import the serverless PDF service
+      const { serverlessPDFService } = await import('./serverless-pdf-service.js');
+      
+      // Use the new serverless PDF service
+      return await serverlessPDFService.generateFlashcardPDF({
+        flashcards
+      });
+    } catch (error) {
+      console.error('PDF generation failed, using fallback:', error);
+      
+      // Fallback to text format if PDF generation fails
+      let content = `FLASHCARDS PDF\n${'='.repeat(50)}\n\n`;
+      
+      flashcards.forEach((card, index) => {
+        content += `Card ${index + 1}:\n`;
+        content += `Chinese: ${card.word || '???'}\n`;
+        content += `Pinyin: ${card.pinyin || ''}\n`;
+        content += `Vietnamese: ${card.vietnamese || ''}\n`;
+        content += `Part of Speech: ${card.partOfSpeech || ''}\n`;
+        content += `Image: ${card.imageUrl ? 'Generated' : 'Not available'}\n`;
+        content += `${'-'.repeat(30)}\n\n`;
+      });
+      
+      return Buffer.from(content, 'utf-8');
+    }
   }
 }
 

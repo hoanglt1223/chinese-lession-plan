@@ -1,4 +1,6 @@
 import { StepCard } from "./step-card";
+import { GlobalExportBar } from "@/components/export/global-export-bar";
+import { useWorkflowContext } from "@/contexts/WorkflowContext";
 import type { Lesson } from "@shared/schema";
 
 interface KanbanBoardProps {
@@ -16,6 +18,8 @@ export function KanbanBoard({
   currentStep, 
   onStepUpdate 
 }: KanbanBoardProps) {
+  const { isStepCompleted, isStepAvailable } = useWorkflowContext();
+  
   const steps = [
     { id: 0, title: "Input", description: "Upload PDF files" },
     { id: 1, title: "Review", description: "AI analysis" },
@@ -25,19 +29,24 @@ export function KanbanBoard({
   ];
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {steps.map((step) => (
-        <StepCard
-          key={step.id}
-          step={step}
-          isActive={step.id === currentStep}
-          isCompleted={step.id < currentStep}
-          selectedLesson={selectedLesson}
-          lesson={lesson}
-          onLessonSelect={onLessonSelect}
-          onStepUpdate={onStepUpdate}
-        />
-      ))}
-    </div>
+    <>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {steps.map((step) => (
+          <StepCard
+            key={step.id}
+            step={step}
+            isActive={isStepAvailable(step.id, lesson) && !isStepCompleted(step.id, lesson)}
+            isCompleted={isStepCompleted(step.id, lesson)}
+            selectedLesson={selectedLesson}
+            lesson={lesson}
+            onLessonSelect={onLessonSelect}
+            onStepUpdate={onStepUpdate}
+          />
+        ))}
+      </div>
+      
+      {/* Global Export Bar - Fixed position */}
+      <GlobalExportBar lesson={lesson} />
+    </>
   );
 }

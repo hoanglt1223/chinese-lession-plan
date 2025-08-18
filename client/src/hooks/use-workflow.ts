@@ -8,7 +8,7 @@ export function useWorkflow(lessonId: string | null) {
   const { getStepProgress, setCurrentStep } = useWorkflowContext();
 
   // Get lesson data instead of workflow data
-  const { data: lesson, isLoading } = useQuery<Lesson>({
+  const { data: lesson, isLoading } = useQuery<Lesson | null>({
     queryKey: ["/api/lessons", lessonId],
     queryFn: async () => {
       if (!lessonId) throw new Error("No lesson ID");
@@ -17,7 +17,15 @@ export function useWorkflow(lessonId: string | null) {
         action: 'get',
         lessonId: lessonId
       });
-      return response.json();
+      const result = await response.json();
+      
+      // Handle null response gracefully (lesson not found)
+      if (result === null) {
+        console.warn(`Lesson not found for ID: ${lessonId}`);
+        return null;
+      }
+      
+      return result;
     },
     enabled: !!lessonId,
   });
@@ -48,6 +56,13 @@ export function useWorkflow(lessonId: string | null) {
       }
       
       const result = await response.json();
+      
+      // Handle null response gracefully (lesson not found during update)
+      if (result === null) {
+        console.warn(`Lesson not found during update for ID: ${lessonId}`);
+        return null;
+      }
+      
       console.log('✅ updateStep mutation successful:', result);
       return result;
     },
