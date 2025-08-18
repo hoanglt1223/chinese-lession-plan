@@ -78,7 +78,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             fontSize: fontSize || 64,
             background: background || '#ffffff',
             textColor: textColor || '#111111',
-            fontWeight: fontWeight || 'normal'
+            fontWeight: fontWeight || '400'
           });
           
           res.setHeader('Content-Type', 'image/png');

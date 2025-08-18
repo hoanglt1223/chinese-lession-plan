@@ -30,7 +30,7 @@ export interface FlashcardPDFOptions {
 async function callChineseTextAPI(text: string, options: {
   fontSize?: number;
   fontFamily?: string;
-  fontWeight?: string | number;
+  fontWeight?: "100" | "200" | "300" | "400" | "500" | "600" | "700" | "800" | "900" | "normal" | "bold" | "lighter" | "bolder";
   width?: number;
   height?: number;
   backgroundColor?: string;
@@ -64,7 +64,7 @@ async function callChineseTextAPI(text: string, options: {
         method: 'svg',
         fontSize: options.fontSize || 100,
         fontFamily: options.fontFamily || 'NotoSansTC',
-        fontWeight: options.fontWeight || 'normal',
+        fontWeight: options.fontWeight || '400',
         width: options.width || 800,
         height: options.height || 600,
         backgroundColor: options.backgroundColor || '#ffffff',
@@ -207,7 +207,7 @@ export class ServerlessPDFService {
   /**
    * Public: Generate a PNG image for the given Chinese text using external API.
    */
-  public async generateChineseTextImage(text: string, opts?: { width?: number; height?: number; fontSize?: number; background?: string; textColor?: string; fontWeight?: string | number; }): Promise<{ buffer: Buffer; dataUri: string; contentType: 'image/png'; width: number; height: number; }> {
+  public async generateChineseTextImage(text: string, opts?: { width?: number; height?: number; fontSize?: number; background?: string; textColor?: string; fontWeight?: "100" | "200" | "300" | "400" | "500" | "600" | "700" | "800" | "900" | "normal" | "bold" | "lighter" | "bolder"; }): Promise<{ buffer: Buffer; dataUri: string; contentType: 'image/png'; width: number; height: number; }> {
     const width = opts?.width ?? 600;
     const height = opts?.height ?? 180;
     
@@ -216,7 +216,7 @@ export class ServerlessPDFService {
       const svgDataUri = await callChineseTextAPI(text, {
         fontSize: opts?.fontSize || 100,
         fontFamily: 'NotoSansTC',
-        fontWeight: opts?.fontWeight || 'normal',
+        fontWeight: opts?.fontWeight || '400',
         width,
         height,
         backgroundColor: opts?.background || '#ffffff',
@@ -561,7 +561,7 @@ export class ServerlessPDFService {
       const chineseImageData = await callChineseTextAPI(card.word || '朋友', {
         fontSize: 120,
         fontFamily: 'NotoSansTC',
-        fontWeight: 'bold',
+        fontWeight: '700',
         width: 400,
         height: 150,
         backgroundColor: '#ffffff',
@@ -573,7 +573,7 @@ export class ServerlessPDFService {
       const pinyinImageData = await callChineseTextAPI(card.pinyin || 'péngyǒu', {
         fontSize: 60,
         fontFamily: 'NotoSansTC',
-        fontWeight: 'normal',
+        fontWeight: '400',
         width: 400,
         height: 80,
         backgroundColor: '#ffffff',
