@@ -26,18 +26,75 @@ export interface FlashcardPDFOptions {
   flashcards: FlashcardData[];
 }
 
-// Utility: Generate SVG data URI for Chinese text (serverless-compatible)
-function chineseTextToSVGDataURI(text: string, width = 300, height = 80): string {
-  // Escape special XML characters
-  const safeText = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const svg = `
-    <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-      <rect width="${width}" height="${height}" fill="#fff"/>
-      <text x="50%" y="50%" font-size="32" font-family="Noto Sans TC, Arial, sans-serif" fill="#000" text-anchor="middle" alignment-baseline="middle" dominant-baseline="middle">${safeText}</text>
-    </svg>
-  `;
-  const base64 = Buffer.from(svg).toString('base64');
-  return `data:image/svg+xml;base64,${base64}`;
+// External API function for Chinese text conversion
+async function callChineseTextAPI(text: string, options: {
+  fontSize?: number;
+  fontFamily?: string;
+  fontWeight?: string | number;
+  width?: number;
+  height?: number;
+  backgroundColor?: string;
+  textColor?: string;
+  padding?: number;
+  lineHeight?: number;
+  textAlign?: string;
+  quality?: number;
+} = {}): Promise<string> {
+  try {
+    const response = await fetch('https://booking.hoangha.shop/api/convert-chinese-text', {
+      method: 'POST',
+      headers: {
+        'accept': '*/*',
+        'accept-language': 'en,vi;q=0.9',
+        'content-type': 'application/json',
+        'dnt': '1',
+        'origin': 'https://booking.hoangha.shop',
+        'priority': 'u=1, i',
+        'referer': 'https://booking.hoangha.shop/chinese-converter',
+        'sec-ch-ua': '"Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"',
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': '"Windows"',
+        'sec-fetch-dest': 'empty',
+        'sec-fetch-mode': 'cors',
+        'sec-fetch-site': 'same-origin',
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36'
+      },
+      body: JSON.stringify({
+        text,
+        method: 'svg',
+        fontSize: options.fontSize || 100,
+        fontFamily: options.fontFamily || 'NotoSansTC',
+        fontWeight: options.fontWeight || 'normal',
+        width: options.width || 800,
+        height: options.height || 600,
+        backgroundColor: options.backgroundColor || '#ffffff',
+        textColor: options.textColor || '#000000',
+        padding: options.padding || 20,
+        lineHeight: options.lineHeight || 1.5,
+        textAlign: options.textAlign || 'left',
+        quality: options.quality || 90
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`API request failed: ${response.status}`);
+    }
+
+    const result = await response.text();
+    return result; // Should return SVG data URI
+  } catch (error) {
+    console.error('Chinese text API call failed:', error);
+    // Fallback to simple SVG generation
+    const safeText = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const svg = `
+      <svg width="${options.width || 300}" height="${options.height || 80}" xmlns="http://www.w3.org/2000/svg">
+        <rect width="${options.width || 300}" height="${options.height || 80}" fill="${options.backgroundColor || '#fff'}"/>
+        <text x="50%" y="50%" font-size="${options.fontSize || 32}" font-family="Noto Sans TC, Arial, sans-serif" fill="${options.textColor || '#000'}" text-anchor="middle" alignment-baseline="middle" dominant-baseline="middle">${safeText}</text>
+      </svg>
+    `;
+    const base64 = Buffer.from(svg).toString('base64');
+    return `data:image/svg+xml;base64,${base64}`;
+  }
 }
 
 export class ServerlessPDFService {
@@ -148,14 +205,36 @@ export class ServerlessPDFService {
   }
 
   /**
-   * Public: Generate a PNG image for the given Chinese text. Returns PNG buffer and data URI.
+   * Public: Generate a PNG image for the given Chinese text using external API.
    */
-  public async generateChineseTextImage(text: string, opts?: { width?: number; height?: number; fontSize?: number; background?: string; textColor?: string; }): Promise<{ buffer: Buffer; dataUri: string; contentType: 'image/png'; width: number; height: number; }> {
+  public async generateChineseTextImage(text: string, opts?: { width?: number; height?: number; fontSize?: number; background?: string; textColor?: string; fontWeight?: string | number; }): Promise<{ buffer: Buffer; dataUri: string; contentType: 'image/png'; width: number; height: number; }> {
     const width = opts?.width ?? 600;
     const height = opts?.height ?? 180;
-    const svg = await this.buildChineseTextSVG(text, { width, height, fontSize: opts?.fontSize, background: opts?.background, textColor: opts?.textColor });
-    const { dataUri, buffer } = await this.svgToPngDataUri(svg, width, height);
-    return { buffer, dataUri, contentType: 'image/png', width, height };
+    
+    try {
+      // Use external API for Chinese text rendering
+      const svgDataUri = await callChineseTextAPI(text, {
+        fontSize: opts?.fontSize || 100,
+        fontFamily: 'NotoSansTC',
+        fontWeight: opts?.fontWeight || 'normal',
+        width,
+        height,
+        backgroundColor: opts?.background || '#ffffff',
+        textColor: opts?.textColor || '#000000',
+        textAlign: 'center'
+      });
+      
+      // Convert SVG to PNG using our existing method
+      const { dataUri, buffer } = await this.svgToPngDataUri(svgDataUri, width, height);
+      return { buffer, dataUri, contentType: 'image/png', width, height };
+      
+    } catch (error) {
+      console.error('External API failed, using fallback SVG method:', error);
+      // Fallback to local SVG generation
+      const svg = await this.buildChineseTextSVG(text, { width, height, fontSize: opts?.fontSize, background: opts?.background, textColor: opts?.textColor });
+      const { dataUri, buffer } = await this.svgToPngDataUri(svg, width, height);
+      return { buffer, dataUri, contentType: 'image/png', width, height };
+    }
   }
 
   /**
@@ -466,7 +545,7 @@ export class ServerlessPDFService {
   }
 
   /**
-   * Generate back side using template background - 10 FIXED METHODS
+   * Generate back side using template background - Simplified version using external API
    */
   private async generateCardBackWithTemplate(pdf: any, card: FlashcardData, cardNumber: number, templateImage: string): Promise<void> {
     const pageWidth = 297; // A4 landscape width in mm
@@ -475,613 +554,74 @@ export class ServerlessPDFService {
     // Add template as background image (landscape orientation)
     pdf.addImage(templateImage, 'JPEG', 0, 0, pageWidth, pageHeight);
     
-    console.log(`🔧 TESTING 10 METHODS: Chinese text "${card.word}"`);
-    console.log(`🚀 Methods 1, 4, 6 use Ultimate Text To Image with Noto Sans TC font`);
-    
-    // Debug the original text
-    const originalText = card.word;
-    const textBytes = Buffer.from(originalText, 'utf8');
-    const textHex = textBytes.toString('hex');
-    console.log(`Original text: "${originalText}", hex: ${textHex}, length: ${originalText.length}`);
-    
-    // Try multiple recovery strategies
-    let recoveredTexts = {
-      original: originalText,
-      latin1ToUtf8: '',
-      bufferDecoded: '',
-      normalized: ''
-    };
+    console.log(`🚀 Generating flashcard back for: "${card.word}" with pinyin: "${card.pinyin}"`);
     
     try {
-      // Strategy 1: Latin1 to UTF8 conversion
-      const latin1Buffer = Buffer.from(originalText, 'latin1');
-      recoveredTexts.latin1ToUtf8 = latin1Buffer.toString('utf8');
-      
-      // Strategy 2: Direct buffer interpretation
-      recoveredTexts.bufferDecoded = Buffer.from(originalText).toString('utf8');
-      
-      // Strategy 3: Unicode normalization
-      recoveredTexts.normalized = originalText.normalize('NFC');
-      
-      console.log('Recovery attempts:', recoveredTexts);
-    } catch (error) {
-      console.warn('Recovery failed:', error);
-    }
-    
-    // TEST LAYOUT: 2 rows of 10 methods each
-    const cols = 20;
-    const rows = 2;
-    const sectionWidth = pageWidth / cols;
-    const sectionHeight = (pageHeight * 0.6) / rows;
-    const startY = 30;
-    // Methods 1-10 (already implemented)
-    await this.method1_UltimateTextToImage(pdf, card.word || '朋友', 0 * sectionWidth, startY, sectionWidth, sectionHeight);
-    await this.method2_TextToImage(pdf, card.word || '朋友', 1 * sectionWidth, startY, sectionWidth, sectionHeight);
-    await this.method3_PDFKit(pdf, card.word || '朋友', 2 * sectionWidth, startY, sectionWidth, sectionHeight);
-    await this.method4_Canvas(pdf, card.word || '朋友', 3 * sectionWidth, startY, sectionWidth, sectionHeight);
-    await this.method5_Html2PdfJs(pdf, card.word || '朋友', 4 * sectionWidth, startY, sectionWidth, sectionHeight);
-    await this.method6_jsPDF(pdf, card.word || '朋友', 5 * sectionWidth, startY, sectionWidth, sectionHeight);
-    await this.method7_Browserless(pdf, card.word || '朋友', 6 * sectionWidth, startY, sectionWidth, sectionHeight);
-    await this.method8_Html2CanvasClient(pdf, card.word || '朋友', 7 * sectionWidth, startY, sectionWidth, sectionHeight);
-    await this.method9_PdfLib(pdf, card.word || '朋友', 8 * sectionWidth, startY, sectionWidth, sectionHeight);
-    await this.method10_Fallback(pdf, card.word || '朋友', 9 * sectionWidth, startY, sectionWidth, sectionHeight);
-    // Methods 11-20 (new)
-    await this.method11_WasmTextToImage(pdf, card.word || '朋友', 10 * sectionWidth, startY, sectionWidth, sectionHeight);
-    await this.method12_PreGeneratedAsset(pdf, card.word || '朋友', 11 * sectionWidth, startY, sectionWidth, sectionHeight);
-    await this.method13_DocRaptor(pdf, card.word || '朋友', 12 * sectionWidth, startY, sectionWidth, sectionHeight);
-    await this.method14_MarkupGo(pdf, card.word || '朋友', 13 * sectionWidth, startY, sectionWidth, sectionHeight);
-    await this.method15_GoogleCloudVision(pdf, card.word || '朋友', 14 * sectionWidth, startY, sectionWidth, sectionHeight);
-    await this.method16_CloudFunctionMicroservice(pdf, card.word || '朋友', 15 * sectionWidth, startY, sectionWidth, sectionHeight);
-    await this.method17_PdfLibFont(pdf, card.word || '朋友', 16 * sectionWidth, startY, sectionWidth, sectionHeight);
-    await this.method18_PdfLibSVG(pdf, card.word || '朋友', 17 * sectionWidth, startY, sectionWidth, sectionHeight);
-    await this.method19_PuppeteerAPI(pdf, card.word || '朋友', 18 * sectionWidth, startY, sectionWidth, sectionHeight);
-    await this.method20_CustomLambda(pdf, card.word || '朋友', 19 * sectionWidth, startY, sectionWidth, sectionHeight);
-    // Add grid
-    pdf.setDrawColor(200, 200, 200);
-    pdf.setLineWidth(0.3);
-    for (let i = 1; i < cols; i++) {
-      const x = i * sectionWidth;
-      pdf.line(x, 0, x, pageHeight);
-    }
-    // Add method labels
-    pdf.setFontSize(6);
-    pdf.setTextColor(100, 100, 100);
-    const labelY1 = pageHeight - 20;
-    const methodLabels = [
-      '1.svg-data-uri', '2.text-to-image', '3.pdfkit/canvas', '4.node-canvas', '5.html2pdf.js',
-      '6.jsPDF-font', '7.browserless', '8.html2canvas-client', '9.pdf-lib', '10.fallback',
-      '11.wasm-text2img', '12.pre-gen-asset', '13.docraptor', '14.markupgo', '15.gcloud-vision',
-      '16.cloud-fn', '17.pdf-lib-font', '18.pdf-lib-svg', '19.puppeteer', '20.lambda'
-    ];
-    for (let i = 0; i < methodLabels.length; i++) {
-      const x = (i * sectionWidth) + (sectionWidth / 2);
-      pdf.text(methodLabels[i], x, labelY1, { align: 'center' });
-    }
-  }
-
-  /**
-   * METHOD 1: ultimate-text-to-image library (REPLACED with SVG for serverless)
-   * This method now uses SVG data URI for Chinese text rendering, which is serverless-compatible.
-   */
-  private async method1_UltimateTextToImage(pdf: any, chineseText: string, x: number, y: number, width: number, height: number): Promise<void> {
-    try {
-      pdf.setFontSize(6);
-      pdf.setTextColor(0, 100, 0);
-      pdf.text('Method 1: SVG text', x + width/2, y - 5, { align: 'center' });
-      // Use SVG data URI for Chinese text rendering
-      const dataUri = chineseTextToSVGDataURI(chineseText, 300, 80);
-      const imgWidth = width * 0.8;
-      const imgHeight = 25;
-      const imgX = x + (width - imgWidth) / 2;
-      const imgY = y + 20;
-      pdf.addImage(dataUri, 'SVG', imgX, imgY, imgWidth, imgHeight);
-      pdf.setFontSize(5);
-      pdf.setTextColor(0, 150, 0);
-      pdf.text('✓ SUCCESS', x + width/2, y + height - 8, { align: 'center' });
-    } catch (error) {
-      pdf.setFontSize(5);
-      pdf.setTextColor(200, 0, 0);
-      pdf.text('✗ FAILED', x + width/2, y + 15, { align: 'center' });
-      pdf.text('SVG error', x + width/2, y + 25, { align: 'center' });
-    }
-  }
-
-  /**
-   * METHOD 2: text-to-image library (DISABLED for serverless)
-   *
-   * Alternative solutions to explore in the future:
-   * - Use a paid 3rd-party API that supports CJK text rendering (e.g., Google Cloud Vision, custom Lambda)
-   * - Use a WASM-based text-to-image renderer (if available)
-   * - Pre-generate images on the client and upload
-   */
-  private async method2_TextToImage(pdf: any, chineseText: string, x: number, y: number, width: number, height: number): Promise<void> {
-    pdf.setFontSize(6);
-    pdf.setTextColor(200, 0, 0);
-    pdf.text('Not supported in serverless', x + width/2, y + height/2, { align: 'center' });
-    pdf.setFontSize(5);
-    pdf.text('text-to-image', x + width/2, y + height/2 + 10, { align: 'center' });
-    return;
-  }
-
-  /**
-   * METHOD 3: PDFKit approach
-   */
-  private async method3_PDFKit(pdf: any, chineseText: string, x: number, y: number, width: number, height: number): Promise<void> {
-    try {
-      pdf.setFontSize(6);
-      pdf.setTextColor(0, 100, 0);
-      pdf.text('Method 3: pdfkit', x + width/2, y - 5, { align: 'center' });
-      
-      console.log(`🚀 Method 3 (pdfkit): "${chineseText}"`);
-      
-      // Use canvas to create image for PDFKit-style approach
-      const { createCanvas } = await import('canvas');
-      
-      const canvas = createCanvas(300, 80);
-      const ctx = canvas.getContext('2d');
-      
-      // Light blue background
-      ctx.fillStyle = '#f0f8ff';
-      ctx.fillRect(0, 0, 300, 80);
-      
-      // Chinese text with different font approach
-      ctx.font = '26px "Noto Sans TC", Arial, sans-serif';
-      ctx.fillStyle = '#1e40af';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(chineseText, 150, 40);
-      
-      const buffer = canvas.toBuffer('image/png');
-      const dataUri = `data:image/png;base64,${buffer.toString('base64')}`;
-      
-      const imgWidth = width * 0.8;
-      const imgHeight = 25;
-      const imgX = x + (width - imgWidth) / 2;
-      const imgY = y + 20;
-      
-      pdf.addImage(dataUri, 'PNG', imgX, imgY, imgWidth, imgHeight);
-      
-      pdf.setFontSize(5);
-      pdf.setTextColor(0, 150, 0);
-      pdf.text('✓ SUCCESS', x + width/2, y + height - 8, { align: 'center' });
-      
-      console.log('✅ Method 3: pdfkit completed');
-      
-    } catch (error: any) {
-      console.error('❌ Method 3 failed:', error?.message || error);
-      
-      pdf.setFontSize(5);
-      pdf.setTextColor(200, 0, 0);
-      pdf.text('✗ FAILED', x + width/2, y + 15, { align: 'center' });
-      pdf.text('pdfkit error', x + width/2, y + 25, { align: 'center' });
-    }
-  }
-
-  /**
-   * METHOD 4: Canvas library
-   */
-  private async method4_Canvas(pdf: any, chineseText: string, x: number, y: number, width: number, height: number): Promise<void> {
-    try {
-      pdf.setFontSize(6);
-      pdf.setTextColor(0, 100, 0);
-      pdf.text('Method 4: canvas', x + width/2, y - 5, { align: 'center' });
-      
-      console.log(`🚀 Method 4 (canvas): "${chineseText}"`);
-      
-      // Import canvas module 
-      const canvasModule = await import('canvas');
-      const createCanvas = canvasModule.createCanvas || canvasModule.default?.createCanvas;
-      const registerFont = canvasModule.registerFont || canvasModule.default?.registerFont;
-      
-      if (!createCanvas) {
-        throw new Error('createCanvas not found in canvas module');
-      }
-      
-      console.log('📦 Method 4: Canvas module loaded');
-      
-      // Register Chinese font
-      let fontRegistered = false;
-      try {
-        if (registerFont) {
-          const fs = require('fs');
-          const path = require('path');
-          const fontPath = path.join(process.cwd(), 'data', 'NotoSansTC-Regular.ttf');
-          
-          if (fs.existsSync(fontPath)) {
-            registerFont(fontPath, { family: 'Noto Sans TC' });
-            fontRegistered = true;
-            console.log('✅ Method 4: Canvas font registered');
-          } else {
-            console.log('⚠️ Method 4: Font file not found');
-          }
-        }
-      } catch (fontError) {
-        console.log('⚠️ Method 4: Font registration failed:', (fontError as any)?.message || fontError);
-      }
-      
-      const canvas = createCanvas(300, 80);
-      const ctx = canvas.getContext('2d');
-      
-      if (!ctx) {
-        throw new Error('Failed to get canvas context');
-      }
-      
-      // Green background
-      ctx.fillStyle = '#f0fdf4';
-      ctx.fillRect(0, 0, 300, 80);
-      
-      // Chinese text with registered font or fallback
-      const fontFamily = fontRegistered ? '"Noto Sans TC", Arial, sans-serif' : 'Arial, sans-serif';
-      ctx.font = `28px ${fontFamily}`;
-      ctx.fillStyle = '#16a34a';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      
-      console.log(`🖋️ Method 4: Using font: ${ctx.font}`);
-      ctx.fillText(chineseText, 150, 40);
-      
-      const buffer = canvas.toBuffer('image/png');
-      const dataUri = `data:image/png;base64,${buffer.toString('base64')}`;
-      
-      console.log(`🖼️ Method 4: Generated image ${buffer.length} bytes with font`);
-      
-      const imgWidth = width * 0.8;
-      const imgHeight = 25;
-      const imgX = x + (width - imgWidth) / 2;
-      const imgY = y + 20;
-      
-      pdf.addImage(dataUri, 'PNG', imgX, imgY, imgWidth, imgHeight);
-      
-      pdf.setFontSize(5);
-      pdf.setTextColor(0, 150, 0);
-      pdf.text('✓ SUCCESS', x + width/2, y + height - 8, { align: 'center' });
-      
-      console.log('✅ Method 4: canvas completed');
-      
-    } catch (error: any) {
-      console.error('❌ Method 4 failed:', error?.message || error);
-      
-      pdf.setFontSize(5);
-      pdf.setTextColor(200, 0, 0);
-      pdf.text('✗ FAILED', x + width/2, y + 15, { align: 'center' });
-      pdf.text('canvas error', x + width/2, y + 25, { align: 'center' });
-    }
-  }
-
-  /**
-   * METHOD 6: jsPDF with font
-   */
-  private async method6_jsPDF(pdf: any, chineseText: string, x: number, y: number, width: number, height: number): Promise<void> {
-    try {
-      pdf.setFontSize(6);
-      pdf.setTextColor(0, 100, 0);
-      pdf.text('Method 6: jsPDF', x + width/2, y - 5, { align: 'center' });
-      
-      console.log(`🚀 Method 6 (jsPDF): "${chineseText}"`);
-      
-      // Save current PDF state
-      const currentFont = pdf.internal.getFont();
-      const currentFontSize = pdf.internal.getFontSize();
-      const currentTextColor = pdf.internal.getTextColor();
-      
-      let fontEmbedded = false;
-      
-      // Try to load and embed Chinese font in jsPDF
-      try {
-        const fs = require('fs');
-        const path = require('path');
-        const fontPath = path.join(process.cwd(), 'data', 'NotoSansTC-Regular.ttf');
-        
-        console.log(`📁 Method 6: Checking font at: ${fontPath}`);
-        
-        if (fs.existsSync(fontPath)) {
-          const fontData = fs.readFileSync(fontPath);
-          const fontBase64 = fontData.toString('base64');
-          
-          console.log(`📦 Method 6: Font data loaded, size: ${fontData.length} bytes`);
-          
-          // Add font to jsPDF VFS
-          pdf.addFileToVFS('NotoSansTC-Regular.ttf', fontBase64);
-          pdf.addFont('NotoSansTC-Regular.ttf', 'NotoSansTC', 'normal');
-          
-          // Test if font was added successfully
-          const availableFonts = pdf.getFontList();
-          if (availableFonts.NotoSansTC) {
-            pdf.setFont('NotoSansTC', 'normal');
-            fontEmbedded = true;
-            console.log('✅ Method 6: jsPDF font embedded successfully');
-          } else {
-            console.log('⚠️ Method 6: Font not found in font list');
-          }
-        } else {
-          console.log('⚠️ Method 6: Font file does not exist');
-        }
-      } catch (fontError) {
-        console.log('⚠️ Method 6: Font embedding failed:', (fontError as any)?.message || fontError);
-      }
-      
-      // Fallback to default font if embedding failed
-      if (!fontEmbedded) {
-        pdf.setFont('helvetica', 'normal');
-        console.log('📝 Method 6: Using default helvetica font');
-      }
-      
-      // Direct PDF text rendering
-      pdf.setFontSize(20); // Smaller size to fit in section
-      pdf.setTextColor(75, 0, 130); // Indigo color
-      
-      const textX = x + width / 2;
-      const textY = y + height / 2;
-      
-      console.log(`📝 Method 6: Rendering text "${chineseText}" at (${textX}, ${textY})`);
-      
-      // Try to render the text
-      try {
-        pdf.text(chineseText, textX, textY, { align: 'center' });
-        console.log('📄 Method 6: Text rendered to PDF');
-      } catch (textError) {
-        console.log('❌ Method 6: Text rendering failed:', (textError as any)?.message || textError);
-        throw textError;
-      }
-      
-      pdf.setFontSize(5);
-      pdf.setTextColor(0, 150, 0);
-      pdf.text('✓ SUCCESS', x + width/2, y + height - 8, { align: 'center' });
-      
-      console.log('✅ Method 6: jsPDF completed');
-      
-    } catch (error: any) {
-      console.error('❌ Method 6 failed:', error?.message || error);
-      
-      pdf.setFontSize(5);
-      pdf.setTextColor(200, 0, 0);
-      pdf.text('✗ FAILED', x + width/2, y + 15, { align: 'center' });
-      pdf.text('jsPDF error', x + width/2, y + 25, { align: 'center' });
-    }
-  }
-
-  /**
-   * METHOD 5: html2pdf.js (attempt to use in serverless with jsdom, else fallback)
-   */
-  private async method5_Html2PdfJs(pdf: any, chineseText: string, x: number, y: number, width: number, height: number): Promise<void> {
-    try {
-      // Attempt to use html2pdf.js in Node.js with jsdom (experimental, may not work in all serverless)
-      const { JSDOM } = await import('jsdom');
-      // @ts-ignore
-      const html2pdf = (await import('html2pdf.js')) as any;
-      const dom = new JSDOM(`<div id='pdf-content' style="font-family:'Noto Sans TC',Arial,sans-serif;font-size:32px;">${chineseText}</div>`);
-      const element = dom.window.document.getElementById('pdf-content');
-      // html2pdf expects a real browser DOM, so this may not work in serverless
-      if (element) {
-        // This will likely throw or not work, but we try
-        await html2pdf().from(element).toPdf().get('pdf').then((clientPdf: any) => {
-          // Not possible to merge clientPdf with server jsPDF, so just show a message
-          pdf.setFontSize(6);
-          pdf.setTextColor(120, 120, 120);
-          pdf.text('html2pdf.js: not supported in serverless', x + width/2, y + height/2, { align: 'center' });
-        });
-      } else {
-        throw new Error('No element');
-      }
-    } catch (e) {
-      pdf.setFontSize(6);
-      pdf.setTextColor(200, 0, 0);
-      pdf.text('html2pdf.js: client-side only', x + width/2, y + height/2, { align: 'center' });
-      pdf.setFontSize(5);
-      pdf.text('html2pdf.js', x + width/2, y + height/2 + 10, { align: 'center' });
-    }
-  }
-  /**
-   * METHOD 7: Browserless API (real implementation if API key is set)
-   */
-  private async method7_Browserless(pdf: any, chineseText: string, x: number, y: number, width: number, height: number): Promise<void> {
-    const apiKey = process.env.BROWSERLESS_API_KEY;
-    if (!apiKey) {
-      pdf.setFontSize(6);
-      pdf.setTextColor(200, 0, 0);
-      pdf.text('No API key', x + width/2, y + height/2, { align: 'center' });
-      pdf.setFontSize(5);
-      pdf.text('browserless', x + width/2, y + height/2 + 10, { align: 'center' });
-      return;
-    }
-    try {
-      // Prepare HTML for rendering
-      const html = `<div style="width:300px;height:80px;display:flex;align-items:center;justify-content:center;font-size:32px;font-family:'Noto Sans TC',Arial,sans-serif;">${chineseText}</div>`;
-      
-      // Use node-fetch for Node.js compatibility
-      const fetch = (await import('node-fetch')).default;
-      const response = await fetch('https://chrome.browserless.io/screenshot?token=' + apiKey, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ html, options: { type: 'png', viewport: { width: 300, height: 80 } } })
+      // Generate Chinese text image using external API
+      const chineseImageData = await callChineseTextAPI(card.word || '朋友', {
+        fontSize: 120,
+        fontFamily: 'NotoSansTC',
+        fontWeight: 'bold',
+        width: 400,
+        height: 150,
+        backgroundColor: '#ffffff',
+        textColor: '#000000',
+        textAlign: 'center'
       });
-      if (!response.ok) throw new Error('Browserless API error');
-      const buffer = await response.arrayBuffer();
-      const dataUri = `data:image/png;base64,${Buffer.from(buffer).toString('base64')}`;
-      const imgWidth = width * 0.8;
-      const imgHeight = 25;
-      const imgX = x + (width - imgWidth) / 2;
-      const imgY = y + 20;
-      pdf.addImage(dataUri, 'PNG', imgX, imgY, imgWidth, imgHeight);
-      pdf.setFontSize(5);
-      pdf.setTextColor(0, 150, 0);
-      pdf.text('✓ SUCCESS', x + width/2, y + height - 8, { align: 'center' });
-    } catch (e) {
-      pdf.setFontSize(6);
-      pdf.setTextColor(200, 0, 0);
-      pdf.text('API error', x + width/2, y + height/2, { align: 'center' });
-      pdf.setFontSize(5);
-      pdf.text('browserless', x + width/2, y + height/2 + 10, { align: 'center' });
-    }
-  }
-  /**
-   * METHOD 8: html2canvas client-side (attempt to use in serverless with jsdom, else fallback)
-   */
-  private async method8_Html2CanvasClient(pdf: any, chineseText: string, x: number, y: number, width: number, height: number): Promise<void> {
-    try {
-      // Attempt to use html2canvas in Node.js with jsdom (experimental, may not work in all serverless)
-      const { JSDOM } = await import('jsdom');
-      const html2canvas = (await import('html2canvas')).default;
-      const dom = new JSDOM(`<div id='pdf-content' style="font-family:'Noto Sans TC',Arial,sans-serif;font-size:32px;">${chineseText}</div>`);
-      const element = dom.window.document.getElementById('pdf-content');
-      if (element) {
-        // This will likely throw or not work, but we try
-        await html2canvas(element).then((canvas: any) => {
-          const dataUri = canvas.toDataURL('image/png');
-          const imgWidth = width * 0.8;
-          const imgHeight = 25;
-          const imgX = x + (width - imgWidth) / 2;
-          const imgY = y + 20;
-          pdf.addImage(dataUri, 'PNG', imgX, imgY, imgWidth, imgHeight);
-          pdf.setFontSize(5);
-          pdf.setTextColor(0, 150, 0);
-          pdf.text('✓ SUCCESS', x + width/2, y + height - 8, { align: 'center' });
-        });
-      } else {
-        throw new Error('No element');
-      }
-    } catch (e) {
-      pdf.setFontSize(6);
-      pdf.setTextColor(200, 0, 0);
-      pdf.text('html2canvas: client-side only', x + width/2, y + height/2, { align: 'center' });
-      pdf.setFontSize(5);
-      pdf.text('html2canvas', x + width/2, y + height/2 + 10, { align: 'center' });
-    }
-  }
-  /**
-   * METHOD 9: pdf-lib (serverless-compatible, draws text as image)
-   */
-  private async method9_PdfLib(pdf: any, chineseText: string, x: number, y: number, width: number, height: number): Promise<void> {
-    try {
-      // Dynamically import pdf-lib
-      const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
-      // Create a new PDF just for rendering the text as an image
-      const pdfDoc = await PDFDocument.create();
-      const page = pdfDoc.addPage([300, 80]);
-      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-      page.drawText(chineseText, {
-        x: 20,
-        y: 40,
-        size: 32,
-        font,
-        color: rgb(0, 0, 0),
+      
+      // Generate Pinyin text image using external API
+      const pinyinImageData = await callChineseTextAPI(card.pinyin || 'péngyǒu', {
+        fontSize: 60,
+        fontFamily: 'NotoSansTC',
+        fontWeight: 'normal',
+        width: 400,
+        height: 80,
+        backgroundColor: '#ffffff',
+        textColor: '#666666',
+        textAlign: 'center'
       });
-      const pdfBytes = await pdfDoc.save();
-      // Convert the PDF page to an image (not natively supported, so fallback to SVG method)
-      pdf.setFontSize(6);
-      pdf.setTextColor(120, 120, 120);
-      pdf.text('pdf-lib: fallback to SVG', x + width/2, y + height/2, { align: 'center' });
-      // Optionally, you could use a PDF-to-image service here
-    } catch (e) {
-      pdf.setFontSize(6);
-      pdf.setTextColor(200, 0, 0);
-      pdf.text('Not implemented', x + width/2, y + height/2, { align: 'center' });
-      pdf.setFontSize(5);
-      pdf.text('pdf-lib', x + width/2, y + height/2 + 10, { align: 'center' });
+      
+      // Position Chinese text in center-top
+      const chineseX = (pageWidth - 100) / 2;
+      const chineseY = pageHeight / 2 - 60;
+      pdf.addImage(chineseImageData, 'SVG', chineseX, chineseY, 100, 40);
+      
+      // Position Pinyin text below Chinese
+      const pinyinX = (pageWidth - 100) / 2;
+      const pinyinY = pageHeight / 2 - 10;
+      pdf.addImage(pinyinImageData, 'SVG', pinyinX, pinyinY, 100, 25);
+      
+      // Add Vietnamese translation if available
+      if (card.vietnamese) {
+        pdf.setFontSize(16);
+        pdf.setTextColor(0, 0, 0);
+        pdf.text(card.vietnamese, pageWidth / 2, pageHeight / 2 + 30, { align: 'center' });
+      }
+      
+      console.log(`✅ Successfully generated flashcard back for: ${card.word}`);
+      
+    } catch (error) {
+      console.error(`❌ Failed to generate flashcard back for: ${card.word}`, error);
+      
+      // Fallback: Simple text rendering
+      pdf.setFontSize(24);
+      pdf.setTextColor(0, 0, 0);
+      pdf.text(card.word || '朋友', pageWidth / 2, pageHeight / 2 - 20, { align: 'center' });
+      
+      pdf.setFontSize(16);
+      pdf.setTextColor(100, 100, 100);
+      pdf.text(card.pinyin || 'péngyǒu', pageWidth / 2, pageHeight / 2, { align: 'center' });
+      
+      if (card.vietnamese) {
+        pdf.setFontSize(14);
+        pdf.setTextColor(0, 0, 0);
+        pdf.text(card.vietnamese, pageWidth / 2, pageHeight / 2 + 20, { align: 'center' });
+      }
     }
   }
-  /**
-   * METHOD 10: fallback/error
-   */
-  private async method10_Fallback(pdf: any, chineseText: string, x: number, y: number, width: number, height: number): Promise<void> {
-    pdf.setFontSize(6);
-    pdf.setTextColor(120, 120, 120);
-    pdf.text('No method available', x + width/2, y + height/2, { align: 'center' });
-    pdf.setFontSize(5);
-    pdf.text('fallback', x + width/2, y + height/2 + 10, { align: 'center' });
-  }
-  /** METHOD 11: WASM text-to-image (stub) */
-  private async method11_WasmTextToImage(pdf: any, chineseText: string, x: number, y: number, width: number, height: number): Promise<void> {
-    pdf.setFontSize(6);
-    pdf.setTextColor(200, 0, 0);
-    pdf.text('WASM not available', x + width/2, y + height/2, { align: 'center' });
-    pdf.setFontSize(5);
-    pdf.text('wasm-text2img', x + width/2, y + height/2 + 10, { align: 'center' });
-  }
-  /** METHOD 12: Pre-generated image asset (stub) */
-  private async method12_PreGeneratedAsset(pdf: any, chineseText: string, x: number, y: number, width: number, height: number): Promise<void> {
-    pdf.setFontSize(6);
-    pdf.setTextColor(120, 120, 120);
-    pdf.text('No asset found', x + width/2, y + height/2, { align: 'center' });
-    pdf.setFontSize(5);
-    pdf.text('pre-gen-asset', x + width/2, y + height/2 + 10, { align: 'center' });
-  }
-  /** METHOD 13: DocRaptor API (stub) */
-  private async method13_DocRaptor(pdf: any, chineseText: string, x: number, y: number, width: number, height: number): Promise<void> {
-    pdf.setFontSize(6);
-    pdf.setTextColor(200, 0, 0);
-    pdf.text('API not configured', x + width/2, y + height/2, { align: 'center' });
-    pdf.setFontSize(5);
-    pdf.text('docraptor', x + width/2, y + height/2 + 10, { align: 'center' });
-  }
-  /** METHOD 14: MarkupGo API (stub) */
-  private async method14_MarkupGo(pdf: any, chineseText: string, x: number, y: number, width: number, height: number): Promise<void> {
-    pdf.setFontSize(6);
-    pdf.setTextColor(200, 0, 0);
-    pdf.text('API not configured', x + width/2, y + height/2, { align: 'center' });
-    pdf.setFontSize(5);
-    pdf.text('markupgo', x + width/2, y + height/2 + 10, { align: 'center' });
-  }
-  /** METHOD 15: Google Cloud Vision API (stub) */
-  private async method15_GoogleCloudVision(pdf: any, chineseText: string, x: number, y: number, width: number, height: number): Promise<void> {
-    pdf.setFontSize(6);
-    pdf.setTextColor(200, 0, 0);
-    pdf.text('API not configured', x + width/2, y + height/2, { align: 'center' });
-    pdf.setFontSize(5);
-    pdf.text('gcloud-vision', x + width/2, y + height/2 + 10, { align: 'center' });
-  }
-  /** METHOD 16: Cloud function microservice (stub) */
-  private async method16_CloudFunctionMicroservice(pdf: any, chineseText: string, x: number, y: number, width: number, height: number): Promise<void> {
-    pdf.setFontSize(6);
-    pdf.setTextColor(120, 120, 120);
-    pdf.text('Not configured', x + width/2, y + height/2, { align: 'center' });
-    pdf.setFontSize(5);
-    pdf.text('cloud-fn', x + width/2, y + height/2 + 10, { align: 'center' });
-  }
-  /** METHOD 17: pdf-lib with embedded font (stub) */
-  private async method17_PdfLibFont(pdf: any, chineseText: string, x: number, y: number, width: number, height: number): Promise<void> {
-    pdf.setFontSize(6);
-    pdf.setTextColor(200, 0, 0);
-    pdf.text('Font embedding not implemented', x + width/2, y + height/2, { align: 'center' });
-    pdf.setFontSize(5);
-    pdf.text('pdf-lib-font', x + width/2, y + height/2 + 10, { align: 'center' });
-  }
-  /** METHOD 18: pdf-lib with SVG (real, use SVG data URI) */
-  private async method18_PdfLibSVG(pdf: any, chineseText: string, x: number, y: number, width: number, height: number): Promise<void> {
-    try {
-      const dataUri = chineseTextToSVGDataURI(chineseText, 300, 80);
-      const imgWidth = width * 0.8;
-      const imgHeight = 25;
-      const imgX = x + (width - imgWidth) / 2;
-      const imgY = y + 20;
-      pdf.addImage(dataUri, 'SVG', imgX, imgY, imgWidth, imgHeight);
-      pdf.setFontSize(5);
-      pdf.setTextColor(0, 150, 0);
-      pdf.text('✓ SUCCESS', x + width/2, y + height - 8, { align: 'center' });
-    } catch (e) {
-      pdf.setFontSize(6);
-      pdf.setTextColor(200, 0, 0);
-      pdf.text('SVG error', x + width/2, y + height/2, { align: 'center' });
-      pdf.setFontSize(5);
-      pdf.text('pdf-lib-svg', x + width/2, y + height/2 + 10, { align: 'center' });
-    }
-  }
-  /** METHOD 19: Puppeteer/Playwright API (stub) */
-  private async method19_PuppeteerAPI(pdf: any, chineseText: string, x: number, y: number, width: number, height: number): Promise<void> {
-    pdf.setFontSize(6);
-    pdf.setTextColor(200, 0, 0);
-    pdf.text('API not configured', x + width/2, y + height/2, { align: 'center' });
-    pdf.setFontSize(5);
-    pdf.text('puppeteer', x + width/2, y + height/2 + 10, { align: 'center' });
-  }
-  /** METHOD 20: Custom Lambda (stub) */
-  private async method20_CustomLambda(pdf: any, chineseText: string, x: number, y: number, width: number, height: number): Promise<void> {
-    pdf.setFontSize(6);
-    pdf.setTextColor(120, 120, 120);
-    pdf.text('Not configured', x + width/2, y + height/2, { align: 'center' });
-    pdf.setFontSize(5);
-    pdf.text('lambda', x + width/2, y + height/2 + 10, { align: 'center' });
-  }
+
+  // All old method implementations removed - now using external API only
+  // See generateCardBackWithTemplate() for the simplified implementation
 }
 
 export const serverlessPDFService = new ServerlessPDFService(); 

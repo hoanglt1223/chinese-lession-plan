@@ -67,7 +67,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           
         case 'chinese-text-image':
           // Handle Chinese text to PNG image
-          const { text, width, height, fontSize, background, textColor } = requestData;
+          const { text, width, height, fontSize, background, textColor, fontWeight } = requestData;
           if (!text) {
             return res.status(400).json({ message: 'text is required for chinese-text-image' });
           }
@@ -77,7 +77,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             height: height || 180,
             fontSize: fontSize || 64,
             background: background || '#ffffff',
-            textColor: textColor || '#111111'
+            textColor: textColor || '#111111',
+            fontWeight: fontWeight || 'normal'
           });
           
           res.setHeader('Content-Type', 'image/png');
