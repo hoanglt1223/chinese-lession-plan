@@ -29,7 +29,7 @@ export interface FlashcardPDFOptions {
 // External API function for Chinese text conversion with smart defaults
 async function callChineseTextAPI(
   text: string, 
-  method: 'ultimate-text-to-image' | 'text-to-image' | 'png' = 'png',
+  method: 'svg' | 'text-to-image' | 'png' = 'png',
   fontSize: number = 48,
   fontWeight: "100" | "200" | "300" | "400" | "500" | "600" | "700" | "800" | "900" | "normal" | "bold" = '700'
 ): Promise<string> {
@@ -559,10 +559,10 @@ export class ServerlessPDFService {
        console.log(`🧪 Testing all methods for: Chinese="${card.word}" Pinyin="${card.pinyin}"`);
        
        // CHINESE TEXT - 3 methods (columns 1-3)
-       // Method 1: ultimate-text-to-image
-       const chineseUltimate = await callChineseTextAPI(
+       // Method 1: svg
+       const chineseSvg = await callChineseTextAPI(
          card.word || '朋友',
-         'ultimate-text-to-image',
+         'svg',
          42,
          'bold'
        );
@@ -584,10 +584,10 @@ export class ServerlessPDFService {
        );
        
        // PINYIN TEXT - 3 methods (columns 4-6)
-       // Method 1: ultimate-text-to-image
-       const pinyinUltimate = await callChineseTextAPI(
+       // Method 1: svg
+       const pinyinSvg = await callChineseTextAPI(
          card.pinyin || 'péngyǒu',
-         'ultimate-text-to-image',
+         'svg',
          28,
          '500'
        );
@@ -612,8 +612,8 @@ export class ServerlessPDFService {
        const imageWidth = colWidth * 0.85;
        const imageHeight = 35;
        
-       // Column 1: Chinese Ultimate
-       pdf.addImage(chineseUltimate, 'PNG', 
+       // Column 1: Chinese SVG
+       pdf.addImage(chineseSvg, 'PNG', 
          0 * colWidth + (colWidth - imageWidth) / 2, 
          startY + 20, 
          imageWidth, imageHeight);
@@ -630,8 +630,8 @@ export class ServerlessPDFService {
          startY + 20, 
          imageWidth, imageHeight);
        
-       // Column 4: Pinyin Ultimate
-       pdf.addImage(pinyinUltimate, 'PNG', 
+       // Column 4: Pinyin SVG
+       pdf.addImage(pinyinSvg, 'PNG', 
          3 * colWidth + (colWidth - imageWidth) / 2, 
          startY + 20, 
          imageWidth, imageHeight);
@@ -659,8 +659,8 @@ export class ServerlessPDFService {
        pdf.setFontSize(8);
        pdf.setTextColor(100, 100, 100);
        const labels = [
-         'Chinese\nUltimate', 'Chinese\nText-to-Image', 'Chinese\nPNG',
-         'Pinyin\nUltimate', 'Pinyin\nText-to-Image', 'Pinyin\nPNG'
+         'Chinese\nSVG', 'Chinese\nText-to-Image', 'Chinese\nPNG',
+         'Pinyin\nSVG', 'Pinyin\nText-to-Image', 'Pinyin\nPNG'
        ];
        
        for (let i = 0; i < labels.length; i++) {
