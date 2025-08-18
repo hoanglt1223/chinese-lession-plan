@@ -66,7 +66,6 @@ export default function Tools() {
 
   // Text-to-Image States
   const [textToImageText, setTextToImageText] = useState("");
-  const [textToImageLibrary, setTextToImageLibrary] = useState("ultimate");
   const [textToImageStyle, setTextToImageStyle] = useState("default");
   const [generatedTextImageUrl, setGeneratedTextImageUrl] = useState("");
   const [textImageOptions, setTextImageOptions] = useState({
@@ -222,7 +221,7 @@ export default function Tools() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           text: textToImageText,
-          library: textToImageLibrary,
+          library: "chinese-api", // Always use Chinese API now
           style: textToImageStyle,
           options: textImageOptions
         })
@@ -231,7 +230,7 @@ export default function Tools() {
     },
     onSuccess: (data) => {
       setGeneratedTextImageUrl(data.imageUrl);
-      toast({ title: `Text image generated with ${textToImageLibrary}!` });
+      toast({ title: "Text image generated successfully!" });
     },
     onError: (error) => {
       console.error('Text-to-image error:', error);
@@ -892,7 +891,7 @@ export default function Tools() {
                   Text-to-Image Generator
                 </CardTitle>
                 <CardDescription>
-                  Convert text into images with customizable styling - perfect for Chinese characters
+                  Convert text into images using our unified Chinese API - supports Chinese characters, Pinyin, and all languages
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -900,29 +899,16 @@ export default function Tools() {
                   <Label htmlFor="text-to-image-text">Text Content</Label>
                   <Textarea
                     id="text-to-image-text"
-                    placeholder="Enter Chinese text, vocabulary words, or any text to convert to image..."
+                    placeholder="Enter Chinese characters (美丽), Pinyin (měilì), or any text to convert to image..."
                     value={textToImageText}
                     onChange={(e) => setTextToImageText(e.target.value)}
                     className="min-h-[80px]"
                   />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                   <div>
-                    <Label htmlFor="text-image-library">Library</Label>
-                    <select 
-                      id="text-image-library"
-                      className="w-full mt-1 p-2 border rounded"
-                      value={textToImageLibrary}
-                      onChange={(e) => setTextToImageLibrary(e.target.value)}
-                    >
-                      <option value="ultimate">Ultimate Text-to-Image</option>
-                      <option value="text-to-image">Text-to-Image</option>
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="text-image-style">Style</Label>
+                    <Label htmlFor="text-image-style">Text Style</Label>
                     <select 
                       id="text-image-style"
                       className="w-full mt-1 p-2 border rounded"
@@ -933,8 +919,16 @@ export default function Tools() {
                       <option value="bold">Bold</option>
                       <option value="colorful">Colorful</option>
                       <option value="minimal">Minimal</option>
-                      <option value="large">Large Text</option>
                     </select>
+                  </div>
+                  
+                  <div className="bg-blue-50 p-3 rounded-lg">
+                    <div className="text-sm text-blue-800 font-medium mb-1">Smart Font Detection:</div>
+                    <div className="text-xs text-blue-600 space-y-1">
+                      <div>• Chinese characters: AaBiMoHengZiZhenBaoKaiShu font, 200px</div>
+                      <div>• Pinyin text: Montserrat font, 50px</div>
+                      <div>• Other languages: Montserrat font, 50px</div>
+                    </div>
                   </div>
                 </div>
 
@@ -1013,8 +1007,9 @@ export default function Tools() {
                 {generatedTextImageUrl && (
                   <div className="border rounded p-4">
                     <div className="flex items-center gap-2 mb-2">
-                      <Badge variant="secondary">{textToImageLibrary}</Badge>
+                      <Badge variant="secondary">Chinese API</Badge>
                       <Badge variant="outline">{textImageOptions.width}×{textImageOptions.height}</Badge>
+                      <Badge variant="outline">{textToImageStyle}</Badge>
                     </div>
                     <img 
                       src={generatedTextImageUrl} 

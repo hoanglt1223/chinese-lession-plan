@@ -1,7 +1,5 @@
-import path from 'path';
-import fs from 'fs/promises';
-
-
+import path from "path";
+import fs from "fs/promises";
 
 export interface FlashcardData {
   word: string;
@@ -18,33 +16,49 @@ export interface FlashcardPDFOptions {
 
 // External API function for Chinese text conversion with smart defaults
 async function callChineseTextAPI(
-  text: string, 
-  method: 'svg' | 'text-to-image' | 'png' = 'png',
+  text: string,
+  method: "svg" | "text-to-image" | "png" = "png",
   fontSize: number = 48,
-  fontWeight: "100" | "200" | "300" | "400" | "500" | "600" | "700" | "800" | "900" | "normal" | "bold" = '700'
+  fontWeight:
+    | "100"
+    | "200"
+    | "300"
+    | "400"
+    | "500"
+    | "600"
+    | "700"
+    | "800"
+    | "900"
+    | "normal"
+    | "bold" = "700",
+  fontFamily: string = "AaBiMoHengZiZhenBaoKaiShu"
 ): Promise<string> {
   try {
-    const response = await fetch('https://booking.hoangha.shop/api/convert-chinese-text', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        text,
-        method,
-        fontSize,
-        fontFamily: 'NotoSansTC',
-        fontWeight,
-        width: 200,
-        height: 80,
-        backgroundColor: 'transparent',
-        textColor: '#000000',
-        padding: 10,
-        lineHeight: 1.2,
-        textAlign: 'center',
-        quality: 100
-      })
-    });
+    const response = await fetch(
+      "https://booking.hoangha.shop/api/convert-chinese-text",
+      {
+        method: "POST",
+        headers: {
+          "accept": "*/*",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          text,
+          method,
+          fontSize,
+          fontFamily,
+          fontWeight,
+          width: 200,
+          height: 200,
+          backgroundColor: "#ffffff",
+          textColor: "#000000",
+          padding: 20,
+          lineHeight: 1.5,
+          textAlign: "center",
+          quality: 90,
+        }),
+      }
+    );
 
     if (!response.ok) {
       throw new Error(`API request failed: ${response.status}`);
@@ -53,25 +67,16 @@ async function callChineseTextAPI(
     // Get the response as binary data since API returns image file
     const arrayBuffer = await response.arrayBuffer();
     const imageBuffer = Buffer.from(arrayBuffer);
-    
+
     // Get content type from response headers or default to PNG
-    const contentType = response.headers.get('content-type') || 'image/png';
-    
+    const contentType = response.headers.get("content-type") || "image/png";
+
     // Convert to data URI
-    const base64 = imageBuffer.toString('base64');
+    const base64 = imageBuffer.toString("base64");
     return `data:${contentType};base64,${base64}`;
     } catch (error) {
-    console.error('Chinese text API call failed:', error);
-    // Fallback to simple SVG generation
-  const safeText = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const svg = `
-      <svg width="200" height="80" xmlns="http://www.w3.org/2000/svg">
-        <rect width="200" height="80" fill="#fff"/>
-        <text x="50%" y="50%" font-size="${fontSize}" font-family="Noto Sans TC, Arial, sans-serif" fill="#000" text-anchor="middle" alignment-baseline="middle" dominant-baseline="middle">${safeText}</text>
-    </svg>
-  `;
-  const base64 = Buffer.from(svg).toString('base64');
-  return `data:image/svg+xml;base64,${base64}`;
+    console.error(`🚨 Chinese text API call failed for "${text}" (${method}):`, error);
+    throw error; // Re-throw the error without fallback
   }
 }
 
@@ -82,63 +87,96 @@ export class ServerlessPDFService {
   constructor() {
     // Paths to the flashcard template images
     // In Vercel serverless environment, files from client/public/ are available in the root
-    this.templateFrontPath = path.join(process.cwd(), 'client/public/templates', 'flashcard-front.png');
-    this.templateBackPath = path.join(process.cwd(), 'client/public/templates', 'flashcard-back.png');
+    this.templateFrontPath = path.join(
+      process.cwd(),
+      "client/public/templates",
+      "flashcard-front.png"
+    );
+    this.templateBackPath = path.join(
+      process.cwd(),
+      "client/public/templates",
+      "flashcard-back.png"
+    );
   }
-
-
 
   /**
    * Public: Generate a PNG image for the given Chinese text using external API.
    */
   public async generateChineseTextImage(
-    text: string, 
-    opts?: { 
-      width?: number; 
-      height?: number; 
-      fontSize?: number; 
-      fontWeight?: "100" | "200" | "300" | "400" | "500" | "600" | "700" | "800" | "900" | "normal" | "bold";
+    text: string,
+    opts?: {
+      width?: number;
+      height?: number;
+      fontSize?: number;
+      fontWeight?:
+        | "100"
+        | "200"
+        | "300"
+        | "400"
+        | "500"
+        | "600"
+        | "700"
+        | "800"
+        | "900"
+        | "normal"
+        | "bold";
     }
-  ): Promise<{ buffer: Buffer; dataUri: string; contentType: 'image/png'; width: number; height: number; }> {
+  ): Promise<{
+    buffer: Buffer;
+    dataUri: string;
+    contentType: "image/png";
+    width: number;
+    height: number;
+  }> {
     const width = opts?.width ?? 600;
     const height = opts?.height ?? 180;
-    
+
     try {
-       // Use simplified external API for Chinese text rendering
+             // Use simplified external API for Chinese text rendering
        const svgDataUri = await callChineseTextAPI(
          text,
-         'png',
+         "png",
          opts?.fontSize || 48,
-         opts?.fontWeight || '400'
+         opts?.fontWeight || "400",
+         "AaBiMoHengZiZhenBaoKaiShu"
        );
-      
-             // The API already returns binary image data as data URI, no need to convert
-       // Extract buffer from data URI for compatibility
-       const base64Data = svgDataUri.split(',')[1];
-       const buffer = Buffer.from(base64Data, 'base64');
-       return { buffer, dataUri: svgDataUri, contentType: 'image/png', width, height };
-      
-    } catch (error) {
-      console.error('External API failed, using minimal fallback:', error);
-      // Simple fallback: return a basic placeholder image
-      const tiny = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==', 'base64');
-      return { 
-        buffer: tiny, 
-        dataUri: `data:image/png;base64,${tiny.toString('base64')}`, 
-        contentType: 'image/png', 
-        width, 
-        height 
+
+      // The API already returns binary image data as data URI, no need to convert
+      // Extract buffer from data URI for compatibility
+      const base64Data = svgDataUri.split(",")[1];
+      const buffer = Buffer.from(base64Data, "base64");
+      return {
+        buffer,
+        dataUri: svgDataUri,
+        contentType: "image/png",
+        width,
+        height,
       };
+    } catch (error) {
+      console.error("External API failed:", error);
+      throw error; // Re-throw the error without fallback
     }
   }
 
   /**
    * Public: Generate a simple PDF where each page shows one Chinese text centered as an image.
    */
-  public async generateChineseTextPDF(texts: string[] | string, opts?: { orientation?: 'portrait' | 'landscape'; unit?: 'mm' | 'pt'; format?: 'a4' | 'letter'; margin?: number; }): Promise<Buffer> {
+  public async generateChineseTextPDF(
+    texts: string[] | string,
+    opts?: {
+      orientation?: "portrait" | "landscape";
+      unit?: "mm" | "pt";
+      format?: "a4" | "letter";
+      margin?: number;
+    }
+  ): Promise<Buffer> {
     const list = Array.isArray(texts) ? texts : [texts];
-    const { jsPDF } = await import('jspdf');
-    const pdf = new jsPDF({ orientation: opts?.orientation ?? 'portrait', unit: opts?.unit ?? 'mm', format: opts?.format ?? 'a4' });
+    const { jsPDF } = await import("jspdf");
+    const pdf = new jsPDF({
+      orientation: opts?.orientation ?? "portrait",
+      unit: opts?.unit ?? "mm",
+      format: opts?.format ?? "a4",
+    });
 
     const pageWidth = (pdf as any).internal.pageSize.getWidth();
     const pageHeight = (pdf as any).internal.pageSize.getHeight();
@@ -149,7 +187,10 @@ export class ServerlessPDFService {
       if (!first) pdf.addPage();
       first = false;
       try {
-        const { dataUri } = await this.generateChineseTextImage(t, { width: 1200, height: 360 });
+        const { dataUri } = await this.generateChineseTextImage(t, {
+          width: 1200,
+          height: 360,
+        });
         const props = pdf.getImageProperties(dataUri);
         const imgRatio = props.width / props.height;
         const maxW = pageWidth - margin * 2;
@@ -162,15 +203,17 @@ export class ServerlessPDFService {
         }
         const x = (pageWidth - w) / 2;
         const y = (pageHeight - h) / 2;
-        pdf.addImage(dataUri, 'PNG', x, y, w, h);
+        pdf.addImage(dataUri, "PNG", x, y, w, h);
       } catch (e) {
         pdf.setTextColor(200, 0, 0);
         pdf.setFontSize(12);
-        pdf.text('Failed to render text', pageWidth / 2, pageHeight / 2, { align: 'center' });
+        pdf.text("Failed to render text", pageWidth / 2, pageHeight / 2, {
+          align: "center",
+        });
       }
     }
 
-    const uint8Array = pdf.output('arraybuffer');
+    const uint8Array = pdf.output("arraybuffer");
     const pdfBuffer = Buffer.from(uint8Array);
     return pdfBuffer;
   }
@@ -178,23 +221,37 @@ export class ServerlessPDFService {
   /**
    * Load template image and convert to base64 data URL (no caching)
    */
-  private async loadTemplateImage(templateType: 'front' | 'back'): Promise<string> {
+  private async loadTemplateImage(
+    templateType: "front" | "back"
+  ): Promise<string> {
     try {
-      const templatePath = templateType === 'front' ? this.templateFrontPath : this.templateBackPath;
+      const templatePath =
+        templateType === "front"
+          ? this.templateFrontPath
+          : this.templateBackPath;
 
       // Try to read the image file
       const imageBuffer = await fs.readFile(templatePath);
       
       // Convert to base64 data URL
-      const base64Image = `data:image/png;base64,${imageBuffer.toString('base64')}`;
+      const base64Image = `data:image/png;base64,${imageBuffer.toString(
+        "base64"
+      )}`;
       
       return base64Image;
-      
     } catch (error) {
-      console.error(`Error loading ${templateType} template from ${templateType === 'front' ? this.templateFrontPath : this.templateBackPath}:`, error);
+      console.error(
+        `Error loading ${templateType} template from ${
+          templateType === "front"
+            ? this.templateFrontPath
+            : this.templateBackPath
+        }:`,
+        error
+      );
       
       // Return a simple fallback base64 image (1x1 transparent PNG)
-      const fallbackImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
+      const fallbackImage =
+        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==";
       console.log(`Using fallback image for ${templateType} template`);
       
       return fallbackImage;
@@ -207,29 +264,35 @@ export class ServerlessPDFService {
   async generateFlashcardPDF(options: FlashcardPDFOptions): Promise<Buffer> {
     const startTime = Date.now();
     const sessionId = Math.random().toString(36).substring(2, 15);
-    console.log(`🚀 Starting fresh PDF generation at ${new Date().toISOString()} [Session: ${sessionId}]`);
-    console.log(`📊 Testing ${options.flashcards.length} flashcards with ${10} different Chinese rendering methods`);
+    console.log(
+      `🚀 Starting fresh PDF generation at ${new Date().toISOString()} [Session: ${sessionId}]`
+    );
+    console.log(
+      `📊 Testing ${
+        options.flashcards.length
+      } flashcards with ${10} different Chinese rendering methods`
+    );
     try {
       // Load template images
-      const frontTemplateImage = await this.loadTemplateImage('front');
-      const backTemplateImage = await this.loadTemplateImage('back');
+      const frontTemplateImage = await this.loadTemplateImage("front");
+      const backTemplateImage = await this.loadTemplateImage("back");
       
       // Use jsPDF for efficient PDF generation with template background
-      const { jsPDF } = await import('jspdf');
+      const { jsPDF } = await import("jspdf");
       
       // Create new PDF document (A4 landscape: 297 x 210 mm)
       const pdf = new jsPDF({
-        orientation: 'landscape',
-        unit: 'mm',
-        format: 'a4'
+        orientation: "landscape",
+        unit: "mm",
+        format: "a4",
       });
 
       // Set Chinese language support
       try {
         pdf.setLanguage("zh-CN");
-        console.log('✅ Set PDF language to Chinese (zh-CN)');
+        console.log("✅ Set PDF language to Chinese (zh-CN)");
       } catch (langError) {
-        console.warn('Could not set Chinese language:', langError);
+        console.warn("Could not set Chinese language:", langError);
       }
 
       let isFirstPage = true;
@@ -244,15 +307,27 @@ export class ServerlessPDFService {
             pdf.addPage();
           }
           
-          await this.generateCardFrontWithTemplate(pdf, card, i + 1, frontTemplateImage);
+          await this.generateCardFrontWithTemplate(
+            pdf,
+            card,
+            i + 1,
+            frontTemplateImage
+          );
           isFirstPage = false;
 
           // Add back page
           pdf.addPage();
-          await this.generateCardBackWithTemplate(pdf, card, i + 1, backTemplateImage);
-
+          await this.generateCardBackWithTemplate(
+            pdf,
+            card,
+            i + 1,
+            backTemplateImage
+          );
         } catch (cardError) {
-          console.error(`❌ Error processing flashcard ${i + 1} (${card.word}):`, cardError instanceof Error ? cardError.message : String(cardError));
+          console.error(
+            `❌ Error processing flashcard ${i + 1} (${card.word}):`,
+            cardError instanceof Error ? cardError.message : String(cardError)
+          );
           
           // Add a fallback page to prevent completely broken PDF
           try {
@@ -264,15 +339,22 @@ export class ServerlessPDFService {
             }
             
             // Add error page with basic template
-            pdf.addImage(frontTemplateImage, 'JPEG', 0, 0, 297, 210);
+            pdf.addImage(frontTemplateImage, "JPEG", 0, 0, 297, 210);
             pdf.setFontSize(24);
             pdf.setTextColor(255, 0, 0); // Red text
-            pdf.text('Error generating card', 297/2, 210/2, { align: 'center' });
+            pdf.text("Error generating card", 297 / 2, 210 / 2, {
+              align: "center",
+            });
             pdf.setFontSize(16);
             pdf.setTextColor(0, 0, 0); // Black text
-            pdf.text(`Card: ${card.word}`, 297/2, 210/2 + 20, { align: 'center' });
+            pdf.text(`Card: ${card.word}`, 297 / 2, 210 / 2 + 20, {
+              align: "center",
+            });
           } catch (fallbackError) {
-            console.error(`Failed to add error page for card ${i + 1}:`, fallbackError);
+            console.error(
+              `Failed to add error page for card ${i + 1}:`,
+              fallbackError
+            );
           }
         }
       }
@@ -280,48 +362,62 @@ export class ServerlessPDFService {
       // First, validate that we have pages
       const pageCount = pdf.getNumberOfPages();
       if (pageCount === 0) {
-        throw new Error('PDF has no pages');
+        throw new Error("PDF has no pages");
       }
       
       // Generate PDF data - try different output methods for better compatibility
       let pdfBuffer: Buffer;
       try {
         // Method 1: Try uint8array first (more reliable)
-        const uint8Array = pdf.output('arraybuffer');
+        const uint8Array = pdf.output("arraybuffer");
         pdfBuffer = Buffer.from(uint8Array);
       } catch (bufferError) {
-        console.warn('ArrayBuffer method failed, trying string method:', bufferError);
+        console.warn(
+          "ArrayBuffer method failed, trying string method:",
+          bufferError
+        );
         // Method 2: Fallback to string method
-        const pdfString = pdf.output('datauristring');
-        const base64Data = pdfString.split(',')[1];
+        const pdfString = pdf.output("datauristring");
+        const base64Data = pdfString.split(",")[1];
         if (!base64Data) {
-          throw new Error('Failed to extract base64 data from PDF');
+          throw new Error("Failed to extract base64 data from PDF");
         }
-        pdfBuffer = Buffer.from(base64Data, 'base64');
+        pdfBuffer = Buffer.from(base64Data, "base64");
       }
       
       // Validate the PDF buffer
       if (!pdfBuffer || pdfBuffer.length === 0) {
-        throw new Error('Generated PDF buffer is empty');
+        throw new Error("Generated PDF buffer is empty");
       }
       
       // Check if buffer starts with PDF header
       const pdfHeader = pdfBuffer.slice(0, 4).toString();
-      if (pdfHeader !== '%PDF') {
-        console.error('Invalid PDF header:', pdfHeader);
-        throw new Error(`Invalid PDF header: expected '%PDF', got '${pdfHeader}'`);
+      if (pdfHeader !== "%PDF") {
+        console.error("Invalid PDF header:", pdfHeader);
+        throw new Error(
+          `Invalid PDF header: expected '%PDF', got '${pdfHeader}'`
+        );
       }
       
       const endTime = Date.now();
-      console.log(`✅ Fresh PDF generation completed in ${endTime - startTime}ms at ${new Date().toISOString()} [Session: ${sessionId}]`);
+      console.log(
+        `✅ Fresh PDF generation completed in ${
+          endTime - startTime
+        }ms at ${new Date().toISOString()} [Session: ${sessionId}]`
+      );
       console.log(`📦 Generated PDF size: ${pdfBuffer.length} bytes`);
-      console.log(`🔍 Canvas availability caching: DISABLED (ensures fresh testing)`);
+      console.log(
+        `🔍 Canvas availability caching: DISABLED (ensures fresh testing)`
+      );
       
       return pdfBuffer;
-
     } catch (error) {
-      console.error('Error generating flashcard PDF:', error);
-      throw new Error(`Failed to generate flashcard PDF: ${error instanceof Error ? error.message : String(error)}`);
+      console.error("Error generating flashcard PDF:", error);
+      throw new Error(
+        `Failed to generate flashcard PDF: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
     }
   }
 
@@ -331,7 +427,7 @@ export class ServerlessPDFService {
   private async fetchImageAsBase64(imageUrl: string): Promise<string> {
     try {
       // Use node-fetch to get the image
-      const fetch = (await import('node-fetch')).default;
+      const fetch = (await import("node-fetch")).default;
       const response = await fetch(imageUrl);
       
       if (!response.ok) {
@@ -340,15 +436,16 @@ export class ServerlessPDFService {
       
       const arrayBuffer = await response.arrayBuffer();
       const imageBuffer = Buffer.from(arrayBuffer);
-      const contentType = response.headers.get('content-type') || 'image/jpeg';
+      const contentType = response.headers.get("content-type") || "image/jpeg";
       
       // Convert to base64
-      const base64Image = `data:${contentType};base64,${imageBuffer.toString('base64')}`;
+      const base64Image = `data:${contentType};base64,${imageBuffer.toString(
+        "base64"
+      )}`;
       
       return base64Image;
-      
     } catch (error) {
-      console.error('Error fetching image:', error);
+      console.error("Error fetching image:", error);
       throw error;
     }
   }
@@ -356,23 +453,32 @@ export class ServerlessPDFService {
   /**
    * Generate front side using template background
    */
-  private async generateCardFrontWithTemplate(pdf: any, card: FlashcardData, cardNumber: number, templateImage: string): Promise<void> {
+  private async generateCardFrontWithTemplate(
+    pdf: any,
+    card: FlashcardData,
+    cardNumber: number,
+    templateImage: string
+  ): Promise<void> {
     const pageWidth = 297; // A4 landscape width in mm
     const pageHeight = 210; // A4 landscape height in mm
     
     // Add template as background image (landscape orientation)
-    pdf.addImage(templateImage, 'JPEG', 0, 0, pageWidth, pageHeight);
+    pdf.addImage(templateImage, "JPEG", 0, 0, pageWidth, pageHeight);
     
     // Set up Chinese font support (using built-in fonts with fallback)
     try {
       // Try to set a font that supports Chinese characters
       pdf.setFont("helvetica");
     } catch (error) {
-      console.warn('Font setting failed, using default:', error);
+      console.warn("Font setting failed, using default:", error);
     }
 
     // Add actual image or placeholder centered at 70% of page size
-    if (card.imageUrl && !card.imageUrl.includes('placeholder') && !card.imageUrl.includes('via.placeholder')) {
+    if (
+      card.imageUrl &&
+      !card.imageUrl.includes("placeholder") &&
+      !card.imageUrl.includes("via.placeholder")
+    ) {
       try {
         // Fetch and convert image to base64
         const base64Image = await this.fetchImageAsBase64(card.imageUrl);
@@ -414,27 +520,47 @@ export class ServerlessPDFService {
         const imageY = (pageHeight - imageHeight) / 2; // Center vertically
         
         // Add the actual image
-        pdf.addImage(base64Image, 'JPEG', imageX, imageY, imageWidth, imageHeight);
-        
+        pdf.addImage(
+          base64Image,
+          "JPEG",
+          imageX,
+          imageY,
+          imageWidth,
+          imageHeight
+        );
       } catch (error) {
         console.error(`❌ Failed to add image for "${card.word}":`, error);
         // Fallback to placeholder text if image fails
         pdf.setFontSize(12);
         pdf.setTextColor(200, 100, 100); // Light red text
-        pdf.text('Image failed to load', pageWidth / 2, pageHeight / 2, { align: 'center' });
+        pdf.text("Image failed to load", pageWidth / 2, pageHeight / 2, {
+          align: "center",
+        });
         pdf.setFontSize(10);
         pdf.setTextColor(150, 150, 150); // Gray text
-        pdf.text(`URL: ${card.imageUrl?.substring(0, 50)}...`, pageWidth / 2, pageHeight / 2 + 15, { align: 'center' });
+        pdf.text(
+          `URL: ${card.imageUrl?.substring(0, 50)}...`,
+          pageWidth / 2,
+          pageHeight / 2 + 15,
+          { align: "center" }
+        );
       }
     } else {
       // Show placeholder when no image URL provided
       pdf.setFontSize(12);
       pdf.setTextColor(120, 120, 120); // Gray text
-      pdf.text('No image available', pageWidth / 2, pageHeight / 2, { align: 'center' });
+      pdf.text("No image available", pageWidth / 2, pageHeight / 2, {
+        align: "center",
+      });
       
       if (card.imageUrl) {
         pdf.setFontSize(8);
-        pdf.text(`(Placeholder URL detected)`, pageWidth / 2, pageHeight / 2 + 15, { align: 'center' });
+        pdf.text(
+          `(Placeholder URL detected)`,
+          pageWidth / 2,
+          pageHeight / 2 + 15,
+          { align: "center" }
+        );
       }
     }
   }
@@ -442,161 +568,192 @@ export class ServerlessPDFService {
   /**
    * Generate back side using template background - Simplified version using external API
    */
-  private async generateCardBackWithTemplate(pdf: any, card: FlashcardData, cardNumber: number, templateImage: string): Promise<void> {
+  private async generateCardBackWithTemplate(
+    pdf: any,
+    card: FlashcardData,
+    cardNumber: number,
+    templateImage: string
+  ): Promise<void> {
     const pageWidth = 297; // A4 landscape width in mm
     const pageHeight = 210; // A4 landscape height in mm
     
     // Add template as background image (landscape orientation)
-    pdf.addImage(templateImage, 'JPEG', 0, 0, pageWidth, pageHeight);
-    
-    console.log(`🚀 Generating flashcard back for: "${card.word}" with pinyin: "${card.pinyin}"`);
-    
-                  try {
-       // 6-column layout to test all 3 methods for both Chinese and Pinyin
-       const colWidth = pageWidth / 6;
-       const colHeight = pageHeight * 0.6;
+    pdf.addImage(templateImage, "JPEG", 0, 0, pageWidth, pageHeight);
+
+    console.log(
+      `🚀 Generating flashcard back for: "${card.word}" with pinyin: "${card.pinyin}"`
+    );
+    console.log(
+      `🔥 NEW VERSION: Using 6-column Chinese API layout (not old Vietnamese layout)`
+    );
+
+    try {
+      // 6-column layout to test all 3 methods for both Chinese and Pinyin
+      const colWidth = pageWidth / 6;
+      const colHeight = pageHeight * 0.6;
     const startY = 30;
-       
-       console.log(`🧪 Testing all methods for: Chinese="${card.word}" Pinyin="${card.pinyin}"`);
-       
-       // CHINESE TEXT - 3 methods (columns 1-3)
+
+      console.log(
+        `🧪 Testing all methods for: Chinese="${card.word}" Pinyin="${card.pinyin}"`
+      );
+
+             // CHINESE TEXT - 3 methods (columns 1-3) - using AaBiMoHengZiZhenBaoKaiShu 200px
        // Method 1: svg
        const chineseSvg = await callChineseTextAPI(
-         card.word || '朋友',
-         'svg',
-         48,
-         'bold'
+         card.word || "朋友",
+         "svg",
+         200,
+         "bold"
        );
-       
-       // Method 2: text-to-image  
+
+       // Method 2: text-to-image
        const chineseTextToImage = await callChineseTextAPI(
-         card.word || '朋友',
-         'text-to-image',
-         48,
-         'bold'
+         card.word || "朋友",
+         "text-to-image",
+         200,
+         "bold"
        );
-       
+
        // Method 3: png
        const chinesePng = await callChineseTextAPI(
-         card.word || '朋友',
-         'png',
-         48,
-         'bold'
+         card.word || "朋友",
+         "png",
+         200,
+         "bold"
        );
-       
-       // PINYIN TEXT - 3 methods (columns 4-6)
+
+             // PINYIN TEXT - 3 methods (columns 4-6) - using Montserrat 50px
        // Method 1: svg
        const pinyinSvg = await callChineseTextAPI(
-         card.pinyin || 'péngyǒu',
-         'svg',
-         24,
-         '500'
+         card.pinyin || "péngyǒu",
+         "svg",
+         50,
+         "500",
+         "Montserrat"
        );
-       
+
        // Method 2: text-to-image
        const pinyinTextToImage = await callChineseTextAPI(
-         card.pinyin || 'péngyǒu',
-         'text-to-image',
-         24,
-         '500'
+         card.pinyin || "péngyǒu",
+         "text-to-image",
+         50,
+         "500",
+         "Montserrat"
        );
-       
+
        // Method 3: png
        const pinyinPng = await callChineseTextAPI(
-         card.pinyin || 'péngyǒu',
-         'png',
-         24,
-         '500'
+         card.pinyin || "péngyǒu",
+         "png",
+         50,
+         "500",
+         "Montserrat"
        );
-       
-       // Display all 6 columns with compact sizing for single words
-       const imageWidth = colWidth * 0.8;
-       const imageHeight = 30;
-       const imageY = startY + 25;
-       
-       // Column 1: Chinese SVG
-       pdf.addImage(chineseSvg, 'PNG', 
-         0 * colWidth + (colWidth - imageWidth) / 2, 
-         imageY, 
-         imageWidth, imageHeight);
-       
-       // Column 2: Chinese Text-to-Image
-       pdf.addImage(chineseTextToImage, 'PNG', 
-         1 * colWidth + (colWidth - imageWidth) / 2, 
-         imageY, 
-         imageWidth, imageHeight);
-       
-       // Column 3: Chinese PNG
-       pdf.addImage(chinesePng, 'PNG', 
-         2 * colWidth + (colWidth - imageWidth) / 2, 
-         imageY, 
-         imageWidth, imageHeight);
-       
-       // Column 4: Pinyin SVG
-       pdf.addImage(pinyinSvg, 'PNG', 
-         3 * colWidth + (colWidth - imageWidth) / 2, 
-         imageY, 
-         imageWidth, imageHeight);
-       
-       // Column 5: Pinyin Text-to-Image
-       pdf.addImage(pinyinTextToImage, 'PNG', 
-         4 * colWidth + (colWidth - imageWidth) / 2, 
-         imageY, 
-         imageWidth, imageHeight);
-       
-       // Column 6: Pinyin PNG
-       pdf.addImage(pinyinPng, 'PNG', 
-         5 * colWidth + (colWidth - imageWidth) / 2, 
-         imageY, 
-         imageWidth, imageHeight);
-       
-       // Add column divider lines
-       pdf.setDrawColor(180, 180, 180);
-       pdf.setLineWidth(0.3);
-       for (let i = 1; i < 6; i++) {
-         const x = i * colWidth;
-         pdf.line(x, startY + 20, x, imageY + imageHeight + 25);
-       }
-       
-       // Add section titles at top
-       pdf.setFontSize(10);
-       pdf.setTextColor(60, 60, 60);
-       pdf.text('CHINESE CHARACTERS', pageWidth / 4, startY + 10, { align: 'center' });
-       pdf.text('PINYIN', (pageWidth * 3) / 4, startY + 10, { align: 'center' });
-       
-       // Add method labels at bottom
-       pdf.setFontSize(7);
-       pdf.setTextColor(120, 120, 120);
-       const labels = [
-         'SVG', 'Text-to-Image', 'PNG',
-         'SVG', 'Text-to-Image', 'PNG'
-       ];
-       
-       for (let i = 0; i < labels.length; i++) {
-         const x = i * colWidth + colWidth / 2;
-         const y = imageY + imageHeight + 10;
-         pdf.text(labels[i], x, y, { align: 'center' });
-       }
-      
-      
+
+      // Display all 6 columns with compact sizing for single words
+      const imageWidth = colWidth * 0.8;
+      const imageHeight = 40;
+      const imageY = startY + 25;
+
+              // Helper function to safely add image to PDF
+        const safeAddImage = (imageData: string, label: string, colIndex: number) => {
+          try {
+            if (!imageData || imageData.length < 50) {
+              console.log(`⚠️ Skipping ${label}: Invalid image data`);
+              return;
+            }
+            
+            // Check if it's SVG data - jsPDF doesn't support SVG natively
+            if (imageData.startsWith('data:image/svg')) {
+              console.log(`⚠️ Skipping ${label}: SVG format not supported by jsPDF`);
+              return;
+            }
+            
+            // Use PNG format for all non-SVG images
+            const format = 'PNG';
+            
+            pdf.addImage(
+              imageData,
+              format,
+              colIndex * colWidth + (colWidth - imageWidth) / 2,
+              imageY,
+              imageWidth,
+              imageHeight
+            );
+            console.log(`✅ Added ${label} to PDF (${format})`);
+          } catch (error) {
+            console.error(`❌ Failed to add ${label} to PDF:`, error);
+          }
+        };
+
+      // Add all 6 columns safely (SVG columns will be skipped due to jsPDF limitation)
+      safeAddImage(chineseSvg, "Chinese SVG", 0);
+      safeAddImage(chineseTextToImage, "Chinese Text-to-Image", 1);
+      safeAddImage(chinesePng, "Chinese PNG", 2);
+      safeAddImage(pinyinSvg, "Pinyin SVG", 3);
+      safeAddImage(pinyinTextToImage, "Pinyin Text-to-Image", 4);
+      safeAddImage(pinyinPng, "Pinyin PNG", 5);
+
+      // Add column divider lines
+      pdf.setDrawColor(180, 180, 180);
+      pdf.setLineWidth(0.3);
+      for (let i = 1; i < 6; i++) {
+        const x = i * colWidth;
+        pdf.line(x, startY + 20, x, imageY + imageHeight + 25);
+      }
+
+      // Add section titles at top
+      pdf.setFontSize(10);
+      pdf.setTextColor(60, 60, 60);
+      pdf.text("CHINESE CHARACTERS", pageWidth / 4, startY + 10, {
+        align: "center",
+      });
+      pdf.text("PINYIN", (pageWidth * 3) / 4, startY + 10, { align: "center" });
+
+      // Add method labels at bottom
+      pdf.setFontSize(7);
+      pdf.setTextColor(120, 120, 120);
+      const labels = [
+        "SVG",
+        "Text-to-Image",
+        "PNG",
+        "SVG",
+        "Text-to-Image",
+        "PNG",
+      ];
+
+      for (let i = 0; i < labels.length; i++) {
+        const x = i * colWidth + colWidth / 2;
+        const y = imageY + imageHeight + 10;
+        pdf.text(labels[i], x, y, { align: "center" });
+      }
+
       console.log(`✅ Successfully generated flashcard back for: ${card.word}`);
-      
     } catch (error) {
-      console.error(`❌ Failed to generate flashcard back for: ${card.word}`, error);
-      
+      console.error(
+        `❌ Failed to generate flashcard back for: ${card.word}`,
+        error
+      );
+
       // Fallback: Simple text rendering
       pdf.setFontSize(24);
       pdf.setTextColor(0, 0, 0);
-      pdf.text(card.word || '朋友', pageWidth / 2, pageHeight / 2 - 20, { align: 'center' });
-      
+      pdf.text(card.word || "朋友", pageWidth / 2, pageHeight / 2 - 20, {
+        align: "center",
+      });
+
       pdf.setFontSize(16);
       pdf.setTextColor(100, 100, 100);
-      pdf.text(card.pinyin || 'péngyǒu', pageWidth / 2, pageHeight / 2, { align: 'center' });
-      
+      pdf.text(card.pinyin || "péngyǒu", pageWidth / 2, pageHeight / 2, {
+        align: "center",
+      });
+
       if (card.vietnamese) {
         pdf.setFontSize(14);
         pdf.setTextColor(0, 0, 0);
-        pdf.text(card.vietnamese, pageWidth / 2, pageHeight / 2 + 20, { align: 'center' });
+        pdf.text(card.vietnamese, pageWidth / 2, pageHeight / 2 + 20, {
+          align: "center",
+        });
       }
     }
   }

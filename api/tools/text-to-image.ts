@@ -1,5 +1,87 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
+// Function to detect if text contains Chinese characters
+function containsChinese(text: string): boolean {
+  const chineseRegex = /[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/;
+  return chineseRegex.test(text);
+}
+
+// Function to detect if text is primarily pinyin
+function isPinyin(text: string): boolean {
+  // Check for pinyin tone marks and common pinyin patterns
+  const pinyinRegex = /[āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ]/;
+  const hasLatinChars = /[a-zA-Z]/.test(text);
+  const hasToneMarks = pinyinRegex.test(text);
+  
+  return hasLatinChars && (hasToneMarks || /^[a-zA-Z\s]*$/.test(text));
+}
+
+// External Chinese API function (copied from serverless-pdf-service.ts)
+async function callChineseTextAPI(
+  text: string,
+  method: "svg" | "text-to-image" | "png" = "png",
+  fontSize: number = 48,
+  fontWeight: "100" | "200" | "300" | "400" | "500" | "600" | "700" | "800" | "900" | "normal" | "bold" = "700",
+  fontFamily: string = "AaBiMoHengZiZhenBaoKaiShu"
+): Promise<string> {
+  try {
+    const response = await fetch(
+      "https://booking.hoangha.shop/api/convert-chinese-text",
+      {
+        method: "POST",
+        headers: {
+          "accept": "*/*",
+          "accept-language": "en,vi;q=0.9",
+          "content-type": "application/json",
+          "dnt": "1",
+          "origin": "https://booking.hoangha.shop",
+          "referer": "https://booking.hoangha.shop/chinese-converter",
+          "sec-ch-ua": '"Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"',
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": '"Windows"',
+          "sec-fetch-dest": "empty",
+          "sec-fetch-mode": "cors",
+          "sec-fetch-site": "same-origin",
+          "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36"
+        },
+        body: JSON.stringify({
+          text,
+          method,
+          fontSize,
+          fontFamily,
+          fontWeight,
+          width: 800,
+          height: 600,
+          backgroundColor: "#ffffff",
+          textColor: "#000000",
+          padding: 20,
+          lineHeight: 1.5,
+          textAlign: "left",
+          quality: 90,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`API request failed: ${response.status}`);
+    }
+
+    // Get the response as binary data since API returns image file
+    const arrayBuffer = await response.arrayBuffer();
+    const imageBuffer = Buffer.from(arrayBuffer);
+
+    // Get content type from response headers or default to PNG
+    const contentType = response.headers.get("content-type") || "image/png";
+
+    // Convert to data URI
+    const base64 = imageBuffer.toString("base64");
+    return `data:${contentType};base64,${base64}`;
+  } catch (error) {
+    console.error("Chinese text API call failed:", error);
+    throw error;
+  }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -22,11 +104,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let imageBuffer: Buffer;
     let mimeType = 'image/png';
 
-    // Generate image based on selected library
-     if (library === 'text-to-image' || library === 'ultimate') {
-      imageBuffer = await generateWithTextToImage(text, style, options);
+    // Check if text contains Chinese characters and route accordingly
+    if (containsChinese(text)) {
+      console.log('🈳 Detected Chinese characters, using Chinese API');
+      imageBuffer = await generateWithChineseAPI(text, style, options);
+    } else if (isPinyin(text)) {
+      console.log('🔤 Detected Pinyin, using Chinese API with Pinyin settings');
+      imageBuffer = await generateWithChineseAPI(text, style, options, true);
     } else {
-      return res.status(400).json({ error: 'Invalid library specified' });
+      // Use Chinese API for all text types with appropriate settings
+      console.log('🔤 Using Chinese API for non-Chinese text with Montserrat font');
+      imageBuffer = await generateWithChineseAPI(text, style, options, true); // Use pinyin settings (Montserrat font)
     }
 
     // Convert to base64 data URL
@@ -52,156 +140,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 }
 
-async function generateWithTextToImage(text: string, style: string, options: any): Promise<Buffer> {
+async function generateWithChineseAPI(text: string, style: string, options: any, isPinyinText: boolean = false): Promise<Buffer> {
   try {
-    // Import text-to-image
-    const textToImageModule = await import('text-to-image');
-    const generate = textToImageModule.generate || textToImageModule.default?.generate || textToImageModule.default;
+    // Determine font and size based on text type
+    const fontFamily = isPinyinText ? "Montserrat" : "AaBiMoHengZiZhenBaoKaiShu";
+    const fontSize = isPinyinText ? 50 : 200;
+    const fontWeight = isPinyinText ? "500" : "700";
 
-    if (!generate) {
-      throw new Error('text-to-image generate function not found');
-    }
+    console.log(`🎨 Chinese API: ${isPinyinText ? 'Pinyin' : 'Chinese'} - Font: ${fontFamily}, Size: ${fontSize}`);
 
-    // Style configurations with Chinese font support
-    const chineseFontFamily = 'Noto Sans TC, SimSun, Microsoft YaHei, Arial Unicode MS, Arial, sans-serif';
-    const styleConfigs = {
-      default: {
-        fontFamily: chineseFontFamily,
-        textColor: options.fontColor || '#000000',
-        bgColor: options.backgroundColor || '#ffffff',
-        fontSize: undefined as number | undefined,
-        fontWeight: undefined as string | undefined
-      },
-      bold: {
-        fontFamily: chineseFontFamily,
-        fontWeight: 'bold' as const,
-        textColor: '#2563eb',
-        bgColor: '#f8fafc',
-        fontSize: undefined as number | undefined
-      },
-      colorful: {
-        fontFamily: chineseFontFamily,
-        textColor: '#dc2626',
-        bgColor: '#fef2f2',
-        fontSize: undefined as number | undefined,
-        fontWeight: undefined as string | undefined
-      },
-      minimal: {
-        fontFamily: chineseFontFamily,
-        textColor: '#374151',
-        bgColor: '#ffffff',
-        fontSize: undefined as number | undefined,
-        fontWeight: undefined as string | undefined
-      }
-    };
+    // Call external Chinese API
+    const dataUri = await callChineseTextAPI(
+      text,
+      "png", // Always use PNG for consistency
+      fontSize,
+      fontWeight as any,
+      fontFamily
+    );
 
-    const config = styleConfigs[style as keyof typeof styleConfigs] || styleConfigs.default;
-
-    // Generate image
-    const dataUri = await generate(text, {
-      maxWidth: options.width || 400,
-      fontSize: config.fontSize || options.fontSize || 24,
-      fontFamily: config.fontFamily,
-      fontWeight: config.fontWeight || 'normal',
-      lineHeight: Math.ceil((config.fontSize || options.fontSize || 24) * 1.2),
-      margin: 20,
-      bgColor: config.bgColor,
-      textColor: config.textColor,
-      textAlign: 'center' as const
-    });
-
-    // Convert data URI to buffer
-    if (!dataUri || !dataUri.startsWith('data:')) {
-      throw new Error('Invalid data URI returned');
-    }
-
+    // Extract buffer from data URI
     const base64Data = dataUri.split(',')[1];
+    if (!base64Data) {
+      throw new Error('No base64 data found in API response');
+    }
+
     return Buffer.from(base64Data, 'base64');
 
   } catch (error) {
-    console.error('Text-to-image generation failed:', error);
-    // Try fallback with Canvas for Chinese characters
-    return await generateWithCanvas(text, style, options);
-  }
-}
-
-async function generateWithCanvas(text: string, style: string, options: any): Promise<Buffer> {
-  try {
-    const { createCanvas, registerFont } = await import('canvas');
-    
-    // Register Chinese font for Canvas
-    try {
-      const path = require('path');
-      const fs = require('fs');
-      const fontPath = path.join(process.cwd(), 'data', 'NotoSansTC-Regular.ttf');
-      
-      if (fs.existsSync(fontPath)) {
-        registerFont(fontPath, { family: 'Noto Sans TC' });
-        console.log('✅ Canvas: Noto Sans TC font registered');
-      }
-    } catch (fontError) {
-      console.log('⚠️ Canvas: Font registration failed, using system fonts');
-    }
-    
-    const width = options.width || 400;
-    const height = options.height || 200;
-    const fontSize = options.fontSize || 24;
-    
-    const canvas = createCanvas(width, height);
-    const ctx = canvas.getContext('2d');
-    
-    // Set background
-    ctx.fillStyle = options.backgroundColor || '#ffffff';
-    ctx.fillRect(0, 0, width, height);
-    
-    // Set font with Chinese fallbacks
-    const chineseFonts = [
-      'Noto Sans TC',
-      'SimSun', 
-      'Microsoft YaHei',
-      'Arial Unicode MS',
-      'WenQuanYi Micro Hei',
-      'Droid Sans Fallback',
-      'DejaVu Sans',
-      'Arial',
-      'sans-serif'
-    ];
-    
-    // Try each font
-    let fontSet = false;
-    for (const fontFamily of chineseFonts) {
-      try {
-        ctx.font = `${fontSize}px "${fontFamily}"`;
-        // Test if the font can render Chinese characters
-        const testMetrics = ctx.measureText('中');
-        if (testMetrics.width > 0) {
-          console.log(`✅ Canvas: Successfully set font: ${fontFamily}`);
-          fontSet = true;
-          break;
-        }
-      } catch (fontError) {
-        continue;
-      }
-    }
-    
-    if (!fontSet) {
-      ctx.font = `${fontSize}px sans-serif`;
-      console.log('⚠️ Canvas: Using default font');
-    }
-    
-    // Set text properties
-    ctx.fillStyle = options.fontColor || '#000000';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    
-    // Draw text
-    ctx.fillText(text, width / 2, height / 2);
-    
-    // Convert to buffer
-    return canvas.toBuffer('image/png');
-    
-  } catch (error) {
-    console.error('Canvas generation failed:', error);
-    throw new Error(`Canvas text-to-image failed: ${(error as any)?.message}`);
+    console.error('Chinese API generation failed:', error);
+    // Return empty buffer as final fallback
+    return Buffer.from('');
   }
 }
