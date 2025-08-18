@@ -45,14 +45,14 @@ async function callChineseTextAPI(
         fontSize,
         fontFamily: 'NotoSansTC',
         fontWeight,
-        width: 600,
-        height: 200,
+        width: 800,
+        height: 300,
         backgroundColor: 'transparent',
         textColor: '#000000',
-        padding: 20,
-        lineHeight: 1.2,
+        padding: 30,
+        lineHeight: 1.8,
         textAlign: 'center',
-        quality: 95
+        quality: 100
       })
     });
 
@@ -75,8 +75,8 @@ async function callChineseTextAPI(
     // Fallback to simple SVG generation
   const safeText = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const svg = `
-      <svg width="600" height="200" xmlns="http://www.w3.org/2000/svg">
-        <rect width="600" height="200" fill="#fff"/>
+      <svg width="800" height="300" xmlns="http://www.w3.org/2000/svg">
+        <rect width="800" height="300" fill="#fff"/>
         <text x="50%" y="50%" font-size="${fontSize}" font-family="Noto Sans TC, Arial, sans-serif" fill="#000" text-anchor="middle" alignment-baseline="middle" dominant-baseline="middle">${safeText}</text>
     </svg>
   `;
@@ -563,24 +563,24 @@ export class ServerlessPDFService {
        const chineseSvg = await callChineseTextAPI(
          card.word || '朋友',
          'svg',
-         42,
-         'bold'
+         64,
+         '800'
        );
        
        // Method 2: text-to-image  
        const chineseTextToImage = await callChineseTextAPI(
          card.word || '朋友',
          'text-to-image',
-         42,
-         'bold'
+         64,
+         '800'
        );
        
        // Method 3: png
        const chinesePng = await callChineseTextAPI(
          card.word || '朋友',
          'png',
-         42,
-         'bold'
+         64,
+         '800'
        );
        
        // PINYIN TEXT - 3 methods (columns 4-6)
@@ -588,84 +588,92 @@ export class ServerlessPDFService {
        const pinyinSvg = await callChineseTextAPI(
          card.pinyin || 'péngyǒu',
          'svg',
-         28,
-         '500'
+         36,
+         '600'
        );
        
        // Method 2: text-to-image
        const pinyinTextToImage = await callChineseTextAPI(
          card.pinyin || 'péngyǒu',
          'text-to-image',
-         28,
-         '500'
+         36,
+         '600'
        );
        
        // Method 3: png
        const pinyinPng = await callChineseTextAPI(
          card.pinyin || 'péngyǒu',
          'png',
-         28,
-         '500'
+         36,
+         '600'
        );
        
-       // Display all 6 columns
-       const imageWidth = colWidth * 0.85;
-       const imageHeight = 35;
+       // Display all 6 columns with better sizing
+       const imageWidth = colWidth * 0.9;
+       const imageHeight = 50;
+       const imageY = startY + 30;
        
        // Column 1: Chinese SVG
        pdf.addImage(chineseSvg, 'PNG', 
          0 * colWidth + (colWidth - imageWidth) / 2, 
-         startY + 20, 
+         imageY, 
          imageWidth, imageHeight);
        
        // Column 2: Chinese Text-to-Image
        pdf.addImage(chineseTextToImage, 'PNG', 
          1 * colWidth + (colWidth - imageWidth) / 2, 
-         startY + 20, 
+         imageY, 
          imageWidth, imageHeight);
        
        // Column 3: Chinese PNG
        pdf.addImage(chinesePng, 'PNG', 
          2 * colWidth + (colWidth - imageWidth) / 2, 
-         startY + 20, 
+         imageY, 
          imageWidth, imageHeight);
        
        // Column 4: Pinyin SVG
        pdf.addImage(pinyinSvg, 'PNG', 
          3 * colWidth + (colWidth - imageWidth) / 2, 
-         startY + 20, 
+         imageY, 
          imageWidth, imageHeight);
        
        // Column 5: Pinyin Text-to-Image
        pdf.addImage(pinyinTextToImage, 'PNG', 
          4 * colWidth + (colWidth - imageWidth) / 2, 
-         startY + 20, 
+         imageY, 
          imageWidth, imageHeight);
        
        // Column 6: Pinyin PNG
        pdf.addImage(pinyinPng, 'PNG', 
          5 * colWidth + (colWidth - imageWidth) / 2, 
-         startY + 20, 
+         imageY, 
          imageWidth, imageHeight);
        
        // Add column divider lines
        pdf.setDrawColor(180, 180, 180);
-       pdf.setLineWidth(0.2);
+       pdf.setLineWidth(0.3);
        for (let i = 1; i < 6; i++) {
-         pdf.line(i * colWidth, 20, i * colWidth, pageHeight - 20);
+         const x = i * colWidth;
+         pdf.line(x, startY + 20, x, imageY + imageHeight + 25);
        }
        
+       // Add section titles at top
+       pdf.setFontSize(10);
+       pdf.setTextColor(60, 60, 60);
+       pdf.text('CHINESE CHARACTERS', pageWidth / 4, startY + 10, { align: 'center' });
+       pdf.text('PINYIN', (pageWidth * 3) / 4, startY + 10, { align: 'center' });
+       
        // Add method labels at bottom
-       pdf.setFontSize(8);
-       pdf.setTextColor(100, 100, 100);
+       pdf.setFontSize(7);
+       pdf.setTextColor(120, 120, 120);
        const labels = [
-         'Chinese\nSVG', 'Chinese\nText-to-Image', 'Chinese\nPNG',
-         'Pinyin\nSVG', 'Pinyin\nText-to-Image', 'Pinyin\nPNG'
+         'SVG', 'Text-to-Image', 'PNG',
+         'SVG', 'Text-to-Image', 'PNG'
        ];
        
        for (let i = 0; i < labels.length; i++) {
          const x = i * colWidth + colWidth / 2;
-         const y = pageHeight - 25;
+         const y = imageY + imageHeight + 15;
          pdf.text(labels[i], x, y, { align: 'center' });
        }
       
