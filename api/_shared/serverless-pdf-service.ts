@@ -26,21 +26,13 @@ export interface FlashcardPDFOptions {
   flashcards: FlashcardData[];
 }
 
-// External API function for Chinese text conversion
-async function callChineseTextAPI(text: string, options: {
-  method?: 'ultimate-text-to-image' | 'text-to-image' | 'pdf' | 'svg' | 'png' | 'canvas' | 'jpg' | 'webp' | 'html' | 'json';
-  fontSize?: number;
-  fontFamily?: string;
-  fontWeight?: "100" | "200" | "300" | "400" | "500" | "600" | "700" | "800" | "900" | "normal" | "bold" | "lighter" | "bolder";
-  width?: number;
-  height?: number;
-  backgroundColor?: string;
-  textColor?: string;
-  padding?: number;
-  lineHeight?: number;
-  textAlign?: 'left' | 'center' | 'right' | 'justify';
-  quality?: number;
-} = {}): Promise<string> {
+// External API function for Chinese text conversion with smart defaults
+async function callChineseTextAPI(
+  text: string, 
+  method: 'ultimate-text-to-image' | 'text-to-image' | 'png' = 'png',
+  fontSize: number = 48,
+  fontWeight: "100" | "200" | "300" | "400" | "500" | "600" | "700" | "800" | "900" | "normal" | "bold" = '700'
+): Promise<string> {
   try {
     const response = await fetch('https://booking.hoangha.shop/api/convert-chinese-text', {
       method: 'POST',
@@ -49,18 +41,18 @@ async function callChineseTextAPI(text: string, options: {
       },
       body: JSON.stringify({
         text,
-        method: options.method || 'png',
-        fontSize: options.fontSize || 24,
-        fontFamily: options.fontFamily || 'NotoSansTC',
-        fontWeight: options.fontWeight || '400',
-        width: options.width || 800,
-        height: options.height || 600,
-        backgroundColor: options.backgroundColor || '#ffffff',
-        textColor: options.textColor || '#000000',
-        padding: options.padding || 20,
-        lineHeight: options.lineHeight || 1.5,
-        textAlign: options.textAlign || 'center',
-        quality: options.quality || 90
+        method,
+        fontSize,
+        fontFamily: 'NotoSansTC',
+        fontWeight,
+        width: 600,
+        height: 200,
+        backgroundColor: 'transparent',
+        textColor: '#000000',
+        padding: 20,
+        lineHeight: 1.2,
+        textAlign: 'center',
+        quality: 95
       })
     });
 
@@ -72,34 +64,8 @@ async function callChineseTextAPI(text: string, options: {
     const arrayBuffer = await response.arrayBuffer();
     const imageBuffer = Buffer.from(arrayBuffer);
     
-    // Get content type from response headers or determine based on method
-    let contentType = response.headers.get('content-type');
-    if (!contentType) {
-      // Default content type based on method
-      const method = options.method || 'png';
-      switch (method) {
-        case 'png':
-        case 'canvas':
-        case 'ultimate-text-to-image':
-        case 'text-to-image':
-          contentType = 'image/png';
-          break;
-        case 'jpg':
-          contentType = 'image/jpeg';
-          break;
-        case 'webp':
-          contentType = 'image/webp';
-          break;
-        case 'svg':
-          contentType = 'image/svg+xml';
-          break;
-        case 'pdf':
-          contentType = 'application/pdf';
-          break;
-        default:
-          contentType = 'image/png';
-      }
-    }
+    // Get content type from response headers or default to PNG
+    const contentType = response.headers.get('content-type') || 'image/png';
     
     // Convert to data URI
     const base64 = imageBuffer.toString('base64');
@@ -229,26 +195,26 @@ export class ServerlessPDFService {
   /**
    * Public: Generate a PNG image for the given Chinese text using external API.
    */
-  public async generateChineseTextImage(text: string, opts?: { width?: number; height?: number; fontSize?: number; background?: string; textColor?: string; fontWeight?: "100" | "200" | "300" | "400" | "500" | "600" | "700" | "800" | "900" | "normal" | "bold" | "lighter" | "bolder"; }): Promise<{ buffer: Buffer; dataUri: string; contentType: 'image/png'; width: number; height: number; }> {
+  public async generateChineseTextImage(
+    text: string, 
+    opts?: { 
+      width?: number; 
+      height?: number; 
+      fontSize?: number; 
+      fontWeight?: "100" | "200" | "300" | "400" | "500" | "600" | "700" | "800" | "900" | "normal" | "bold";
+    }
+  ): Promise<{ buffer: Buffer; dataUri: string; contentType: 'image/png'; width: number; height: number; }> {
     const width = opts?.width ?? 600;
     const height = opts?.height ?? 180;
     
     try {
-             // Use external API for Chinese text rendering with high quality
-       const svgDataUri = await callChineseTextAPI(text, {
-         method: 'png',
-         fontSize: opts?.fontSize || 24,
-         fontFamily: 'NotoSansTC',
-         fontWeight: opts?.fontWeight || '400',
-         width,
-         height,
-         backgroundColor: opts?.background || '#ffffff',
-         textColor: opts?.textColor || '#000000',
-         textAlign: 'center',
-         padding: 20,
-         lineHeight: 1.5,
-         quality: 95
-       });
+       // Use simplified external API for Chinese text rendering
+       const svgDataUri = await callChineseTextAPI(
+         text,
+         'png',
+         opts?.fontSize || 48,
+         opts?.fontWeight || '400'
+       );
       
              // The API already returns binary image data as data URI, no need to convert
        // Extract buffer from data URI for compatibility
@@ -585,58 +551,45 @@ export class ServerlessPDFService {
     console.log(`🚀 Generating flashcard back for: "${card.word}" with pinyin: "${card.pinyin}"`);
     
          try {
-       // Generate Chinese text image using external API with high-quality method
-       const chineseImageData = await callChineseTextAPI(card.word || '朋友', {
-         method: 'ultimate-text-to-image',
-         fontSize: 48,
-         fontFamily: 'NotoSansTC',
-         fontWeight: '700',
-         width: 600,
-         height: 200,
-         backgroundColor: '#ffffff',
-         textColor: '#000000',
-         textAlign: 'center',
-         padding: 30,
-         lineHeight: 1.2,
-         quality: 95
-       });
+       // Split screen layout - Chinese on left, Pinyin on right
+       const leftSection = pageWidth * 0.5;
+       const rightSection = pageWidth * 0.5;
        
-       // Generate Pinyin text image using external API with clean method
-       const pinyinImageData = await callChineseTextAPI(card.pinyin || 'péngyǒu', {
-         method: 'text-to-image',
-         fontSize: 24,
-         fontFamily: 'NotoSansTC',
-         fontWeight: '400',
-         width: 400,
-         height: 100,
-         backgroundColor: '#ffffff',
-         textColor: '#666666',
-         textAlign: 'center',
-         padding: 20,
-         lineHeight: 1.4,
-         quality: 90
-       });
+       // Generate Chinese text image (left side) - large and bold
+       const chineseImageData = await callChineseTextAPI(
+         card.word || '朋友', 
+         'ultimate-text-to-image',
+         80,
+         'bold'
+       );
        
-       // Position Chinese text in center-top (adjust for image format)
-       const chineseWidth = 120; // Larger width for Chinese text
-       const chineseHeight = 50; // Proportional height
-       const chineseX = (pageWidth - chineseWidth) / 2;
-       const chineseY = pageHeight / 2 - 60;
+       // Generate Pinyin text image (right side) - smaller and normal weight  
+       const pinyinImageData = await callChineseTextAPI(
+         card.pinyin || 'péngyǒu',
+         'text-to-image', 
+         36,
+         '400'
+       );
+       
+       // LEFT SECTION: Chinese characters (centered)
+       const chineseWidth = 130;
+       const chineseHeight = 60;
+       const chineseX = (leftSection - chineseWidth) / 2;
+       const chineseY = pageHeight / 2 - 30;
        pdf.addImage(chineseImageData, 'PNG', chineseX, chineseY, chineseWidth, chineseHeight);
        
-       // Position Pinyin text below Chinese (adjust for image format)
-       const pinyinWidth = 80; // Smaller width for pinyin
-       const pinyinHeight = 30; // Proportional height
-       const pinyinX = (pageWidth - pinyinWidth) / 2;
-       const pinyinY = pageHeight / 2 - 5;
+       // RIGHT SECTION: Pinyin (centered)
+       const pinyinWidth = 120;
+       const pinyinHeight = 45;
+       const pinyinX = leftSection + (rightSection - pinyinWidth) / 2;
+       const pinyinY = pageHeight / 2 - 22;
        pdf.addImage(pinyinImageData, 'PNG', pinyinX, pinyinY, pinyinWidth, pinyinHeight);
+       
+       // Add vertical divider line
+    pdf.setDrawColor(200, 200, 200);
+    pdf.setLineWidth(0.3);
+       pdf.line(leftSection, 40, leftSection, pageHeight - 40);
       
-      // Add Vietnamese translation if available
-      if (card.vietnamese) {
-        pdf.setFontSize(16);
-        pdf.setTextColor(0, 0, 0);
-        pdf.text(card.vietnamese, pageWidth / 2, pageHeight / 2 + 30, { align: 'center' });
-      }
       
       console.log(`✅ Successfully generated flashcard back for: ${card.word}`);
       

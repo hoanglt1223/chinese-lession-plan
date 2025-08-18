@@ -66,19 +66,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           break;
           
         case 'chinese-text-image':
-          // Handle Chinese text to PNG image
-          const { text, width, height, fontSize, background, textColor, fontWeight } = requestData;
+          // Handle Chinese text to image with method selection
+          const { text, method, width, height, fontSize, background, textColor, fontWeight, padding, lineHeight, textAlign, quality } = requestData;
           if (!text) {
             return res.status(400).json({ message: 'text is required for chinese-text-image' });
           }
           
           const imageResult = await serverlessPDFService.generateChineseTextImage(text, {
+            method: method || 'png',
             width: width || 600,
             height: height || 180,
             fontSize: fontSize || 24,
             background: background || '#ffffff',
             textColor: textColor || '#000000',
-            fontWeight: fontWeight || '400'
+            fontWeight: fontWeight || '400',
+            padding: padding || 20,
+            lineHeight: lineHeight || 1.5,
+            textAlign: textAlign || 'center',
+            quality: quality || 95
           });
           
           res.setHeader('Content-Type', 'image/png');
