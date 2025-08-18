@@ -70,14 +70,14 @@ async function callChineseTextAPI(
     // Convert to data URI
     const base64 = imageBuffer.toString('base64');
     return `data:${contentType};base64,${base64}`;
-  } catch (error) {
+    } catch (error) {
     console.error('Chinese text API call failed:', error);
     // Fallback to simple SVG generation
   const safeText = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const svg = `
-      <svg width="${options.width || 300}" height="${options.height || 80}" xmlns="http://www.w3.org/2000/svg">
-        <rect width="${options.width || 300}" height="${options.height || 80}" fill="${options.backgroundColor || '#fff'}"/>
-        <text x="50%" y="50%" font-size="${options.fontSize || 32}" font-family="Noto Sans TC, Arial, sans-serif" fill="${options.textColor || '#000'}" text-anchor="middle" alignment-baseline="middle" dominant-baseline="middle">${safeText}</text>
+      <svg width="600" height="200" xmlns="http://www.w3.org/2000/svg">
+        <rect width="600" height="200" fill="#fff"/>
+        <text x="50%" y="50%" font-size="${fontSize}" font-family="Noto Sans TC, Arial, sans-serif" fill="#000" text-anchor="middle" alignment-baseline="middle" dominant-baseline="middle">${safeText}</text>
     </svg>
   `;
   const base64 = Buffer.from(svg).toString('base64');
@@ -225,7 +225,7 @@ export class ServerlessPDFService {
     } catch (error) {
       console.error('External API failed, using fallback SVG method:', error);
       // Fallback to local SVG generation
-    const svg = await this.buildChineseTextSVG(text, { width, height, fontSize: opts?.fontSize, background: opts?.background, textColor: opts?.textColor });
+    const svg = await this.buildChineseTextSVG(text, { width, height, fontSize: opts?.fontSize });
     const { dataUri, buffer } = await this.svgToPngDataUri(svg, width, height);
     return { buffer, dataUri, contentType: 'image/png', width, height };
     }
@@ -550,45 +550,124 @@ export class ServerlessPDFService {
     
     console.log(`🚀 Generating flashcard back for: "${card.word}" with pinyin: "${card.pinyin}"`);
     
-         try {
-       // Split screen layout - Chinese on left, Pinyin on right
-       const leftSection = pageWidth * 0.5;
-       const rightSection = pageWidth * 0.5;
+                  try {
+       // 6-column layout to test all 3 methods for both Chinese and Pinyin
+       const colWidth = pageWidth / 6;
+       const colHeight = pageHeight * 0.6;
+    const startY = 30;
        
-       // Generate Chinese text image (left side) - large and bold
-       const chineseImageData = await callChineseTextAPI(
-         card.word || '朋友', 
+       console.log(`🧪 Testing all methods for: Chinese="${card.word}" Pinyin="${card.pinyin}"`);
+       
+       // CHINESE TEXT - 3 methods (columns 1-3)
+       // Method 1: ultimate-text-to-image
+       const chineseUltimate = await callChineseTextAPI(
+         card.word || '朋友',
          'ultimate-text-to-image',
-         80,
+         42,
          'bold'
        );
        
-       // Generate Pinyin text image (right side) - smaller and normal weight  
-       const pinyinImageData = await callChineseTextAPI(
-         card.pinyin || 'péngyǒu',
-         'text-to-image', 
-         36,
-         '400'
+       // Method 2: text-to-image  
+       const chineseTextToImage = await callChineseTextAPI(
+         card.word || '朋友',
+         'text-to-image',
+         42,
+         'bold'
        );
        
-       // LEFT SECTION: Chinese characters (centered)
-       const chineseWidth = 130;
-       const chineseHeight = 60;
-       const chineseX = (leftSection - chineseWidth) / 2;
-       const chineseY = pageHeight / 2 - 30;
-       pdf.addImage(chineseImageData, 'PNG', chineseX, chineseY, chineseWidth, chineseHeight);
+       // Method 3: png
+       const chinesePng = await callChineseTextAPI(
+         card.word || '朋友',
+         'png',
+         42,
+         'bold'
+       );
        
-       // RIGHT SECTION: Pinyin (centered)
-       const pinyinWidth = 120;
-       const pinyinHeight = 45;
-       const pinyinX = leftSection + (rightSection - pinyinWidth) / 2;
-       const pinyinY = pageHeight / 2 - 22;
-       pdf.addImage(pinyinImageData, 'PNG', pinyinX, pinyinY, pinyinWidth, pinyinHeight);
+       // PINYIN TEXT - 3 methods (columns 4-6)
+       // Method 1: ultimate-text-to-image
+       const pinyinUltimate = await callChineseTextAPI(
+         card.pinyin || 'péngyǒu',
+         'ultimate-text-to-image',
+         28,
+         '500'
+       );
        
-       // Add vertical divider line
-    pdf.setDrawColor(200, 200, 200);
-    pdf.setLineWidth(0.3);
-       pdf.line(leftSection, 40, leftSection, pageHeight - 40);
+       // Method 2: text-to-image
+       const pinyinTextToImage = await callChineseTextAPI(
+         card.pinyin || 'péngyǒu',
+         'text-to-image',
+         28,
+         '500'
+       );
+       
+       // Method 3: png
+       const pinyinPng = await callChineseTextAPI(
+         card.pinyin || 'péngyǒu',
+         'png',
+         28,
+         '500'
+       );
+       
+       // Display all 6 columns
+       const imageWidth = colWidth * 0.85;
+       const imageHeight = 35;
+       
+       // Column 1: Chinese Ultimate
+       pdf.addImage(chineseUltimate, 'PNG', 
+         0 * colWidth + (colWidth - imageWidth) / 2, 
+         startY + 20, 
+         imageWidth, imageHeight);
+       
+       // Column 2: Chinese Text-to-Image
+       pdf.addImage(chineseTextToImage, 'PNG', 
+         1 * colWidth + (colWidth - imageWidth) / 2, 
+         startY + 20, 
+         imageWidth, imageHeight);
+       
+       // Column 3: Chinese PNG
+       pdf.addImage(chinesePng, 'PNG', 
+         2 * colWidth + (colWidth - imageWidth) / 2, 
+         startY + 20, 
+         imageWidth, imageHeight);
+       
+       // Column 4: Pinyin Ultimate
+       pdf.addImage(pinyinUltimate, 'PNG', 
+         3 * colWidth + (colWidth - imageWidth) / 2, 
+         startY + 20, 
+         imageWidth, imageHeight);
+       
+       // Column 5: Pinyin Text-to-Image
+       pdf.addImage(pinyinTextToImage, 'PNG', 
+         4 * colWidth + (colWidth - imageWidth) / 2, 
+         startY + 20, 
+         imageWidth, imageHeight);
+       
+       // Column 6: Pinyin PNG
+       pdf.addImage(pinyinPng, 'PNG', 
+         5 * colWidth + (colWidth - imageWidth) / 2, 
+         startY + 20, 
+         imageWidth, imageHeight);
+       
+       // Add column divider lines
+       pdf.setDrawColor(180, 180, 180);
+       pdf.setLineWidth(0.2);
+       for (let i = 1; i < 6; i++) {
+         pdf.line(i * colWidth, 20, i * colWidth, pageHeight - 20);
+       }
+       
+       // Add method labels at bottom
+       pdf.setFontSize(8);
+       pdf.setTextColor(100, 100, 100);
+       const labels = [
+         'Chinese\nUltimate', 'Chinese\nText-to-Image', 'Chinese\nPNG',
+         'Pinyin\nUltimate', 'Pinyin\nText-to-Image', 'Pinyin\nPNG'
+       ];
+       
+       for (let i = 0; i < labels.length; i++) {
+         const x = i * colWidth + colWidth / 2;
+         const y = pageHeight - 25;
+         pdf.text(labels[i], x, y, { align: 'center' });
+       }
       
       
       console.log(`✅ Successfully generated flashcard back for: ${card.word}`);
