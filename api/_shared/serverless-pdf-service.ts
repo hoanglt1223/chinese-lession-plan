@@ -737,6 +737,9 @@ export class ServerlessPDFService {
     try {
       // Prepare HTML for rendering
       const html = `<div style="width:300px;height:80px;display:flex;align-items:center;justify-content:center;font-size:32px;font-family:'Noto Sans TC',Arial,sans-serif;">${chineseText}</div>`;
+      
+      // Use node-fetch for Node.js compatibility
+      const fetch = (await import('node-fetch')).default;
       const response = await fetch('https://chrome.browserless.io/screenshot?token=' + apiKey, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
