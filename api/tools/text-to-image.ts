@@ -23,9 +23,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let mimeType = 'image/png';
 
     // Generate image based on selected library
-    if (library === 'ultimate') {
-      imageBuffer = await generateWithUltimate(text, style, options);
-    } else if (library === 'text-to-image') {
+     if (library === 'text-to-image' || library === 'ultimate') {
       imageBuffer = await generateWithTextToImage(text, style, options);
     } else {
       return res.status(400).json({ error: 'Invalid library specified' });
@@ -51,86 +49,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       error: 'Failed to generate text image',
       details: error.message
     });
-  }
-}
-
-async function generateWithUltimate(text: string, style: string, options: any): Promise<Buffer> {
-  try {
-    // Import ultimate-text-to-image
-    const { UltimateTextToImage, registerFont } = await import('ultimate-text-to-image');
-
-    // Register Chinese font if available
-    try {
-      const path = require('path');
-      const fs = require('fs');
-      const fontPath = path.join(process.cwd(), 'data', 'NotoSansTC-Regular.ttf');
-      
-      // Check if font file exists
-      if (fs.existsSync(fontPath)) {
-        // Register the font with a specific family name
-        registerFont(fontPath, { family: 'Noto Sans TC' });
-        console.log('✅ Ultimate: Noto Sans TC font registered successfully');
-      } else {
-        console.log('⚠️ Ultimate: Font file not found at', fontPath);
-      }
-    } catch (fontError) {
-      console.log('⚠️ Ultimate: Font registration failed:', (fontError as Error).message);
-      console.log('⚠️ Ultimate: Using system fonts');
-    }
-
-    // Style configurations
-    const styleConfigs = {
-      default: {
-        fontFamily: "Noto Sans TC, Arial, sans-serif",
-        fontColor: options.fontColor || "#000000",
-        backgroundColor: options.backgroundColor || "#ffffff",
-        fontSize: undefined as number | undefined,
-        fontWeight: undefined as string | undefined
-      },
-      bold: {
-        fontFamily: "Noto Sans TC, Arial, sans-serif",
-        fontWeight: "bold" as const,
-        fontColor: "#2563eb",
-        backgroundColor: "#f8fafc",
-        fontSize: undefined as number | undefined
-      },
-      colorful: {
-        fontFamily: "Noto Sans TC, Arial, sans-serif",
-        fontColor: "#dc2626",
-        backgroundColor: "#fef2f2",
-        fontSize: undefined as number | undefined,
-        fontWeight: undefined as string | undefined
-      },
-      minimal: {
-        fontFamily: "Noto Sans TC, Arial, sans-serif",
-        fontColor: "#374151",
-        backgroundColor: "#ffffff",
-        fontSize: undefined as number | undefined,
-        fontWeight: undefined as string | undefined
-      }
-    };
-
-    const config = styleConfigs[style as keyof typeof styleConfigs] || styleConfigs.default;
-
-    // Create text-to-image instance
-    const textToImage = new UltimateTextToImage(text, {
-      width: options.width || 400,
-      height: options.height || 200,
-      fontSize: config.fontSize || options.fontSize || 24,
-      fontFamily: config.fontFamily,
-      fontColor: config.fontColor,
-      backgroundColor: config.backgroundColor,
-      align: "center",
-      valign: "middle",
-      margin: 20
-    });
-
-    const canvas = textToImage.render();
-    return canvas.toBuffer('image/png');
-
-  } catch (error) {
-    console.error('Ultimate generation failed:', error);
-    throw new Error(`Ultimate text-to-image failed: ${(error as any)?.message}`);
   }
 }
 
