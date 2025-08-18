@@ -8,7 +8,7 @@ interface AuthUser {
 
 export function useAuth() {
   const { data, isLoading, error } = useQuery({
-    queryKey: ["/api/auth/me"],
+    queryKey: ["/api/auth"],
     queryFn: async () => {
       // Skip login for development
       if (import.meta.env.DEV) {
@@ -21,7 +21,7 @@ export function useAuth() {
         };
       }
       
-      const response = await fetch("/api/auth/me", {
+      const response = await fetch("/api/auth", {
         credentials: "include", // Important for session cookies
       });
       

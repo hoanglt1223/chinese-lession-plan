@@ -77,6 +77,17 @@ export default function Tools() {
     backgroundColor: "#ffffff"
   });
 
+  // Chinese Text Render (Serverless Export) States
+  const [chineseText, setChineseText] = useState("");
+  const [chineseTextImageUrl, setChineseTextImageUrl] = useState("");
+  const [cnOptions, setCnOptions] = useState({
+    width: 600,
+    height: 180,
+    fontSize: 64,
+    fontColor: "#111111",
+    backgroundColor: "#ffffff"
+  });
+
   // Translation States
   const [translationText, setTranslationText] = useState("");
   const [translationFrom, setTranslationFrom] = useState("chinese");
@@ -225,6 +236,81 @@ export default function Tools() {
     onError: (error) => {
       console.error('Text-to-image error:', error);
       toast({ title: "Text-to-image generation failed", variant: "destructive" });
+    }
+  });
+
+  // Chinese Text to PNG (via unified export)
+  const chineseTextToImageMutation = useMutation({
+    mutationFn: async () => {
+      if (!chineseText.trim()) throw new Error('No text provided');
+      const response = await fetch('/api/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          documentType: 'chinese-text-image',
+          text: chineseText,
+          width: cnOptions.width,
+          height: cnOptions.height,
+          fontSize: cnOptions.fontSize,
+          background: cnOptions.backgroundColor,
+          textColor: cnOptions.fontColor,
+        })
+      });
+      if (!response.ok) throw new Error('Request failed');
+      // Return blob so we can create an object URL
+      return response.blob();
+    },
+    onSuccess: (blob) => {
+      // Create object URL for preview
+      const url = URL.createObjectURL(blob);
+      setChineseTextImageUrl(url);
+      toast({ title: "Chinese text image generated!" });
+    },
+    onError: (error) => {
+      console.error('Chinese text-to-image error:', error);
+      toast({ title: "Chinese text image generation failed", variant: "destructive" });
+    }
+  });
+
+  // Chinese Text to PDF (multiple lines)
+  const chineseTextToPDFMutation = useMutation({
+    mutationFn: async () => {
+      if (!chineseText.trim()) throw new Error('No text provided');
+      const lines = chineseText.split('\n').filter(line => line.trim());
+      if (lines.length === 0) throw new Error('No valid text lines');
+      
+      const response = await fetch('/api/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          documentType: 'chinese-text-pdf',
+          texts: lines,
+          width: cnOptions.width,
+          height: cnOptions.height,
+          fontSize: cnOptions.fontSize,
+          background: cnOptions.backgroundColor,
+          textColor: cnOptions.fontColor,
+        })
+      });
+      if (!response.ok) throw new Error('Request failed');
+      return response.blob();
+    },
+    onSuccess: (blob) => {
+      // Create download link
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = `Chinese_Text_${Date.now()}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast({ title: "Chinese text PDF generated!" });
+    },
+    onError: (error) => {
+      console.error('Chinese text-to-PDF error:', error);
+      toast({ title: "Chinese text PDF generation failed", variant: "destructive" });
     }
   });
 
@@ -944,6 +1030,158 @@ export default function Tools() {
                     </Button>
                   </div>
                 )}
+              </CardContent>
+            </Card>
+
+            {/* Chinese Text to Image/PDF (Serverless Export) */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileImage className="w-5 h-5" />
+                  Chinese Text ➜ Image/PDF
+                </CardTitle>
+                <CardDescription>
+                  Render Chinese text to a PNG image using embedded Noto Sans TC, or batch to a PDF (one text per page).
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="chinese-text-input">Chinese Text (one or multiple lines)</Label>
+                  <Textarea
+                    id="chinese-text-input"
+                    placeholder="输入中文文本，例如：&#10;你好&#10;再见&#10;小鸟&#10;&#10;Each line will become a separate page in PDF mode."
+                    value={chineseText}
+                    onChange={(e) => setChineseText(e.target.value)}
+                    className="min-h-[100px] text-lg"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div>
+                    <Label htmlFor="cn-width">Width (px)</Label>
+                    <Input
+                      id="cn-width"
+                      type="number"
+                      value={cnOptions.width}
+                      onChange={(e) => setCnOptions(prev => ({
+                        ...prev,
+                        width: parseInt(e.target.value) || 600
+                      }))}
+                      min="200"
+                      max="1200"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="cn-height">Height (px)</Label>
+                    <Input
+                      id="cn-height"
+                      type="number"
+                      value={cnOptions.height}
+                      onChange={(e) => setCnOptions(prev => ({
+                        ...prev,
+                        height: parseInt(e.target.value) || 180
+                      }))}
+                      min="80"
+                      max="600"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="cn-font-size">Font Size</Label>
+                    <Input
+                      id="cn-font-size"
+                      type="number"
+                      value={cnOptions.fontSize}
+                      onChange={(e) => setCnOptions(prev => ({
+                        ...prev,
+                        fontSize: parseInt(e.target.value) || 64
+                      }))}
+                      min="16"
+                      max="200"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="cn-bg-color">Background</Label>
+                    <Input
+                      id="cn-bg-color"
+                      type="color"
+                      value={cnOptions.backgroundColor}
+                      onChange={(e) => setCnOptions(prev => ({
+                        ...prev,
+                        backgroundColor: e.target.value
+                      }))}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <Button 
+                    onClick={() => chineseTextToImageMutation.mutate()}
+                    disabled={chineseTextToImageMutation.isPending || !chineseText.trim()}
+                    className="flex-1"
+                  >
+                    {chineseTextToImageMutation.isPending ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Creating PNG...</>
+                    ) : (
+                      <><FileImage className="w-4 h-4 mr-2" /> Generate PNG</>
+                    )}
+                  </Button>
+                  
+                  <Button 
+                    onClick={() => chineseTextToPDFMutation.mutate()}
+                    disabled={chineseTextToPDFMutation.isPending || !chineseText.trim()}
+                    className="flex-1"
+                    variant="outline"
+                  >
+                    {chineseTextToPDFMutation.isPending ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Creating PDF...</>
+                    ) : (
+                      <><Download className="w-4 h-4 mr-2" /> Generate PDF</>
+                    )}
+                  </Button>
+                </div>
+
+                {chineseTextImageUrl && (
+                  <div className="border rounded p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge variant="secondary">Noto Sans TC</Badge>
+                      <Badge variant="outline">{cnOptions.width}×{cnOptions.height}</Badge>
+                      <Badge variant="outline">{cnOptions.fontSize}px</Badge>
+                    </div>
+                    <img 
+                      src={chineseTextImageUrl} 
+                      alt="Generated Chinese text image"
+                      className="w-full max-w-md mx-auto rounded border"
+                    />
+                    <Button 
+                      className="w-full mt-2"
+                      onClick={() => {
+                        const a = document.createElement('a');
+                        a.href = chineseTextImageUrl;
+                        a.download = `chinese-text-${Date.now()}.png`;
+                        a.click();
+                      }}
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Download PNG Image
+                    </Button>
+                  </div>
+                )}
+
+                <div className="text-sm bg-blue-50 border border-blue-200 rounded p-3">
+                  <div className="font-medium text-blue-900">🎯 Features:</div>
+                  <div className="text-blue-700 text-xs mt-1">
+                    • <strong>PNG Mode:</strong> Renders first line of text as a high-quality PNG image
+                    <br />
+                    • <strong>PDF Mode:</strong> Each line becomes a separate page in a multi-page PDF
+                    <br />
+                    • <strong>Font:</strong> Uses embedded Noto Sans TC for perfect Chinese character rendering
+                    <br />
+                    • <strong>Serverless:</strong> Works offline and in serverless environments
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
