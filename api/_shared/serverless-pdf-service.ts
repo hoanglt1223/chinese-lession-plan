@@ -44,20 +44,7 @@ async function callChineseTextAPI(text: string, options: {
     const response = await fetch('https://booking.hoangha.shop/api/convert-chinese-text', {
       method: 'POST',
       headers: {
-        'accept': '*/*',
-        'accept-language': 'en,vi;q=0.9',
         'content-type': 'application/json',
-        'dnt': '1',
-        'origin': 'https://booking.hoangha.shop',
-        'priority': 'u=1, i',
-        'referer': 'https://booking.hoangha.shop/chinese-converter',
-        'sec-ch-ua': '"Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"',
-        'sec-ch-ua-mobile': '?0',
-        'sec-ch-ua-platform': '"Windows"',
-        'sec-fetch-dest': 'empty',
-        'sec-fetch-mode': 'cors',
-        'sec-fetch-site': 'same-origin',
-        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36'
       },
       body: JSON.stringify({
         text,
@@ -71,7 +58,7 @@ async function callChineseTextAPI(text: string, options: {
         textColor: options.textColor || '#000000',
         padding: options.padding || 20,
         lineHeight: options.lineHeight || 1.5,
-        textAlign: options.textAlign || 'left',
+        textAlign: options.textAlign || 'center',
         quality: options.quality || 90
       })
     });
@@ -81,19 +68,31 @@ async function callChineseTextAPI(text: string, options: {
     }
 
     const result = await response.text();
-    return result; // Should return SVG data URI
+    // The API returns SVG data directly, so we need to convert it to a data URI
+    if (result.startsWith('<svg')) {
+      // It's raw SVG, convert to data URI
+      const base64 = Buffer.from(result).toString('base64');
+      return `data:image/svg+xml;base64,${base64}`;
+    } else if (result.startsWith('data:image/svg+xml')) {
+      // It's already a data URI
+      return result;
+    } else {
+      // Unknown format, treat as raw SVG
+      const base64 = Buffer.from(result).toString('base64');
+      return `data:image/svg+xml;base64,${base64}`;
+    }
   } catch (error) {
     console.error('Chinese text API call failed:', error);
     // Fallback to simple SVG generation
-    const safeText = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    const svg = `
+  const safeText = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const svg = `
       <svg width="${options.width || 300}" height="${options.height || 80}" xmlns="http://www.w3.org/2000/svg">
         <rect width="${options.width || 300}" height="${options.height || 80}" fill="${options.backgroundColor || '#fff'}"/>
         <text x="50%" y="50%" font-size="${options.fontSize || 32}" font-family="Noto Sans TC, Arial, sans-serif" fill="${options.textColor || '#000'}" text-anchor="middle" alignment-baseline="middle" dominant-baseline="middle">${safeText}</text>
-      </svg>
-    `;
-    const base64 = Buffer.from(svg).toString('base64');
-    return `data:image/svg+xml;base64,${base64}`;
+    </svg>
+  `;
+  const base64 = Buffer.from(svg).toString('base64');
+  return `data:image/svg+xml;base64,${base64}`;
   }
 }
 
@@ -231,9 +230,9 @@ export class ServerlessPDFService {
     } catch (error) {
       console.error('External API failed, using fallback SVG method:', error);
       // Fallback to local SVG generation
-      const svg = await this.buildChineseTextSVG(text, { width, height, fontSize: opts?.fontSize, background: opts?.background, textColor: opts?.textColor });
-      const { dataUri, buffer } = await this.svgToPngDataUri(svg, width, height);
-      return { buffer, dataUri, contentType: 'image/png', width, height };
+    const svg = await this.buildChineseTextSVG(text, { width, height, fontSize: opts?.fontSize, background: opts?.background, textColor: opts?.textColor });
+    const { dataUri, buffer } = await this.svgToPngDataUri(svg, width, height);
+    return { buffer, dataUri, contentType: 'image/png', width, height };
     }
   }
 
@@ -563,7 +562,7 @@ export class ServerlessPDFService {
         fontFamily: 'NotoSansTC',
         fontWeight: '700',
         width: 400,
-        height: 150,
+        height: 200,
         backgroundColor: '#ffffff',
         textColor: '#000000',
         textAlign: 'center'
@@ -574,8 +573,8 @@ export class ServerlessPDFService {
         fontSize: 60,
         fontFamily: 'NotoSansTC',
         fontWeight: '400',
-        width: 400,
-        height: 80,
+        width: 200,
+        height: 100,
         backgroundColor: '#ffffff',
         textColor: '#666666',
         textAlign: 'center'
