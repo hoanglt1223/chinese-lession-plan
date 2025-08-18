@@ -1,16 +1,20 @@
 ---
-globs: server/**/*.ts
 description: API routes, server patterns, and backend architecture guidelines
+globs: api/**/*.ts
+alwaysApply: false
 ---
-
 # API Routes and Server Architecture
+
+- All api must compatitive with serverless vercel
+- Maximum api for vercel is 12 endpoint, try group all related endpoint to 1
+- The grouped api will have many methods and reconize by type or other field
 
 ## Server Structure
 
-- **Entry point**: [server/index.ts](mdc:server/index.ts) - Express app setup and middleware
-- **Routes**: [server/routes.ts](mdc:server/routes.ts) - API endpoint definitions
-- **Database**: [server/db.ts](mdc:server/db.ts) - Database connection and queries
-- **Services**: `server/services/` - Business logic and external integrations
+- **Entry point**: [api/index.ts](mdc:api/index.ts) - Express app setup and middleware
+- **Routes**: [api/routes.ts](mdc:api/routes.ts) - API endpoint definitions
+- **Database**: [api/db.ts](mdc:api/db.ts) - Database connection and queries
+- **Services**: `api/services/` - Business logic and external integrations
 
 ## API Conventions
 
@@ -33,7 +37,7 @@ app.get("/api/lessons", async (req, res) => {
 
 ## Middleware
 
-- **Session management**: Express sessions configured in [server/index.ts](mdc:server/index.ts)
+- **Session management**: Express sessions configured in [api/index.ts](mdc:api/index.ts)
 - **Request logging**: Custom middleware for API request logging
 - **Error handling**: Global error handler for consistent error responses
 - **Body parsing**: JSON and URL-encoded body parsing
@@ -47,12 +51,12 @@ app.get("/api/lessons", async (req, res) => {
 ## File Handling
 
 - **Upload directory**: `uploads/` for temporary file storage
-- **File processing**: [server/services/fileProcessor.ts](mdc:server/services/fileProcessor.ts)
+- **File processing**: [api/services/fileProcessor.ts](mdc:api/services/fileProcessor.ts)
 - **Storage**: Cloud storage integration via Google Cloud Storage
 
 ## External Services
 
-- **OpenAI Integration**: [server/services/openai.ts](mdc:server/services/openai.ts)
+- **OpenAI Integration**: [api/services/openai.ts](mdc:api/services/openai.ts)
 - **File Processing**: PDF extraction, DOCX parsing, image generation
 - **API Keys**: Managed through environment variables
 
@@ -74,6 +78,6 @@ Required environment variables:
 ## Database Queries
 
 - Use Drizzle ORM for all database operations
-- Import database connection from [server/db.ts](mdc:server/db.ts)
+- Import database connection from [api/db.ts](mdc:api/db.ts)
 - Use transactions for multi-table operations
 - Implement proper error handling for database operations
