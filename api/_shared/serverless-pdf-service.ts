@@ -645,7 +645,8 @@ export class ServerlessPDFService {
         try {
           // Position Chinese characters in the center of the page
           // Visual size should reflect fontSize(200) - make Chinese much larger than Pinyin
-          const chineseImageWidth = 200;
+          // Chinese characters are wider than tall, so increase width
+          const chineseImageWidth = 400;
           const chineseImageHeight = 200;
           const chineseX = (pageWidth - chineseImageWidth) / 2;
           const chineseY = (pageHeight - chineseImageHeight) / 2 - 15;
@@ -669,7 +670,8 @@ export class ServerlessPDFService {
         try {
           // Position Pinyin below Chinese characters  
           // Visual size should reflect fontSize(50) - much smaller than Chinese
-          const pinyinImageWidth = 50;
+          // Pinyin also needs wider space for multiple syllables
+          const pinyinImageWidth = 200;
           const pinyinImageHeight = 50;
           const pinyinX = (pageWidth - pinyinImageWidth) / 2;
           const pinyinY = (pageHeight - pinyinImageHeight) / 2 + 40;
