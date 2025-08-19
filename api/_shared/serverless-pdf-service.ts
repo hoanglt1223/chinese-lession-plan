@@ -64,7 +64,7 @@ async function callChineseTextAPI(
           height: fontSize * 1.2,
           backgroundColor: "transparent",
           textColor: "#000000",
-          padding: 20,
+          padding: 0,
           lineHeight: 1.5,
           textAlign: "center",
           quality: 90,
