@@ -290,15 +290,7 @@ export class ServerlessPDFService {
    */
   async generateFlashcardPDF(options: FlashcardPDFOptions): Promise<Buffer> {
     const startTime = Date.now();
-    const sessionId = Math.random().toString(36).substring(2, 15);
-    console.log(
-      `🚀 Starting fresh PDF generation at ${new Date().toISOString()} [Session: ${sessionId}]`
-    );
-    console.log(
-      `📊 Testing ${
-        options.flashcards.length
-      } flashcards with ${10} different Chinese rendering methods`
-    );
+    console.log(`🚀 Starting PDF generation for ${options.flashcards.length} flashcards`);
     try {
       // Load template images
       const frontTemplateImage = await this.loadTemplateImage("front");
@@ -427,15 +419,7 @@ export class ServerlessPDFService {
       }
       
       const endTime = Date.now();
-      console.log(
-        `✅ Fresh PDF generation completed in ${
-          endTime - startTime
-        }ms at ${new Date().toISOString()} [Session: ${sessionId}]`
-      );
-      console.log(`📦 Generated PDF size: ${pdfBuffer.length} bytes`);
-      console.log(
-        `🔍 Canvas availability caching: DISABLED (ensures fresh testing)`
-      );
+      console.log(`✅ PDF generated in ${endTime - startTime}ms (${pdfBuffer.length} bytes)`);
       
       return pdfBuffer;
     } catch (error) {
@@ -486,8 +470,7 @@ export class ServerlessPDFService {
         // For SVG, we can also try to convert it to a high-resolution PNG for better PDF compatibility
         // For now, return as-is since jsPDF can handle SVG in some cases
         const base64Image = `data:${contentType};base64,${imageBuffer.toString("base64")}`;
-        console.log(`✅ SVG image processed - vector quality maintained`);
-        return base64Image;
+                return base64Image;
       }
       
       // Convert to base64
@@ -632,38 +615,16 @@ export class ServerlessPDFService {
     // Add template as background image (landscape orientation)
     pdf.addImage(templateImage, "JPEG", 0, 0, pageWidth, pageHeight);
 
-    console.log(
-      `🚀 Generating flashcard back for: "${card.word}" with pinyin: "${card.pinyin}"`
-    );
-        console.log(
-      `🔥 NEW VERSION: Using centered ultimate-text-to-image layout with transparent background, no border`
-    );
+    console.log(`🚀 Generating flashcard: "${card.word}" (${card.pinyin})`);
 
     try {
-      console.log(
-        `🧪 Generating centered layout for: Chinese="${card.word}" Pinyin="${card.pinyin}"`
-      );
 
-      // Make only 2 API calls for text-to-image method with transparent background
-      console.log(`⚡ Starting 2 parallel API calls...`);
-      const apiCallsStartTime = Date.now();
 
-      const [
-        chineseTextImage,
-        pinyinTextImage
-      ] = await Promise.all([
-        // CHINESE TEXT - ultimate-text-to-image for better quality, no border
+      // Generate Chinese and Pinyin images via external API
+      const [chineseTextImage, pinyinTextImage] = await Promise.all([
         callChineseTextAPI(card.word || "朋友", "ultimate-text-to-image", 200, "bold", "AaBiMoHengZiZhenBaoKaiShu"),
-        
-        // PINYIN TEXT - ultimate-text-to-image for better quality, no border
         callChineseTextAPI(card.pinyin || "péngyǒu", "ultimate-text-to-image", 50, "300", "Montserrat")
       ]);
-
-      const apiCallsEndTime = Date.now();
-      console.log(`⚡ Completed 2 parallel API calls in ${apiCallsEndTime - apiCallsStartTime}ms`);
-      
-      // Debug: Check which calls succeeded/failed
-      console.log(`🔍 API Results - Chinese: ${chineseTextImage?.length || 'FAILED'}, Pinyin: ${pinyinTextImage?.length || 'FAILED'}`);
 
       // CALCULATE ALL IMAGE DIMENSIONS FIRST TO PREVENT OVERLAP
       let chineseImageWidth = 0, chineseImageHeight = 0;
@@ -677,11 +638,8 @@ export class ServerlessPDFService {
             throw new Error(`Invalid Chinese image properties: ${chineseImageProps.width}x${chineseImageProps.height}`);
           }
           
-          const originalAspectRatio = chineseImageProps.width / chineseImageProps.height;
-          console.log(`📏 Chinese DYNAMIC sizing - actual API response: ${chineseImageProps.width}x${chineseImageProps.height} (aspect ratio: ${originalAspectRatio.toFixed(3)}:1)`);
-          
-          const maxWidth = pageWidth * 0.8; // Max 80% of page width for larger text
-          const maxHeight = pageHeight * 0.4; // Max 40% of page height for larger text
+          const maxWidth = pageWidth * 0.8;
+          const maxHeight = pageHeight * 0.4;
           
           const scaleX = maxWidth / chineseImageProps.width;
           const scaleY = maxHeight / chineseImageProps.height;
@@ -689,8 +647,6 @@ export class ServerlessPDFService {
           
           chineseImageWidth = chineseImageProps.width * scale;
           chineseImageHeight = chineseImageProps.height * scale;
-          
-          console.log(`📐 Chinese SCALED dimensions: ${Math.round(chineseImageWidth)}x${Math.round(chineseImageHeight)} (scale: ${scale.toFixed(3)})`);
         } catch (error) {
           console.error(`❌ Failed to calculate Chinese dimensions:`, error);
         }
@@ -704,11 +660,8 @@ export class ServerlessPDFService {
             throw new Error(`Invalid Pinyin image properties: ${pinyinImageProps.width}x${pinyinImageProps.height}`);
           }
           
-          const originalAspectRatio = pinyinImageProps.width / pinyinImageProps.height;
-          console.log(`📏 Pinyin DYNAMIC sizing - actual API response: ${pinyinImageProps.width}x${pinyinImageProps.height} (aspect ratio: ${originalAspectRatio.toFixed(3)}:1)`);
-          
-          const maxWidth = pageWidth * 0.9; // Max 90% of page width for full display
-          const maxHeight = pageHeight * 0.25; // Max 25% of page height for larger pinyin
+          const maxWidth = pageWidth * 0.9;
+          const maxHeight = pageHeight * 0.25;
           
           const scaleX = maxWidth / pinyinImageProps.width;
           const scaleY = maxHeight / pinyinImageProps.height;
@@ -716,24 +669,15 @@ export class ServerlessPDFService {
           
           pinyinImageWidth = pinyinImageProps.width * scale;
           pinyinImageHeight = pinyinImageProps.height * scale;
-          
-          console.log(`📐 Pinyin SCALED dimensions: ${Math.round(pinyinImageWidth)}x${Math.round(pinyinImageHeight)} (scale: ${scale.toFixed(3)})`);
         } catch (error) {
           console.error(`❌ Failed to calculate Pinyin dimensions:`, error);
         }
       }
       
-      // NOW CALCULATE DYNAMIC POSITIONING TO PREVENT OVERLAP
-      const gap = 20; // 20px gap between Chinese and Pinyin
+      // Calculate dynamic positioning to prevent overlap
+      const gap = 40;
       const totalContentHeight = chineseImageHeight + pinyinImageHeight + gap;
-      const startY = (pageHeight - totalContentHeight) / 2; // Center the combined content
-      
-      console.log(`🎯 ANTI-OVERLAP POSITIONING:
-      - Chinese height: ${Math.round(chineseImageHeight)}px
-      - Pinyin height: ${Math.round(pinyinImageHeight)}px  
-      - Gap: ${gap}px
-      - Total content: ${Math.round(totalContentHeight)}px
-      - Start Y: ${Math.round(startY)}px`);
+      const startY = (pageHeight - totalContentHeight) / 2;
       
       // Add Chinese characters with calculated position
       if (chineseTextImage && chineseTextImage.length > 50 && chineseImageWidth > 0) {
@@ -749,7 +693,7 @@ export class ServerlessPDFService {
             chineseImageWidth,
             chineseImageHeight
           );
-          console.log(`✅ Added Chinese at (${Math.round(chineseX)}, ${Math.round(chineseY)}) size ${Math.round(chineseImageWidth)}x${Math.round(chineseImageHeight)}`);
+
         } catch (error) {
           console.error(`❌ Failed to add Chinese characters:`, error);
         }
@@ -769,36 +713,25 @@ export class ServerlessPDFService {
             pinyinImageWidth,
             pinyinImageHeight
           );
-          console.log(`✅ Added Pinyin at (${Math.round(pinyinX)}, ${Math.round(pinyinY)}) size ${Math.round(pinyinImageWidth)}x${Math.round(pinyinImageHeight)}`);
+
         } catch (error) {
           console.error(`❌ Failed to add Pinyin:`, error);
         }
       }
 
-      console.log(`✅ Successfully generated flashcard back for: ${card.word}`);
     } catch (error) {
-      console.error(
-        `❌ Failed to generate flashcard back for: ${card.word}`,
-        error
-      );
-
-      // Fallback: Simple text rendering
+      console.error(`❌ Failed to generate flashcard: ${card.word}`, error);
+      
+      // Fallback to basic text rendering
       pdf.setFontSize(24);
       pdf.setTextColor(0, 0, 0);
-      pdf.text(card.word || "朋友", pageWidth / 2, pageHeight / 2 - 20, {
-        align: "center",
-      });
+      pdf.text(card.word || "朋友", pageWidth / 2, pageHeight / 2 - 20, { align: "center" });
 
       pdf.setFontSize(16);
       pdf.setTextColor(100, 100, 100);
-      pdf.text(card.pinyin || "péngyǒu", pageWidth / 2, pageHeight / 2, {
-        align: "center",
-      });
+      pdf.text(card.pinyin || "péngyǒu", pageWidth / 2, pageHeight / 2, { align: "center" });
     }
   }
-
-  // All old method implementations removed - now using external API only
-  // See generateCardBackWithTemplate() for the simplified implementation
 }
 
 export const serverlessPDFService = new ServerlessPDFService(); 
