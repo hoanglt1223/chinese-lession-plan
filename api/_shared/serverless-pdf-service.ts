@@ -666,10 +666,10 @@ export class ServerlessPDFService {
         pinyinTextImage
       ] = await Promise.all([
         // CHINESE TEXT - ultimate-text-to-image for better quality, no border
-        callChineseTextAPI(card.word || "朋友", "ultimate-text-to-image", 120, "bold", "AaBiMoHengZiZhenBaoKaiShu"),
+        callChineseTextAPI(card.word || "朋友", "ultimate-text-to-image", 200, "bold", "AaBiMoHengZiZhenBaoKaiShu"),
         
         // PINYIN TEXT - ultimate-text-to-image for better quality, no border
-        callChineseTextAPI(card.pinyin || "péngyǒu", "ultimate-text-to-image", 80, "300", "Montserrat")
+        callChineseTextAPI(card.pinyin || "péngyǒu", "ultimate-text-to-image", 50, "300", "Montserrat")
       ]);
 
       const apiCallsEndTime = Date.now();
