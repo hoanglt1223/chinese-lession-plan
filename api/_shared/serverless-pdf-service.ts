@@ -574,7 +574,7 @@ export class ServerlessPDFService {
       // Add Pinyin below Chinese with calculated position (NO OVERLAP!)
       if (pinyinTextImage && pinyinTextImage.length > 50 && pinyinImageWidth > 0) {
         try {
-          const pinyinX = (pageWidth - pinyinImageWidth) / 2;
+          const pinyinX = (pageWidth - pinyinImageWidth) / 2 + 10;
           const pinyinY = startY + chineseImageHeight + gap; // Position directly below Chinese + gap
 
           pdf.addImage(pinyinTextImage, "PNG", pinyinX, pinyinY, pinyinImageWidth, pinyinImageHeight);
