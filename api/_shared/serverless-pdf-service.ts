@@ -19,58 +19,33 @@ async function callChineseTextAPI(
   text: string,
   method: "svg" | "text-to-image" | "ultimate-text-to-image" | "png" = "ultimate-text-to-image",
   fontSize: number = 48,
-  fontWeight:
-    | "100"
-    | "200"
-    | "300"
-    | "400"
-    | "500"
-    | "600"
-    | "700"
-    | "800"
-    | "900"
-    | "normal"
-    | "bold" = "700",
+  fontWeight: "100" | "200" | "300" | "400" | "500" | "600" | "700" | "800" | "900" | "normal" | "bold" = "700",
   fontFamily: string = "AaBiMoHengZiZhenBaoKaiShu"
 ): Promise<string> {
   try {
-    const response = await fetch(
-      "https://booking.hoangha.shop/api/convert-chinese-text",
-      {
-        method: "POST",
-        headers: {
-          "accept": "*/*",
-          "accept-language": "en,vi;q=0.9",
-          "content-type": "application/json", 
-          "dnt": "1",
-          "origin": "https://booking.hoangha.shop",
-          "priority": "u=1, i",
-          "referer": "https://booking.hoangha.shop/chinese-converter",
-          "sec-ch-ua": '"Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"',
-          "sec-ch-ua-mobile": "?0",
-          "sec-ch-ua-platform": '"Windows"',
-          "sec-fetch-dest": "empty",
-          "sec-fetch-mode": "cors",
-          "sec-fetch-site": "same-origin",
-          "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36"
-        },
-        body: JSON.stringify({
-          text,
-          method,
-          fontSize,
-          fontFamily,
-          fontWeight,
-          width: 720,
-          height: 240,
-          backgroundColor: "#ffffff",
-          textColor: "#000000",
-          padding: 0,
-          lineHeight: 1.5,
-          textAlign: "center",
-          quality: 100,
-        }),
-      }
-    );
+    const response = await fetch("https://booking.hoangha.shop/api/convert-chinese-text", {
+      method: "POST",
+      headers: {
+        accept: "*/*",
+        "accept-language": "en,vi;q=0.9",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        text,
+        method,
+        fontSize,
+        fontFamily,
+        fontWeight,
+        width: 720,
+        height: 240,
+        backgroundColor: "#ffffff",
+        textColor: "#000000",
+        padding: 0,
+        lineHeight: 1.5,
+        textAlign: "center",
+        quality: 100,
+      }),
+    });
 
     if (!response.ok) {
       // Try to get error message from JSON response like frontend code
@@ -87,21 +62,21 @@ async function callChineseTextAPI(
 
     // Handle response based on content type like frontend code
     const contentType = response.headers.get("content-type") || "image/png";
-    
-    if (contentType.includes('application/json')) {
+
+    if (contentType.includes("application/json")) {
       // Handle JSON responses (errors or special cases)
       const jsonData = await response.json();
-      throw new Error(jsonData.message || 'Unexpected JSON response from image API');
+      throw new Error(jsonData.message || "Unexpected JSON response from image API");
     } else {
       // Handle binary file responses (images)
       const arrayBuffer = await response.arrayBuffer();
       const imageBuffer = Buffer.from(arrayBuffer);
-      
+
       // Convert to data URI
       const base64 = imageBuffer.toString("base64");
       return `data:${contentType};base64,${base64}`;
     }
-    } catch (error) {
+  } catch (error) {
     console.error(`🚨 Chinese text API call failed for "${text}" (${method}):`, error);
     throw error; // Re-throw the error without fallback
   }
@@ -114,16 +89,8 @@ export class ServerlessPDFService {
   constructor() {
     // Paths to the flashcard template images
     // In Vercel serverless environment, files from client/public/ are available in the root
-    this.templateFrontPath = path.join(
-      process.cwd(),
-      "client/public/templates",
-      "flashcard-front.png"
-    );
-    this.templateBackPath = path.join(
-      process.cwd(),
-      "client/public/templates",
-      "flashcard-back.png"
-    );
+    this.templateFrontPath = path.join(process.cwd(), "client/public/templates", "flashcard-front.png");
+    this.templateBackPath = path.join(process.cwd(), "client/public/templates", "flashcard-back.png");
   }
 
   /**
@@ -135,18 +102,7 @@ export class ServerlessPDFService {
       width?: number;
       height?: number;
       fontSize?: number;
-      fontWeight?:
-        | "100"
-        | "200"
-        | "300"
-        | "400"
-        | "500"
-        | "600"
-        | "700"
-        | "800"
-        | "900"
-        | "normal"
-        | "bold";
+      fontWeight?: "100" | "200" | "300" | "400" | "500" | "600" | "700" | "800" | "900" | "normal" | "bold";
     }
   ): Promise<{
     buffer: Buffer;
@@ -159,14 +115,8 @@ export class ServerlessPDFService {
     const height = opts?.height ?? 180;
 
     try {
-             // Use simplified external API for Chinese text rendering
-       const svgDataUri = await callChineseTextAPI(
-         text,
-         "png",
-         opts?.fontSize || 48,
-         opts?.fontWeight || "400",
-         "AaBiMoHengZiZhenBaoKaiShu"
-       );
+      // Use simplified external API for Chinese text rendering
+      const svgDataUri = await callChineseTextAPI(text, "png", opts?.fontSize || 48, opts?.fontWeight || "400", "AaBiMoHengZiZhenBaoKaiShu");
 
       // The API already returns binary image data as data URI, no need to convert
       // Extract buffer from data URI for compatibility
@@ -248,39 +198,27 @@ export class ServerlessPDFService {
   /**
    * Load template image and convert to base64 data URL (no caching)
    */
-  private async loadTemplateImage(
-    templateType: "front" | "back"
-  ): Promise<string> {
+  private async loadTemplateImage(templateType: "front" | "back"): Promise<string> {
     try {
-      const templatePath =
-        templateType === "front"
-          ? this.templateFrontPath
-          : this.templateBackPath;
+      const templatePath = templateType === "front" ? this.templateFrontPath : this.templateBackPath;
 
       // Try to read the image file
       const imageBuffer = await fs.readFile(templatePath);
-      
+
       // Convert to base64 data URL
-      const base64Image = `data:image/png;base64,${imageBuffer.toString(
-        "base64"
-      )}`;
-      
+      const base64Image = `data:image/png;base64,${imageBuffer.toString("base64")}`;
+
       return base64Image;
     } catch (error) {
       console.error(
-        `Error loading ${templateType} template from ${
-          templateType === "front"
-            ? this.templateFrontPath
-            : this.templateBackPath
-        }:`,
+        `Error loading ${templateType} template from ${templateType === "front" ? this.templateFrontPath : this.templateBackPath}:`,
         error
       );
-      
+
       // Return a simple fallback base64 image (1x1 transparent PNG)
-      const fallbackImage =
-        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==";
+      const fallbackImage = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==";
       console.log(`Using fallback image for ${templateType} template`);
-      
+
       return fallbackImage;
     }
   }
@@ -295,13 +233,13 @@ export class ServerlessPDFService {
       // Load template images
       const frontTemplateImage = await this.loadTemplateImage("front");
       const backTemplateImage = await this.loadTemplateImage("back");
-      
+
       // Use jsPDF for efficient PDF generation with template background
       const { jsPDF } = await import("jspdf");
-      
+
       // Create new PDF document (A4 at reasonable resolution)
       const pdf = new jsPDF({
-        orientation: "landscape", 
+        orientation: "landscape",
         unit: "px",
         format: [1754, 1240], // Reasonable high resolution without breaking rendering
       });
@@ -325,29 +263,16 @@ export class ServerlessPDFService {
           if (!isFirstPage) {
             pdf.addPage();
           }
-          
-          await this.generateCardFrontWithTemplate(
-            pdf,
-            card,
-            i + 1,
-            frontTemplateImage
-          );
+
+          await this.generateCardFrontWithTemplate(pdf, card, i + 1, frontTemplateImage);
           isFirstPage = false;
 
           // Add back page
           pdf.addPage();
-          await this.generateCardBackWithTemplate(
-            pdf,
-            card,
-            i + 1,
-            backTemplateImage
-          );
+          await this.generateCardBackWithTemplate(pdf, card, i + 1, backTemplateImage);
         } catch (cardError) {
-          console.error(
-            `❌ Error processing flashcard ${i + 1} (${card.word}):`,
-            cardError instanceof Error ? cardError.message : String(cardError)
-          );
-          
+          console.error(`❌ Error processing flashcard ${i + 1} (${card.word}):`, cardError instanceof Error ? cardError.message : String(cardError));
+
           // Add a fallback page to prevent completely broken PDF
           try {
             if (isFirstPage) {
@@ -356,7 +281,7 @@ export class ServerlessPDFService {
             } else {
               pdf.addPage();
             }
-            
+
             // Add error page with basic template
             pdf.addImage(frontTemplateImage, "JPEG", 0, 0, 297, 210);
             pdf.setFontSize(24);
@@ -370,10 +295,7 @@ export class ServerlessPDFService {
               align: "center",
             });
           } catch (fallbackError) {
-            console.error(
-              `Failed to add error page for card ${i + 1}:`,
-              fallbackError
-            );
+            console.error(`Failed to add error page for card ${i + 1}:`, fallbackError);
           }
         }
       }
@@ -383,7 +305,7 @@ export class ServerlessPDFService {
       if (pageCount === 0) {
         throw new Error("PDF has no pages");
       }
-      
+
       // Generate PDF data - try different output methods for better compatibility
       let pdfBuffer: Buffer;
       try {
@@ -391,10 +313,7 @@ export class ServerlessPDFService {
         const uint8Array = pdf.output("arraybuffer");
         pdfBuffer = Buffer.from(uint8Array);
       } catch (bufferError) {
-        console.warn(
-          "ArrayBuffer method failed, trying string method:",
-          bufferError
-        );
+        console.warn("ArrayBuffer method failed, trying string method:", bufferError);
         // Method 2: Fallback to string method
         const pdfString = pdf.output("datauristring");
         const base64Data = pdfString.split(",")[1];
@@ -403,32 +322,26 @@ export class ServerlessPDFService {
         }
         pdfBuffer = Buffer.from(base64Data, "base64");
       }
-      
+
       // Validate the PDF buffer
       if (!pdfBuffer || pdfBuffer.length === 0) {
         throw new Error("Generated PDF buffer is empty");
       }
-      
+
       // Check if buffer starts with PDF header
       const pdfHeader = pdfBuffer.slice(0, 4).toString();
       if (pdfHeader !== "%PDF") {
         console.error("Invalid PDF header:", pdfHeader);
-        throw new Error(
-          `Invalid PDF header: expected '%PDF', got '${pdfHeader}'`
-        );
+        throw new Error(`Invalid PDF header: expected '%PDF', got '${pdfHeader}'`);
       }
-      
+
       const endTime = Date.now();
       console.log(`✅ PDF generated in ${endTime - startTime}ms (${pdfBuffer.length} bytes)`);
-      
+
       return pdfBuffer;
     } catch (error) {
       console.error("Error generating flashcard PDF:", error);
-      throw new Error(
-        `Failed to generate flashcard PDF: ${
-          error instanceof Error ? error.message : String(error)
-        }`
-      );
+      throw new Error(`Failed to generate flashcard PDF: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -438,46 +351,44 @@ export class ServerlessPDFService {
   private async fetchImageAsBase64(imageUrl: string): Promise<string> {
     try {
       console.log(`🖼️  Fetching high-quality image: ${imageUrl.substring(0, 100)}...`);
-      
+
       // Use node-fetch to get the image with enhanced headers for better quality
       const fetch = (await import("node-fetch")).default;
       const response = await fetch(imageUrl, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-          'Accept': 'image/*, */*',
-          'Accept-Encoding': 'gzip, deflate, br',
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+          Accept: "image/*, */*",
+          "Accept-Encoding": "gzip, deflate, br",
         },
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
       }
-      
+
       const arrayBuffer = await response.arrayBuffer();
       const imageBuffer = Buffer.from(arrayBuffer);
-      
+
       // Log image quality information
       const sizeKB = Math.round(imageBuffer.length / 1024);
       console.log(`📏 Image downloaded: ${sizeKB}KB`);
-      
+
       const contentType = response.headers.get("content-type") || "image/jpeg";
       console.log(`🎨 Image type: ${contentType}`);
-      
+
       // Special handling for SVG content
-      if (contentType.includes('svg') || imageUrl.includes('.svg')) {
+      if (contentType.includes("svg") || imageUrl.includes(".svg")) {
         console.log(`🎯 Processing SVG image for optimal PDF quality`);
-        
+
         // For SVG, we can also try to convert it to a high-resolution PNG for better PDF compatibility
         // For now, return as-is since jsPDF can handle SVG in some cases
         const base64Image = `data:${contentType};base64,${imageBuffer.toString("base64")}`;
-                return base64Image;
+        return base64Image;
       }
-      
+
       // Convert to base64
-      const base64Image = `data:${contentType};base64,${imageBuffer.toString(
-        "base64"
-      )}`;
-      
+      const base64Image = `data:${contentType};base64,${imageBuffer.toString("base64")}`;
+
       return base64Image;
     } catch (error) {
       console.error(`❌ Failed to fetch image from ${imageUrl}:`, error);
@@ -488,18 +399,13 @@ export class ServerlessPDFService {
   /**
    * Generate front side using template background
    */
-  private async generateCardFrontWithTemplate(
-    pdf: any,
-    card: FlashcardData,
-    cardNumber: number,
-    templateImage: string
-  ): Promise<void> {
+  private async generateCardFrontWithTemplate(pdf: any, card: FlashcardData, cardNumber: number, templateImage: string): Promise<void> {
     const pageWidth = 1754; // Updated high resolution width
     const pageHeight = 1240; // Updated high resolution height
-    
+
     // Add template as background image (landscape orientation)
     pdf.addImage(templateImage, "JPEG", 0, 0, pageWidth, pageHeight);
-    
+
     // Set up Chinese font support (using built-in fonts with fallback)
     try {
       // Try to set a font that supports Chinese characters
@@ -509,28 +415,24 @@ export class ServerlessPDFService {
     }
 
     // Add actual image or placeholder centered at 70% of page size
-    if (
-      card.imageUrl &&
-      !card.imageUrl.includes("placeholder") &&
-      !card.imageUrl.includes("via.placeholder")
-    ) {
+    if (card.imageUrl && !card.imageUrl.includes("placeholder") && !card.imageUrl.includes("via.placeholder")) {
       try {
         // Fetch and convert image to base64
         const base64Image = await this.fetchImageAsBase64(card.imageUrl);
-        
+
         // Define maximum dimensions (70% of page size)
         const maxImageWidth = pageWidth * 0.7; // 70% of page width
         const maxImageHeight = pageHeight * 0.7; // 70% of page height
-        
+
         // Get image properties to calculate aspect ratio
         const imageProperties = pdf.getImageProperties(base64Image);
         const originalWidth = imageProperties.width;
         const originalHeight = imageProperties.height;
         const aspectRatio = originalWidth / originalHeight;
-        
+
         // Calculate final dimensions maintaining aspect ratio within 70% bounds
         let imageWidth, imageHeight;
-        
+
         if (aspectRatio > 1) {
           // Landscape image - constrain by width
           imageWidth = Math.min(maxImageWidth, maxImageHeight * aspectRatio);
@@ -540,7 +442,7 @@ export class ServerlessPDFService {
           imageHeight = Math.min(maxImageHeight, maxImageWidth / aspectRatio);
           imageWidth = imageHeight * aspectRatio;
         }
-        
+
         // Ensure we don't exceed the maximum bounds
         if (imageWidth > maxImageWidth) {
           imageWidth = maxImageWidth;
@@ -550,19 +452,12 @@ export class ServerlessPDFService {
           imageHeight = maxImageHeight;
           imageWidth = imageHeight * aspectRatio;
         }
-        
+
         const imageX = (pageWidth - imageWidth) / 2; // Center horizontally
         const imageY = (pageHeight - imageHeight) / 2; // Center vertically
-        
+
         // Add the actual image
-        pdf.addImage(
-          base64Image,
-          "JPEG",
-          imageX,
-          imageY,
-          imageWidth,
-          imageHeight
-        );
+        pdf.addImage(base64Image, "JPEG", imageX, imageY, imageWidth, imageHeight);
       } catch (error) {
         console.error(`❌ Failed to add image for "${card.word}":`, error);
         // Fallback to placeholder text if image fails
@@ -573,12 +468,7 @@ export class ServerlessPDFService {
         });
         pdf.setFontSize(10);
         pdf.setTextColor(150, 150, 150); // Gray text
-        pdf.text(
-          `URL: ${card.imageUrl?.substring(0, 50)}...`,
-          pageWidth / 2,
-          pageHeight / 2 + 15,
-          { align: "center" }
-        );
+        pdf.text(`URL: ${card.imageUrl?.substring(0, 50)}...`, pageWidth / 2, pageHeight / 2 + 15, { align: "center" });
       }
     } else {
       // Show placeholder when no image URL provided
@@ -587,15 +477,10 @@ export class ServerlessPDFService {
       pdf.text("No image available", pageWidth / 2, pageHeight / 2, {
         align: "center",
       });
-      
+
       if (card.imageUrl) {
         pdf.setFontSize(8);
-        pdf.text(
-          `(Placeholder URL detected)`,
-          pageWidth / 2,
-          pageHeight / 2 + 15,
-          { align: "center" }
-        );
+        pdf.text(`(Placeholder URL detected)`, pageWidth / 2, pageHeight / 2 + 15, { align: "center" });
       }
     }
   }
@@ -603,33 +488,28 @@ export class ServerlessPDFService {
   /**
    * Generate back side using template background - Simplified version using external API
    */
-  private async generateCardBackWithTemplate(
-    pdf: any,
-    card: FlashcardData,
-    cardNumber: number,
-    templateImage: string
-  ): Promise<void> {
+  private async generateCardBackWithTemplate(pdf: any, card: FlashcardData, cardNumber: number, templateImage: string): Promise<void> {
     const pageWidth = 1754; // Updated high resolution width
     const pageHeight = 1240; // Updated high resolution height
-    
+
     // Add template as background image (landscape orientation)
     pdf.addImage(templateImage, "JPEG", 0, 0, pageWidth, pageHeight);
 
     console.log(`🚀 Generating flashcard: "${card.word}" (${card.pinyin})`);
 
     try {
-
-
       // Generate Chinese and Pinyin images via external API
       const [chineseTextImage, pinyinTextImage] = await Promise.all([
         callChineseTextAPI(card.word || "朋友", "ultimate-text-to-image", 200, "bold", "AaBiMoHengZiZhenBaoKaiShu"),
-        callChineseTextAPI(card.pinyin || "péngyǒu", "ultimate-text-to-image", 50, "300", "Montserrat")
+        callChineseTextAPI(card.pinyin || "péngyǒu", "ultimate-text-to-image", 50, "300", "Montserrat"),
       ]);
 
       // CALCULATE ALL IMAGE DIMENSIONS FIRST TO PREVENT OVERLAP
-      let chineseImageWidth = 0, chineseImageHeight = 0;
-      let pinyinImageWidth = 0, pinyinImageHeight = 0;
-      
+      let chineseImageWidth = 0,
+        chineseImageHeight = 0;
+      let pinyinImageWidth = 0,
+        pinyinImageHeight = 0;
+
       // Calculate Chinese dimensions
       if (chineseTextImage && chineseTextImage.length > 50) {
         try {
@@ -637,21 +517,21 @@ export class ServerlessPDFService {
           if (!chineseImageProps.width || !chineseImageProps.height || chineseImageProps.width <= 0 || chineseImageProps.height <= 0) {
             throw new Error(`Invalid Chinese image properties: ${chineseImageProps.width}x${chineseImageProps.height}`);
           }
-          
+
           const maxWidth = pageWidth * 0.8;
           const maxHeight = pageHeight * 0.4;
-          
+
           const scaleX = maxWidth / chineseImageProps.width;
           const scaleY = maxHeight / chineseImageProps.height;
           const scale = Math.min(scaleX, scaleY);
-          
+
           chineseImageWidth = chineseImageProps.width * scale;
           chineseImageHeight = chineseImageProps.height * scale;
         } catch (error) {
           console.error(`❌ Failed to calculate Chinese dimensions:`, error);
         }
       }
-      
+
       // Calculate Pinyin dimensions
       if (pinyinTextImage && pinyinTextImage.length > 50) {
         try {
@@ -659,41 +539,33 @@ export class ServerlessPDFService {
           if (!pinyinImageProps.width || !pinyinImageProps.height || pinyinImageProps.width <= 0 || pinyinImageProps.height <= 0) {
             throw new Error(`Invalid Pinyin image properties: ${pinyinImageProps.width}x${pinyinImageProps.height}`);
           }
-          
+
           const maxWidth = pageWidth * 0.9;
           const maxHeight = pageHeight * 0.25;
-          
+
           const scaleX = maxWidth / pinyinImageProps.width;
           const scaleY = maxHeight / pinyinImageProps.height;
           const scale = Math.min(scaleX, scaleY);
-          
+
           pinyinImageWidth = pinyinImageProps.width * scale;
           pinyinImageHeight = pinyinImageProps.height * scale;
         } catch (error) {
           console.error(`❌ Failed to calculate Pinyin dimensions:`, error);
         }
       }
-      
+
       // Calculate dynamic positioning to prevent overlap
       const gap = 40;
       const totalContentHeight = chineseImageHeight + pinyinImageHeight + gap;
       const startY = (pageHeight - totalContentHeight) / 2;
-      
+
       // Add Chinese characters with calculated position
       if (chineseTextImage && chineseTextImage.length > 50 && chineseImageWidth > 0) {
         try {
           const chineseX = (pageWidth - chineseImageWidth) / 2;
           const chineseY = startY;
 
-          pdf.addImage(
-            chineseTextImage,
-            "PNG",
-            chineseX,
-            chineseY,
-            chineseImageWidth,
-            chineseImageHeight
-          );
-
+          pdf.addImage(chineseTextImage, "PNG", chineseX, chineseY, chineseImageWidth, chineseImageHeight);
         } catch (error) {
           console.error(`❌ Failed to add Chinese characters:`, error);
         }
@@ -705,33 +577,28 @@ export class ServerlessPDFService {
           const pinyinX = (pageWidth - pinyinImageWidth) / 2;
           const pinyinY = startY + chineseImageHeight + gap; // Position directly below Chinese + gap
 
-          pdf.addImage(
-            pinyinTextImage,
-            "PNG",
-            pinyinX,
-            pinyinY,
-            pinyinImageWidth,
-            pinyinImageHeight
-          );
-
+          pdf.addImage(pinyinTextImage, "PNG", pinyinX, pinyinY, pinyinImageWidth, pinyinImageHeight);
         } catch (error) {
           console.error(`❌ Failed to add Pinyin:`, error);
         }
       }
-
     } catch (error) {
       console.error(`❌ Failed to generate flashcard: ${card.word}`, error);
-      
+
       // Fallback to basic text rendering
       pdf.setFontSize(24);
       pdf.setTextColor(0, 0, 0);
-      pdf.text(card.word || "朋友", pageWidth / 2, pageHeight / 2 - 20, { align: "center" });
+      pdf.text(card.word || "朋友", pageWidth / 2, pageHeight / 2 - 20, {
+        align: "center",
+      });
 
       pdf.setFontSize(16);
       pdf.setTextColor(100, 100, 100);
-      pdf.text(card.pinyin || "péngyǒu", pageWidth / 2, pageHeight / 2, { align: "center" });
+      pdf.text(card.pinyin || "péngyǒu", pageWidth / 2, pageHeight / 2, {
+        align: "center",
+      });
     }
   }
 }
 
-export const serverlessPDFService = new ServerlessPDFService(); 
+export const serverlessPDFService = new ServerlessPDFService();
