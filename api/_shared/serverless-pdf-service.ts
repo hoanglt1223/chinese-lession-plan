@@ -627,11 +627,11 @@ export class ServerlessPDFService {
         chineseTextImage,
         pinyinTextImage
       ] = await Promise.all([
-        // CHINESE TEXT - text-to-image with larger font for main display  
-        callChineseTextAPI(card.word || "朋友", "text-to-image", 200, "900", "AaBiMoHengZiZhenBaoKaiShu"),
+        // CHINESE TEXT - text-to-image with larger font for main display (extra bold)
+        callChineseTextAPI(card.word || "朋友", "text-to-image", 200, "bold", "AaBiMoHengZiZhenBaoKaiShu"),
         
-        // PINYIN TEXT - text-to-image with smaller font for pronunciation
-        callChineseTextAPI(card.pinyin || "péngyǒu", "text-to-image", 50, "400", "Montserrat")
+        // PINYIN TEXT - text-to-image with smaller font for pronunciation (lighter weight)
+        callChineseTextAPI(card.pinyin || "péngyǒu", "text-to-image", 50, "300", "Montserrat")
       ]);
 
       const apiCallsEndTime = Date.now();
