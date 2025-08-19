@@ -597,58 +597,31 @@ export class ServerlessPDFService {
         `🧪 Testing all methods for: Chinese="${card.word}" Pinyin="${card.pinyin}"`
       );
 
-             // CHINESE TEXT - 3 methods (columns 1-3) - using AaBiMoHengZiZhenBaoKaiShu 200px
-       // Method 1: svg
-       const chineseSvg = await callChineseTextAPI(
-         card.word || "朋友",
-         "svg",
-         200,
-         "bold"
-       );
+             // Make all 6 API calls in parallel for maximum performance
+       console.log(`⚡ Starting 6 parallel API calls...`);
+       const apiCallsStartTime = Date.now();
 
-       // Method 2: text-to-image
-       const chineseTextToImage = await callChineseTextAPI(
-         card.word || "朋友",
-         "text-to-image",
-         200,
-         "bold"
-       );
+       const [
+         chineseSvg,
+         chineseTextToImage, 
+         chinesePng,
+         pinyinSvg,
+         pinyinTextToImage,
+         pinyinPng
+       ] = await Promise.all([
+         // CHINESE TEXT - 3 methods (columns 1-3) - using AaBiMoHengZiZhenBaoKaiShu 200px
+         callChineseTextAPI(card.word || "朋友", "svg", 200, "bold"),
+         callChineseTextAPI(card.word || "朋友", "text-to-image", 200, "bold"),
+         callChineseTextAPI(card.word || "朋友", "png", 200, "bold"),
+         
+         // PINYIN TEXT - 3 methods (columns 4-6) - using Montserrat 50px
+         callChineseTextAPI(card.pinyin || "péngyǒu", "svg", 50, "500", "Montserrat"),
+         callChineseTextAPI(card.pinyin || "péngyǒu", "text-to-image", 50, "500", "Montserrat"),
+         callChineseTextAPI(card.pinyin || "péngyǒu", "png", 50, "500", "Montserrat")
+       ]);
 
-       // Method 3: png
-       const chinesePng = await callChineseTextAPI(
-         card.word || "朋友",
-         "png",
-         200,
-         "bold"
-       );
-
-             // PINYIN TEXT - 3 methods (columns 4-6) - using Montserrat 50px
-       // Method 1: svg
-       const pinyinSvg = await callChineseTextAPI(
-         card.pinyin || "péngyǒu",
-         "svg",
-         50,
-         "500",
-         "Montserrat"
-       );
-
-       // Method 2: text-to-image
-       const pinyinTextToImage = await callChineseTextAPI(
-         card.pinyin || "péngyǒu",
-         "text-to-image",
-         50,
-         "500",
-         "Montserrat"
-       );
-
-       // Method 3: png
-       const pinyinPng = await callChineseTextAPI(
-         card.pinyin || "péngyǒu",
-         "png",
-         50,
-         "500",
-         "Montserrat"
-       );
+       const apiCallsEndTime = Date.now();
+       console.log(`⚡ Completed 6 parallel API calls in ${apiCallsEndTime - apiCallsStartTime}ms`);
 
       // Display all 6 columns with compact sizing for single words
       const imageWidth = colWidth * 0.8;
