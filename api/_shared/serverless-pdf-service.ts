@@ -48,7 +48,7 @@ async function callChineseTextAPI(
           fontSize,
           fontFamily,
           fontWeight,
-          width: fontSize * 3,
+          width: fontSize * 5,
           height: fontSize * 1.2,
           backgroundColor: "#ffffff",
           textColor: "#000000",
@@ -625,12 +625,12 @@ export class ServerlessPDFService {
          pinyinPng
        ] = await Promise.all([
          // CHINESE TEXT - 3 methods (columns 1-3) - using AaBiMoHengZiZhenBaoKaiShu 200px
-         callChineseTextAPI(card.word || "朋友", "svg", 200, "900", "AaBiMoHengZiZhenBaoKaiShu"),
+         callChineseTextAPI(card.word || "朋友", "ultimate-text-to-image", 200, "900", "AaBiMoHengZiZhenBaoKaiShu"),
          callChineseTextAPI(card.word || "朋友", "text-to-image", 200, "900", "AaBiMoHengZiZhenBaoKaiShu"),
          callChineseTextAPI(card.word || "朋友", "png", 200, "900", "AaBiMoHengZiZhenBaoKaiShu"),
          
          // PINYIN TEXT - 3 methods (columns 4-6) - try AaBiMoHengZiZhenBaoKaiShu instead of Montserrat
-         callChineseTextAPI(card.pinyin || "péngyǒu", "svg", 50, "500", "Montserrat"),
+         callChineseTextAPI(card.pinyin || "péngyǒu", "ultimate-text-to-image", 50, "500", "Montserrat"),
          callChineseTextAPI(card.pinyin || "péngyǒu", "text-to-image", 50, "500", "Montserrat"),
          callChineseTextAPI(card.pinyin || "péngyǒu", "png", 50, "500", "Montserrat")
        ]);
