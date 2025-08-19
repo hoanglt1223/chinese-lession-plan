@@ -627,11 +627,11 @@ export class ServerlessPDFService {
         chineseTextImage,
         pinyinTextImage
       ] = await Promise.all([
-        // CHINESE TEXT - text-to-image with larger font for main display (extra bold)
-        callChineseTextAPI(card.word || "朋友", "text-to-image", 200, "bold", "AaBiMoHengZiZhenBaoKaiShu"),
+        // CHINESE TEXT - text-to-image with reduced font size for API stability
+        callChineseTextAPI(card.word || "朋友", "text-to-image", 120, "bold", "AaBiMoHengZiZhenBaoKaiShu"),
         
-        // PINYIN TEXT - text-to-image with smaller font for pronunciation (lighter weight)
-        callChineseTextAPI(card.pinyin || "péngyǒu", "text-to-image", 50, "300", "Montserrat")
+        // PINYIN TEXT - text-to-image with smaller font for pronunciation
+        callChineseTextAPI(card.pinyin || "péngyǒu", "text-to-image", 30, "300", "Montserrat")
       ]);
 
       const apiCallsEndTime = Date.now();
@@ -644,9 +644,9 @@ export class ServerlessPDFService {
       if (chineseTextImage && chineseTextImage.length > 50) {
         try {
           // Position Chinese characters in the center of the page
-          // Use exact API aspect ratio: 1000px:240px = 4.17:1 (no scaling distortion)
-          const chineseImageWidth = 400;  // Increased width for multi-character words
-          const chineseImageHeight = 96;   // 400:96 = 4.17:1 ratio
+          // API generates 600x144 for fontSize 120, maintain 4.17:1 ratio
+          const chineseImageWidth = 300;  // Scaled down from 600px
+          const chineseImageHeight = 72;   // Scaled down from 144px (300:72 = 4.17:1)
           const chineseX = (pageWidth - chineseImageWidth) / 2;
           const chineseY = (pageHeight - chineseImageHeight) / 2 - 15;
 
@@ -668,8 +668,8 @@ export class ServerlessPDFService {
       if (pinyinTextImage && pinyinTextImage.length > 50) {
         try {
           // Position Pinyin below Chinese characters  
-          // Height = 1/4 of Chinese (96/4=24), Width = 80% of page for full display
-          const pinyinImageHeight = 96 / 4;  // 24px - exactly 1/4 of Chinese height
+          // Height = 1/4 of Chinese (72/4=18), Width = 80% of page for full display
+          const pinyinImageHeight = 72 / 4;  // 18px - exactly 1/4 of Chinese height
           const pinyinImageWidth = pageWidth * 0.8;  // 80% of page width for full display
           const pinyinX = (pageWidth - pinyinImageWidth) / 2;
           const pinyinY = (pageHeight - pinyinImageHeight) / 2 + 40;
