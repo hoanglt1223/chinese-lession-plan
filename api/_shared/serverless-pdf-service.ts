@@ -40,7 +40,19 @@ async function callChineseTextAPI(
         method: "POST",
         headers: {
           "accept": "*/*",
-          "content-type": "application/json",
+          "accept-language": "en,vi;q=0.9",
+          "content-type": "application/json", 
+          "dnt": "1",
+          "origin": "https://booking.hoangha.shop",
+          "priority": "u=1, i",
+          "referer": "https://booking.hoangha.shop/chinese-converter",
+          "sec-ch-ua": '"Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"',
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": '"Windows"',
+          "sec-fetch-dest": "empty",
+          "sec-fetch-mode": "cors",
+          "sec-fetch-site": "same-origin",
+          "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36"
         },
         body: JSON.stringify({
           text,
@@ -49,7 +61,7 @@ async function callChineseTextAPI(
           fontFamily,
           fontWeight,
           width: fontSize * 5,
-          height: fontSize * 1.2,
+          height: Math.max(fontSize * 1.2, 120),
           backgroundColor: "transparent",
           textColor: "#000000",
           padding: 20,
@@ -697,14 +709,6 @@ export class ServerlessPDFService {
       pdf.text(card.pinyin || "péngyǒu", pageWidth / 2, pageHeight / 2, {
         align: "center",
       });
-
-      if (card.vietnamese) {
-        pdf.setFontSize(14);
-        pdf.setTextColor(0, 0, 0);
-        pdf.text(card.vietnamese, pageWidth / 2, pageHeight / 2 + 20, {
-          align: "center",
-        });
-      }
     }
   }
 
