@@ -60,7 +60,7 @@ async function callChineseTextAPI(
           fontSize,
           fontFamily,
           fontWeight,
-          width: 800,
+          width: 720,
           height: 240,
           backgroundColor: "#ffffff",
           textColor: "#000000",
