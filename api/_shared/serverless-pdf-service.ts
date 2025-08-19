@@ -642,10 +642,10 @@ export class ServerlessPDFService {
        console.log(`🔍 API Results - Chinese SVG: ${chineseSvg?.length || 'FAILED'}, Text-to-Image: ${chineseTextToImage?.length || 'FAILED'}, PNG: ${chinesePng?.length || 'FAILED'}`);
        console.log(`🔍 API Results - Pinyin SVG: ${pinyinSvg?.length || 'FAILED'}, Text-to-Image: ${pinyinTextToImage?.length || 'FAILED'}, PNG: ${pinyinPng?.length || 'FAILED'}`);
 
-      // Display all 6 columns with compact sizing for single words
-      const imageWidth = colWidth * 0.8;
-      const imageHeight = 40;
-      const imageY = startY + 25;
+      // Display all 6 columns with proper sizing for readable text
+      const imageWidth = colWidth * 0.9;
+      const imageHeight = 80;
+      const imageY = startY + 20;
 
               // Helper function to safely add image to PDF
         const safeAddImage = (imageData: string, label: string, colIndex: number) => {
