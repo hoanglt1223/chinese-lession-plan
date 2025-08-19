@@ -669,8 +669,8 @@ export class ServerlessPDFService {
         try {
           // Position Pinyin below Chinese characters  
           // Use exact API aspect ratio: 250px:120px = 2.08:1 (no scaling distortion)
-          const pinyinImageWidth = 200;   // Increased width for longer pinyin
-          const pinyinImageHeight = 96;   // 200:96 = 2.08:1 ratio
+          const pinyinImageWidth = 150;   // Smaller pinyin size
+          const pinyinImageHeight = 72;   // 150:72 = 2.08:1 ratio
           const pinyinX = (pageWidth - pinyinImageWidth) / 2;
           const pinyinY = (pageHeight - pinyinImageHeight) / 2 + 40;
 
