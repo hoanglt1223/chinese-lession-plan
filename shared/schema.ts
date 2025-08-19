@@ -80,7 +80,7 @@ export interface FlashcardImage {
   type: 'photo' | 'illustration';
 }
 
-// Freepik Icon types
+// Freepik Icon types (legacy)
 export interface FreepikIcon {
   id: string;
   url: string;
@@ -89,6 +89,21 @@ export interface FreepikIcon {
   credit: string;
   sourceUrl: string;
   type: 'icon';
+}
+
+// High-quality SVG Icon types (Heroicons, Lucide, etc.)
+export interface SVGIcon {
+  id: string;
+  url: string;
+  alt: string;
+  description: string;
+  credit: string;
+  sourceUrl: string;
+  type: 'icon';
+  source: 'heroicons' | 'lucide' | 'feather';
+  quality: 'high';
+  svgContent?: string;
+  size?: string;
 }
 
 // Enhanced Flashcard Data types
@@ -100,13 +115,13 @@ export interface FlashcardData {
   partOfSpeech?: string;
   imageQuery?: string;
   imageUrl?: string;
-  // New Unsplash image options
+  // Enhanced image options with high-quality SVG icons
   imageOptions?: {
     photos: FlashcardImage[];
     illustrations: FlashcardImage[];
-    icons: FreepikIcon[]; // Add Freepik icons
-    autoSelected: FlashcardImage | FreepikIcon | null;
-    all: (FlashcardImage | FreepikIcon)[];
+    icons: SVGIcon[]; // High-quality SVG icons from Heroicons, Lucide, etc.
+    autoSelected: FlashcardImage | SVGIcon | null;
+    all: (FlashcardImage | SVGIcon)[];
   };
   selectedImageId?: string; // Track which image user selected
 }

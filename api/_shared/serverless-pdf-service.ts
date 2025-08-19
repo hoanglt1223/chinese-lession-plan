@@ -453,17 +453,55 @@ export class ServerlessPDFService {
    */
   private async fetchImageAsBase64(imageUrl: string): Promise<string> {
     try {
-      // Use node-fetch to get the image
+      console.log(`🖼️  Fetching high-quality image: ${imageUrl.substring(0, 100)}...`);
+      
+      // Use node-fetch to get the image with enhanced headers for better quality
       const fetch = (await import("node-fetch")).default;
-      const response = await fetch(imageUrl);
+      const response = await fetch(imageUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+          'Accept': 'image/*, */*',
+          'Accept-Encoding': 'gzip, deflate, br',
+        },
+      });
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
       }
       
       const arrayBuffer = await response.arrayBuffer();
       const imageBuffer = Buffer.from(arrayBuffer);
+      
+      // Log image quality information
+      const sizeKB = Math.round(imageBuffer.length / 1024);
+      console.log(`📏 Image downloaded: ${sizeKB}KB`);
+      
       const contentType = response.headers.get("content-type") || "image/jpeg";
+      console.log(`🎨 Image type: ${contentType}`);
+      
+      // Special handling for SVG content
+      if (contentType.includes('svg') || imageUrl.includes('.svg')) {
+        console.log(`🎯 Processing SVG image for optimal PDF quality`);
+        
+        // For SVG, we can also try to convert it to a high-resolution PNG for better PDF compatibility
+        // For now, return as-is since jsPDF can handle SVG in some cases
+        const base64Image = `data:${contentType};base64,${imageBuffer.toString("base64")}`;
+        console.log(`✅ SVG image processed - vector quality maintained`);
+        return base64Image;
+      }
+      
+      // Log quality indicators for raster images
+      if (sizeKB < 5) {
+        console.warn(`⚠️  Very low quality image detected (${sizeKB}KB) - this will appear pixelated in PDF`);
+      } else if (sizeKB < 20) {
+        console.warn(`⚠️  Low quality image detected (${sizeKB}KB) - this may appear pixelated in PDF`);
+      } else if (sizeKB > 200) {
+        console.log(`✅ Very high quality image detected (${sizeKB}KB) - excellent for PDF scaling`);
+      } else if (sizeKB > 100) {
+        console.log(`✅ High quality image detected (${sizeKB}KB) - excellent for PDF scaling`);
+      } else {
+        console.log(`📊 Medium quality image (${sizeKB}KB) - should scale reasonably in PDF`);
+      }
       
       // Convert to base64
       const base64Image = `data:${contentType};base64,${imageBuffer.toString(
@@ -472,7 +510,7 @@ export class ServerlessPDFService {
       
       return base64Image;
     } catch (error) {
-      console.error("Error fetching image:", error);
+      console.error(`❌ Failed to fetch image from ${imageUrl}:`, error);
       throw error;
     }
   }

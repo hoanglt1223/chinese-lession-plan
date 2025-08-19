@@ -678,21 +678,21 @@ IMPORTANT GUIDELINES FOR IMAGE QUERIES:
     );
 
     let unsplashResults: any = {};
-    let freepikResults: any = {};
+    let svgIconResults: any = {};
     
     if (photoSource !== 'ai') {
-      // Import Unsplash and Freepik services only when needed
+      // Import Unsplash and high-quality SVG icon services only when needed
       const { batchGetFlashcardImages } = await import('./unsplash-service.js');
-      const { batchGetFlashcardIcons } = await import('./freepik-service.js');
+      const { batchGetFlashcardSVGIcons } = await import('./svg-icon-service.js');
       
       // Extract image queries for search
       const imageQueries = flashcards.map((card: FlashcardData) => card.imageQuery || card.word);
       
-      // Get images from both Unsplash and Freepik in parallel
-      console.log('🔍 Fetching Unsplash images and Freepik icons...');
-      [unsplashResults, freepikResults] = await Promise.all([
+      // Get images from Unsplash and high-quality SVG icons in parallel
+      console.log('🔍 Fetching Unsplash images and high-quality SVG icons...');
+      [unsplashResults, svgIconResults] = await Promise.all([
         batchGetFlashcardImages(imageQueries),
-        batchGetFlashcardIcons(imageQueries)
+        batchGetFlashcardSVGIcons(imageQueries)
       ]);
     }
     
@@ -756,13 +756,13 @@ IMPORTANT GUIDELINES FOR IMAGE QUERIES:
               console.log(`Skipping AI image generation for ${flashcard.word} (photoSource: ${photoSource})`);
             }
 
-            // Get Unsplash images and Freepik icons for this flashcard (only if using API source)
+            // Get Unsplash images and high-quality SVG icons for this flashcard (only if using API source)
             const unsplashImages = photoSource !== 'ai' ? unsplashResults[flashcard.imageQuery || flashcard.word] : null;
-            const freepikIcons = photoSource !== 'ai' ? (freepikResults[flashcard.imageQuery || flashcard.word] || []) : [];
+            const svgIcons = photoSource !== 'ai' ? (svgIconResults[flashcard.imageQuery || flashcard.word] || []) : [];
             
-            // Combine all image options (only if using API source) - icons first
+            // Combine all image options (only if using API source) - high-quality SVG icons first
             const allImages = photoSource !== 'ai' ? [
-              ...freepikIcons,
+              ...svgIcons,
               ...(unsplashImages?.illustrations || []),
               ...(unsplashImages?.photos || [])
             ] : [];
@@ -772,19 +772,23 @@ IMPORTANT GUIDELINES FOR IMAGE QUERIES:
             let autoSelected = null;
             
             if (photoSource !== 'ai') {
-              // Prefer icons first, then unsplash images (illustrations > photos)
-              if (freepikIcons.length > 0) {
-                autoSelected = freepikIcons[0];
+              // Prefer high-quality SVG icons first, then unsplash images (illustrations > photos)
+              if (svgIcons.length > 0) {
+                autoSelected = svgIcons[0]; // SVG icons are always high quality
+                selectedImageUrl = autoSelected.url;
+                console.log(`✅ Selected high-quality SVG icon for "${flashcard.word}": ${autoSelected.source} - ${autoSelected.description}`);
               } else if (unsplashImages?.autoSelected) {
                 autoSelected = unsplashImages.autoSelected;
+                selectedImageUrl = autoSelected.url;
+              } else {
+                selectedImageUrl = aiImageUrl;
               }
-              selectedImageUrl = autoSelected?.url || aiImageUrl;
             }
             
             const combinedImageOptions = {
               photos: photoSource !== 'ai' ? (unsplashImages?.photos || []) : [],
               illustrations: photoSource !== 'ai' ? (unsplashImages?.illustrations || []) : [],
-              icons: photoSource !== 'ai' ? freepikIcons : [],
+              icons: photoSource !== 'ai' ? svgIcons : [],
               autoSelected,
               all: allImages,
             };
@@ -844,7 +848,7 @@ IMPORTANT GUIDELINES FOR IMAGE QUERIES:
             const combinedImageOptions = {
               photos: photoSource !== 'ai' ? (unsplashImages?.photos || []) : [],
               illustrations: photoSource !== 'ai' ? (unsplashImages?.illustrations || []) : [],
-              icons: photoSource !== 'ai' ? freepikIcons : [],
+              icons: photoSource !== 'ai' ? svgIcons : [],
               autoSelected,
               all: allImages,
             };

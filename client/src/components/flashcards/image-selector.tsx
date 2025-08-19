@@ -234,7 +234,7 @@ export function ImageSelector({
         <div className="text-center p-6">
           <p className="text-sm text-muted-foreground">
             No {activeTab === 'all' ? 'images' : activeTab} available for "{word}"
-            {activeTab === 'icons' && ' (Freepik API required)'}
+            {activeTab === 'icons' && ' (High-quality SVG icons from Heroicons & Lucide)'}
           </p>
         </div>
       )}
