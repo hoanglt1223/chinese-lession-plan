@@ -668,8 +668,8 @@ export class ServerlessPDFService {
       if (pinyinTextImage && pinyinTextImage.length > 50) {
         try {
           // Position Pinyin below Chinese characters  
-          // Height = 1/4 of Chinese (72/4=18), Width = 80% of page for full display
-          const pinyinImageHeight = 72 / 4;  // 18px - exactly 1/4 of Chinese height
+          // Height = 1/2 of Chinese (72/2=36) for better visibility, Width = 80% of page for full display
+          const pinyinImageHeight = 72 / 2;  // 36px - larger for visibility
           const pinyinImageWidth = pageWidth * 0.8;  // 80% of page width for full display
           const pinyinX = (pageWidth - pinyinImageWidth) / 2;
           const pinyinY = (pageHeight - pinyinImageHeight) / 2 + 40;
