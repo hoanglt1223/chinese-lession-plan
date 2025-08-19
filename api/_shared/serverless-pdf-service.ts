@@ -611,7 +611,7 @@ export class ServerlessPDFService {
       `🚀 Generating flashcard back for: "${card.word}" with pinyin: "${card.pinyin}"`
     );
         console.log(
-      `🔥 NEW VERSION: Using centered text-to-image layout with transparent background`
+      `🔥 NEW VERSION: Using centered ultimate-text-to-image layout with transparent background, no border`
     );
 
     try {
@@ -627,11 +627,11 @@ export class ServerlessPDFService {
         chineseTextImage,
         pinyinTextImage
       ] = await Promise.all([
-        // CHINESE TEXT - text-to-image with reduced font size for API stability
-        callChineseTextAPI(card.word || "朋友", "text-to-image", 120, "bold", "AaBiMoHengZiZhenBaoKaiShu"),
+        // CHINESE TEXT - ultimate-text-to-image for better quality, no border
+        callChineseTextAPI(card.word || "朋友", "ultimate-text-to-image", 120, "bold", "AaBiMoHengZiZhenBaoKaiShu"),
         
-        // PINYIN TEXT - text-to-image with smaller font for pronunciation
-        callChineseTextAPI(card.pinyin || "péngyǒu", "text-to-image", 30, "300", "Montserrat")
+        // PINYIN TEXT - ultimate-text-to-image for better quality, no border
+        callChineseTextAPI(card.pinyin || "péngyǒu", "ultimate-text-to-image", 30, "300", "Montserrat")
       ]);
 
       const apiCallsEndTime = Date.now();
