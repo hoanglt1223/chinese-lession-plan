@@ -67,7 +67,7 @@ async function callChineseTextAPI(
           padding: 0,
           lineHeight: 1.5,
           textAlign: "center",
-          quality: 90,
+          quality: 100,
         }),
       }
     );
@@ -307,11 +307,11 @@ export class ServerlessPDFService {
       // Use jsPDF for efficient PDF generation with template background
       const { jsPDF } = await import("jspdf");
       
-      // Create new PDF document (A4 landscape: 297 x 210 mm)
+      // Create new PDF document (Custom size in pixels for easier calculations)
       const pdf = new jsPDF({
-        orientation: "landscape",
-        unit: "mm",
-        format: "a4",
+        orientation: "landscape", 
+        unit: "px",
+        format: [800, 600], // 800px width x 600px height
       });
 
       // Set Chinese language support
@@ -486,8 +486,8 @@ export class ServerlessPDFService {
     cardNumber: number,
     templateImage: string
   ): Promise<void> {
-    const pageWidth = 297; // A4 landscape width in mm
-    const pageHeight = 210; // A4 landscape height in mm
+    const pageWidth = 800; // Custom PDF width in pixels
+    const pageHeight = 600; // Custom PDF height in pixels
     
     // Add template as background image (landscape orientation)
     pdf.addImage(templateImage, "JPEG", 0, 0, pageWidth, pageHeight);
@@ -601,8 +601,8 @@ export class ServerlessPDFService {
     cardNumber: number,
     templateImage: string
   ): Promise<void> {
-    const pageWidth = 297; // A4 landscape width in mm
-    const pageHeight = 210; // A4 landscape height in mm
+    const pageWidth = 800; // Custom PDF width in pixels
+    const pageHeight = 600; // Custom PDF height in pixels
     
     // Add template as background image (landscape orientation)
     pdf.addImage(templateImage, "JPEG", 0, 0, pageWidth, pageHeight);
