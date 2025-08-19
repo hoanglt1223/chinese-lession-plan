@@ -681,10 +681,24 @@ export class ServerlessPDFService {
       // Center the Chinese characters like in the example
       if (chineseTextImage && chineseTextImage.length > 50) {
         try {
-          // Position Chinese characters in the center of the page
-          // API generates 600x144 for fontSize 120, reasonable scaling
-          const chineseImageWidth = 400;  // Reasonable size for display
-          const chineseImageHeight = 96;   // Reasonable size for display
+          // Get actual image properties from the API response
+          const chineseImageProps = pdf.getImageProperties(chineseTextImage);
+          console.log(`📏 Chinese image actual size: ${chineseImageProps.width}x${chineseImageProps.height}`);
+          
+          // Scale the image to fit nicely in the PDF while maintaining aspect ratio
+          const maxWidth = pageWidth * 0.6; // Max 60% of page width
+          const maxHeight = pageHeight * 0.3; // Max 30% of page height
+          
+          // Calculate scaling factor to fit within max dimensions
+          const scaleX = maxWidth / chineseImageProps.width;
+          const scaleY = maxHeight / chineseImageProps.height;
+          const scale = Math.min(scaleX, scaleY);
+          
+          const chineseImageWidth = chineseImageProps.width * scale;
+          const chineseImageHeight = chineseImageProps.height * scale;
+          
+          console.log(`📐 Chinese scaled size: ${Math.round(chineseImageWidth)}x${Math.round(chineseImageHeight)} (scale: ${scale.toFixed(2)})`);
+          
           const chineseX = (pageWidth - chineseImageWidth) / 2;
           const chineseY = (pageHeight - chineseImageHeight) / 2 - 50;
 
@@ -696,7 +710,7 @@ export class ServerlessPDFService {
             chineseImageWidth,
             chineseImageHeight
           );
-          console.log(`✅ Added centered Chinese characters to PDF`);
+          console.log(`✅ Added centered Chinese characters to PDF using actual dimensions`);
         } catch (error) {
           console.error(`❌ Failed to add Chinese characters:`, error);
         }
@@ -705,10 +719,24 @@ export class ServerlessPDFService {
       // Add Pinyin below the Chinese characters
       if (pinyinTextImage && pinyinTextImage.length > 50) {
         try {
-          // Position Pinyin below Chinese characters  
-          // Height = 1/2 of Chinese (96/2=48) for better visibility, Width = 80% of page for full display
-          const pinyinImageHeight = 96 / 2;  // 48px - reasonable size
-          const pinyinImageWidth = pageWidth * 0.8;  // 80% of page width for full display
+          // Get actual image properties from the API response
+          const pinyinImageProps = pdf.getImageProperties(pinyinTextImage);
+          console.log(`📏 Pinyin image actual size: ${pinyinImageProps.width}x${pinyinImageProps.height}`);
+          
+          // Scale the image to fit nicely in the PDF while maintaining aspect ratio
+          const maxWidth = pageWidth * 0.8; // Max 80% of page width for full display
+          const maxHeight = pageHeight * 0.15; // Max 15% of page height (smaller than Chinese)
+          
+          // Calculate scaling factor to fit within max dimensions
+          const scaleX = maxWidth / pinyinImageProps.width;
+          const scaleY = maxHeight / pinyinImageProps.height;
+          const scale = Math.min(scaleX, scaleY);
+          
+          const pinyinImageWidth = pinyinImageProps.width * scale;
+          const pinyinImageHeight = pinyinImageProps.height * scale;
+          
+          console.log(`📐 Pinyin scaled size: ${Math.round(pinyinImageWidth)}x${Math.round(pinyinImageHeight)} (scale: ${scale.toFixed(2)})`);
+          
           const pinyinX = (pageWidth - pinyinImageWidth) / 2;
           const pinyinY = (pageHeight - pinyinImageHeight) / 2 + 80;
 
@@ -720,7 +748,7 @@ export class ServerlessPDFService {
             pinyinImageWidth,
             pinyinImageHeight
           );
-          console.log(`✅ Added centered Pinyin to PDF`);
+          console.log(`✅ Added centered Pinyin to PDF using actual dimensions`);
         } catch (error) {
           console.error(`❌ Failed to add Pinyin:`, error);
         }
