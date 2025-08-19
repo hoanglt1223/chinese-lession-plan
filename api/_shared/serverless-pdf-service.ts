@@ -681,28 +681,42 @@ export class ServerlessPDFService {
       // Center the Chinese characters like in the example
       if (chineseTextImage && chineseTextImage.length > 50) {
         try {
-          // Get actual image properties from the API response
+          // DYNAMIC ASPECT RATIO PRESERVATION using getImageProperties
           const chineseImageProps = pdf.getImageProperties(chineseTextImage);
-          const originalAspectRatio = chineseImageProps.width / chineseImageProps.height;
-          console.log(`📏 Chinese image actual size: ${chineseImageProps.width}x${chineseImageProps.height} (aspect ratio: ${originalAspectRatio.toFixed(2)}:1)`);
           
-          // Scale the image to fit nicely in the PDF while PRESERVING EXACT ASPECT RATIO
+          // Validate image properties
+          if (!chineseImageProps.width || !chineseImageProps.height || chineseImageProps.width <= 0 || chineseImageProps.height <= 0) {
+            throw new Error(`Invalid Chinese image properties: ${chineseImageProps.width}x${chineseImageProps.height}`);
+          }
+          
+          const originalAspectRatio = chineseImageProps.width / chineseImageProps.height;
+          console.log(`📏 Chinese DYNAMIC sizing - actual API response: ${chineseImageProps.width}x${chineseImageProps.height} (aspect ratio: ${originalAspectRatio.toFixed(3)}:1)`);
+          
+          // EXACT ASPECT RATIO PRESERVATION - Scale to fit within bounds while maintaining proportions
           const maxWidth = pageWidth * 0.6; // Max 60% of page width
           const maxHeight = pageHeight * 0.3; // Max 30% of page height
           
-          // Calculate scaling factor - use minimum to ensure image fits within bounds while preserving aspect ratio
+          // Calculate scaling factors for both dimensions
           const scaleX = maxWidth / chineseImageProps.width;
           const scaleY = maxHeight / chineseImageProps.height;
-          const scale = Math.min(scaleX, scaleY); // This preserves aspect ratio!
+          const scale = Math.min(scaleX, scaleY); // CRITICAL: Use minimum to preserve aspect ratio!
           
-          // Apply uniform scaling to both dimensions to maintain aspect ratio
+          // Apply UNIFORM scaling to both dimensions (ensures no distortion)
           const chineseImageWidth = chineseImageProps.width * scale;
           const chineseImageHeight = chineseImageProps.height * scale;
           
-          // Verify aspect ratio is preserved
+          // MATHEMATICAL VERIFICATION of aspect ratio preservation
           const scaledAspectRatio = chineseImageWidth / chineseImageHeight;
-          console.log(`📐 Chinese scaled size: ${Math.round(chineseImageWidth)}x${Math.round(chineseImageHeight)} (scale: ${scale.toFixed(2)}, aspect ratio: ${scaledAspectRatio.toFixed(2)}:1)`);
-          console.log(`✅ Aspect ratio preserved: ${Math.abs(originalAspectRatio - scaledAspectRatio) < 0.01 ? 'YES' : 'NO'}`);
+          const aspectRatioDiff = Math.abs(originalAspectRatio - scaledAspectRatio);
+          const aspectRatioPreserved = aspectRatioDiff < 0.001; // Very strict tolerance
+          
+          console.log(`📐 Chinese SCALED dimensions: ${Math.round(chineseImageWidth)}x${Math.round(chineseImageHeight)} (scale: ${scale.toFixed(3)})`);
+          console.log(`🎯 Aspect ratio verification: Original=${originalAspectRatio.toFixed(3)}, Scaled=${scaledAspectRatio.toFixed(3)}, Diff=${aspectRatioDiff.toFixed(6)}`);
+          console.log(`✅ EXACT aspect ratio preserved: ${aspectRatioPreserved ? 'YES ✓' : 'NO ❌'}`);
+          
+          if (!aspectRatioPreserved) {
+            console.warn(`⚠️ Aspect ratio preservation failed! This should not happen with uniform scaling.`);
+          }
           
           const chineseX = (pageWidth - chineseImageWidth) / 2;
           const chineseY = (pageHeight - chineseImageHeight) / 2 - 50;
@@ -724,28 +738,42 @@ export class ServerlessPDFService {
       // Add Pinyin below the Chinese characters
       if (pinyinTextImage && pinyinTextImage.length > 50) {
         try {
-          // Get actual image properties from the API response
+          // DYNAMIC ASPECT RATIO PRESERVATION using getImageProperties
           const pinyinImageProps = pdf.getImageProperties(pinyinTextImage);
-          const originalAspectRatio = pinyinImageProps.width / pinyinImageProps.height;
-          console.log(`📏 Pinyin image actual size: ${pinyinImageProps.width}x${pinyinImageProps.height} (aspect ratio: ${originalAspectRatio.toFixed(2)}:1)`);
           
-          // Scale the image to fit nicely in the PDF while PRESERVING EXACT ASPECT RATIO
+          // Validate image properties
+          if (!pinyinImageProps.width || !pinyinImageProps.height || pinyinImageProps.width <= 0 || pinyinImageProps.height <= 0) {
+            throw new Error(`Invalid Pinyin image properties: ${pinyinImageProps.width}x${pinyinImageProps.height}`);
+          }
+          
+          const originalAspectRatio = pinyinImageProps.width / pinyinImageProps.height;
+          console.log(`📏 Pinyin DYNAMIC sizing - actual API response: ${pinyinImageProps.width}x${pinyinImageProps.height} (aspect ratio: ${originalAspectRatio.toFixed(3)}:1)`);
+          
+          // EXACT ASPECT RATIO PRESERVATION - Scale to fit within bounds while maintaining proportions
           const maxWidth = pageWidth * 0.8; // Max 80% of page width for full display
           const maxHeight = pageHeight * 0.15; // Max 15% of page height (smaller than Chinese)
           
-          // Calculate scaling factor - use minimum to ensure image fits within bounds while preserving aspect ratio
+          // Calculate scaling factors for both dimensions
           const scaleX = maxWidth / pinyinImageProps.width;
           const scaleY = maxHeight / pinyinImageProps.height;
-          const scale = Math.min(scaleX, scaleY); // This preserves aspect ratio!
+          const scale = Math.min(scaleX, scaleY); // CRITICAL: Use minimum to preserve aspect ratio!
           
-          // Apply uniform scaling to both dimensions to maintain aspect ratio
+          // Apply UNIFORM scaling to both dimensions (ensures no distortion)
           const pinyinImageWidth = pinyinImageProps.width * scale;
           const pinyinImageHeight = pinyinImageProps.height * scale;
           
-          // Verify aspect ratio is preserved
+          // MATHEMATICAL VERIFICATION of aspect ratio preservation
           const scaledAspectRatio = pinyinImageWidth / pinyinImageHeight;
-          console.log(`📐 Pinyin scaled size: ${Math.round(pinyinImageWidth)}x${Math.round(pinyinImageHeight)} (scale: ${scale.toFixed(2)}, aspect ratio: ${scaledAspectRatio.toFixed(2)}:1)`);
-          console.log(`✅ Aspect ratio preserved: ${Math.abs(originalAspectRatio - scaledAspectRatio) < 0.01 ? 'YES' : 'NO'}`);
+          const aspectRatioDiff = Math.abs(originalAspectRatio - scaledAspectRatio);
+          const aspectRatioPreserved = aspectRatioDiff < 0.001; // Very strict tolerance
+          
+          console.log(`📐 Pinyin SCALED dimensions: ${Math.round(pinyinImageWidth)}x${Math.round(pinyinImageHeight)} (scale: ${scale.toFixed(3)})`);
+          console.log(`🎯 Aspect ratio verification: Original=${originalAspectRatio.toFixed(3)}, Scaled=${scaledAspectRatio.toFixed(3)}, Diff=${aspectRatioDiff.toFixed(6)}`);
+          console.log(`✅ EXACT aspect ratio preserved: ${aspectRatioPreserved ? 'YES ✓' : 'NO ❌'}`);
+          
+          if (!aspectRatioPreserved) {
+            console.warn(`⚠️ Aspect ratio preservation failed! This should not happen with uniform scaling.`);
+          }
           
           const pinyinX = (pageWidth - pinyinImageWidth) / 2;
           const pinyinY = (pageHeight - pinyinImageHeight) / 2 + 80;
