@@ -490,19 +490,6 @@ export class ServerlessPDFService {
         return base64Image;
       }
       
-      // Log quality indicators for raster images
-      if (sizeKB < 5) {
-        console.warn(`⚠️  Very low quality image detected (${sizeKB}KB) - this will appear pixelated in PDF`);
-      } else if (sizeKB < 20) {
-        console.warn(`⚠️  Low quality image detected (${sizeKB}KB) - this may appear pixelated in PDF`);
-      } else if (sizeKB > 200) {
-        console.log(`✅ Very high quality image detected (${sizeKB}KB) - excellent for PDF scaling`);
-      } else if (sizeKB > 100) {
-        console.log(`✅ High quality image detected (${sizeKB}KB) - excellent for PDF scaling`);
-      } else {
-        console.log(`📊 Medium quality image (${sizeKB}KB) - should scale reasonably in PDF`);
-      }
-      
       // Convert to base64
       const base64Image = `data:${contentType};base64,${imageBuffer.toString(
         "base64"
@@ -678,13 +665,14 @@ export class ServerlessPDFService {
       // Debug: Check which calls succeeded/failed
       console.log(`🔍 API Results - Chinese: ${chineseTextImage?.length || 'FAILED'}, Pinyin: ${pinyinTextImage?.length || 'FAILED'}`);
 
-      // Center the Chinese characters like in the example
+      // CALCULATE ALL IMAGE DIMENSIONS FIRST TO PREVENT OVERLAP
+      let chineseImageWidth = 0, chineseImageHeight = 0;
+      let pinyinImageWidth = 0, pinyinImageHeight = 0;
+      
+      // Calculate Chinese dimensions
       if (chineseTextImage && chineseTextImage.length > 50) {
         try {
-          // DYNAMIC ASPECT RATIO PRESERVATION using getImageProperties
           const chineseImageProps = pdf.getImageProperties(chineseTextImage);
-          
-          // Validate image properties
           if (!chineseImageProps.width || !chineseImageProps.height || chineseImageProps.width <= 0 || chineseImageProps.height <= 0) {
             throw new Error(`Invalid Chinese image properties: ${chineseImageProps.width}x${chineseImageProps.height}`);
           }
@@ -692,34 +680,66 @@ export class ServerlessPDFService {
           const originalAspectRatio = chineseImageProps.width / chineseImageProps.height;
           console.log(`📏 Chinese DYNAMIC sizing - actual API response: ${chineseImageProps.width}x${chineseImageProps.height} (aspect ratio: ${originalAspectRatio.toFixed(3)}:1)`);
           
-          // EXACT ASPECT RATIO PRESERVATION - Scale to fit within bounds while maintaining proportions
           const maxWidth = pageWidth * 0.8; // Max 80% of page width for larger text
           const maxHeight = pageHeight * 0.4; // Max 40% of page height for larger text
           
-          // Calculate scaling factors for both dimensions
           const scaleX = maxWidth / chineseImageProps.width;
           const scaleY = maxHeight / chineseImageProps.height;
-          const scale = Math.min(scaleX, scaleY); // CRITICAL: Use minimum to preserve aspect ratio!
+          const scale = Math.min(scaleX, scaleY);
           
-          // Apply UNIFORM scaling to both dimensions (ensures no distortion)
-          const chineseImageWidth = chineseImageProps.width * scale;
-          const chineseImageHeight = chineseImageProps.height * scale;
-          
-          // MATHEMATICAL VERIFICATION of aspect ratio preservation
-          const scaledAspectRatio = chineseImageWidth / chineseImageHeight;
-          const aspectRatioDiff = Math.abs(originalAspectRatio - scaledAspectRatio);
-          const aspectRatioPreserved = aspectRatioDiff < 0.001; // Very strict tolerance
+          chineseImageWidth = chineseImageProps.width * scale;
+          chineseImageHeight = chineseImageProps.height * scale;
           
           console.log(`📐 Chinese SCALED dimensions: ${Math.round(chineseImageWidth)}x${Math.round(chineseImageHeight)} (scale: ${scale.toFixed(3)})`);
-          console.log(`🎯 Aspect ratio verification: Original=${originalAspectRatio.toFixed(3)}, Scaled=${scaledAspectRatio.toFixed(3)}, Diff=${aspectRatioDiff.toFixed(6)}`);
-          console.log(`✅ EXACT aspect ratio preserved: ${aspectRatioPreserved ? 'YES ✓' : 'NO ❌'}`);
-          
-          if (!aspectRatioPreserved) {
-            console.warn(`⚠️ Aspect ratio preservation failed! This should not happen with uniform scaling.`);
+        } catch (error) {
+          console.error(`❌ Failed to calculate Chinese dimensions:`, error);
+        }
+      }
+      
+      // Calculate Pinyin dimensions
+      if (pinyinTextImage && pinyinTextImage.length > 50) {
+        try {
+          const pinyinImageProps = pdf.getImageProperties(pinyinTextImage);
+          if (!pinyinImageProps.width || !pinyinImageProps.height || pinyinImageProps.width <= 0 || pinyinImageProps.height <= 0) {
+            throw new Error(`Invalid Pinyin image properties: ${pinyinImageProps.width}x${pinyinImageProps.height}`);
           }
           
+          const originalAspectRatio = pinyinImageProps.width / pinyinImageProps.height;
+          console.log(`📏 Pinyin DYNAMIC sizing - actual API response: ${pinyinImageProps.width}x${pinyinImageProps.height} (aspect ratio: ${originalAspectRatio.toFixed(3)}:1)`);
+          
+          const maxWidth = pageWidth * 0.9; // Max 90% of page width for full display
+          const maxHeight = pageHeight * 0.25; // Max 25% of page height for larger pinyin
+          
+          const scaleX = maxWidth / pinyinImageProps.width;
+          const scaleY = maxHeight / pinyinImageProps.height;
+          const scale = Math.min(scaleX, scaleY);
+          
+          pinyinImageWidth = pinyinImageProps.width * scale;
+          pinyinImageHeight = pinyinImageProps.height * scale;
+          
+          console.log(`📐 Pinyin SCALED dimensions: ${Math.round(pinyinImageWidth)}x${Math.round(pinyinImageHeight)} (scale: ${scale.toFixed(3)})`);
+        } catch (error) {
+          console.error(`❌ Failed to calculate Pinyin dimensions:`, error);
+        }
+      }
+      
+      // NOW CALCULATE DYNAMIC POSITIONING TO PREVENT OVERLAP
+      const gap = 20; // 20px gap between Chinese and Pinyin
+      const totalContentHeight = chineseImageHeight + pinyinImageHeight + gap;
+      const startY = (pageHeight - totalContentHeight) / 2; // Center the combined content
+      
+      console.log(`🎯 ANTI-OVERLAP POSITIONING:
+      - Chinese height: ${Math.round(chineseImageHeight)}px
+      - Pinyin height: ${Math.round(pinyinImageHeight)}px  
+      - Gap: ${gap}px
+      - Total content: ${Math.round(totalContentHeight)}px
+      - Start Y: ${Math.round(startY)}px`);
+      
+      // Add Chinese characters with calculated position
+      if (chineseTextImage && chineseTextImage.length > 50 && chineseImageWidth > 0) {
+        try {
           const chineseX = (pageWidth - chineseImageWidth) / 2;
-          const chineseY = (pageHeight - chineseImageHeight) / 2 - 30; // Closer to center
+          const chineseY = startY;
 
           pdf.addImage(
             chineseTextImage,
@@ -729,54 +749,17 @@ export class ServerlessPDFService {
             chineseImageWidth,
             chineseImageHeight
           );
-          console.log(`✅ Added centered Chinese characters to PDF using actual dimensions`);
+          console.log(`✅ Added Chinese at (${Math.round(chineseX)}, ${Math.round(chineseY)}) size ${Math.round(chineseImageWidth)}x${Math.round(chineseImageHeight)}`);
         } catch (error) {
           console.error(`❌ Failed to add Chinese characters:`, error);
         }
       }
 
-      // Add Pinyin below the Chinese characters
-      if (pinyinTextImage && pinyinTextImage.length > 50) {
+      // Add Pinyin below Chinese with calculated position (NO OVERLAP!)
+      if (pinyinTextImage && pinyinTextImage.length > 50 && pinyinImageWidth > 0) {
         try {
-          // DYNAMIC ASPECT RATIO PRESERVATION using getImageProperties
-          const pinyinImageProps = pdf.getImageProperties(pinyinTextImage);
-          
-          // Validate image properties
-          if (!pinyinImageProps.width || !pinyinImageProps.height || pinyinImageProps.width <= 0 || pinyinImageProps.height <= 0) {
-            throw new Error(`Invalid Pinyin image properties: ${pinyinImageProps.width}x${pinyinImageProps.height}`);
-          }
-          
-          const originalAspectRatio = pinyinImageProps.width / pinyinImageProps.height;
-          console.log(`📏 Pinyin DYNAMIC sizing - actual API response: ${pinyinImageProps.width}x${pinyinImageProps.height} (aspect ratio: ${originalAspectRatio.toFixed(3)}:1)`);
-          
-          // EXACT ASPECT RATIO PRESERVATION - Scale to fit within bounds while maintaining proportions
-          const maxWidth = pageWidth * 0.9; // Max 90% of page width for full display
-          const maxHeight = pageHeight * 0.25; // Max 25% of page height for larger pinyin
-          
-          // Calculate scaling factors for both dimensions
-          const scaleX = maxWidth / pinyinImageProps.width;
-          const scaleY = maxHeight / pinyinImageProps.height;
-          const scale = Math.min(scaleX, scaleY); // CRITICAL: Use minimum to preserve aspect ratio!
-          
-          // Apply UNIFORM scaling to both dimensions (ensures no distortion)
-          const pinyinImageWidth = pinyinImageProps.width * scale;
-          const pinyinImageHeight = pinyinImageProps.height * scale;
-          
-          // MATHEMATICAL VERIFICATION of aspect ratio preservation
-          const scaledAspectRatio = pinyinImageWidth / pinyinImageHeight;
-          const aspectRatioDiff = Math.abs(originalAspectRatio - scaledAspectRatio);
-          const aspectRatioPreserved = aspectRatioDiff < 0.001; // Very strict tolerance
-          
-          console.log(`📐 Pinyin SCALED dimensions: ${Math.round(pinyinImageWidth)}x${Math.round(pinyinImageHeight)} (scale: ${scale.toFixed(3)})`);
-          console.log(`🎯 Aspect ratio verification: Original=${originalAspectRatio.toFixed(3)}, Scaled=${scaledAspectRatio.toFixed(3)}, Diff=${aspectRatioDiff.toFixed(6)}`);
-          console.log(`✅ EXACT aspect ratio preserved: ${aspectRatioPreserved ? 'YES ✓' : 'NO ❌'}`);
-          
-          if (!aspectRatioPreserved) {
-            console.warn(`⚠️ Aspect ratio preservation failed! This should not happen with uniform scaling.`);
-          }
-          
           const pinyinX = (pageWidth - pinyinImageWidth) / 2;
-          const pinyinY = (pageHeight - pinyinImageHeight) / 2 + 50; // Closer to Chinese text
+          const pinyinY = startY + chineseImageHeight + gap; // Position directly below Chinese + gap
 
           pdf.addImage(
             pinyinTextImage,
@@ -786,7 +769,7 @@ export class ServerlessPDFService {
             pinyinImageWidth,
             pinyinImageHeight
           );
-          console.log(`✅ Added centered Pinyin to PDF using actual dimensions`);
+          console.log(`✅ Added Pinyin at (${Math.round(pinyinX)}, ${Math.round(pinyinY)}) size ${Math.round(pinyinImageWidth)}x${Math.round(pinyinImageHeight)}`);
         } catch (error) {
           console.error(`❌ Failed to add Pinyin:`, error);
         }
