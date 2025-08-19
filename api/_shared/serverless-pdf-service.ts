@@ -62,7 +62,7 @@ async function callChineseTextAPI(
           fontWeight,
           width: fontSize * 5,
           height: fontSize * 1.2,
-          backgroundColor: "transparent",
+          backgroundColor: "#ffffff",
           textColor: "#000000",
           padding: 0,
           lineHeight: 1.5,
@@ -307,11 +307,11 @@ export class ServerlessPDFService {
       // Use jsPDF for efficient PDF generation with template background
       const { jsPDF } = await import("jspdf");
       
-      // Create new PDF document (Custom size in pixels for easier calculations)
+      // Create new PDF document (A4 at 300 DPI for print quality)
       const pdf = new jsPDF({
         orientation: "landscape", 
         unit: "px",
-        format: [800, 600], // 800px width x 600px height
+        format: [3508, 2480], // A4 landscape: 3508px width x 2480px height at 300 DPI
       });
 
       // Set Chinese language support
@@ -486,8 +486,8 @@ export class ServerlessPDFService {
     cardNumber: number,
     templateImage: string
   ): Promise<void> {
-    const pageWidth = 800; // Custom PDF width in pixels
-    const pageHeight = 600; // Custom PDF height in pixels
+    const pageWidth = 3508; // A4 landscape width at 300 DPI
+    const pageHeight = 2480; // A4 landscape height at 300 DPI
     
     // Add template as background image (landscape orientation)
     pdf.addImage(templateImage, "JPEG", 0, 0, pageWidth, pageHeight);
@@ -601,8 +601,8 @@ export class ServerlessPDFService {
     cardNumber: number,
     templateImage: string
   ): Promise<void> {
-    const pageWidth = 800; // Custom PDF width in pixels
-    const pageHeight = 600; // Custom PDF height in pixels
+    const pageWidth = 3508; // A4 landscape width at 300 DPI
+    const pageHeight = 2480; // A4 landscape height at 300 DPI
     
     // Add template as background image (landscape orientation)
     pdf.addImage(templateImage, "JPEG", 0, 0, pageWidth, pageHeight);
@@ -644,9 +644,9 @@ export class ServerlessPDFService {
       if (chineseTextImage && chineseTextImage.length > 50) {
         try {
           // Position Chinese characters in the center of the page
-          // API generates 600x144 for fontSize 120, maintain 4.17:1 ratio
-          const chineseImageWidth = 300;  // Scaled down from 600px
-          const chineseImageHeight = 72;   // Scaled down from 144px (300:72 = 4.17:1)
+          // API generates 600x144 for fontSize 120, scale up for A4 300 DPI
+          const chineseImageWidth = 1200;  // Scaled up for high DPI (600px * 2)
+          const chineseImageHeight = 288;   // Scaled up for high DPI (144px * 2)
           const chineseX = (pageWidth - chineseImageWidth) / 2;
           const chineseY = (pageHeight - chineseImageHeight) / 2 - 15;
 
@@ -668,8 +668,8 @@ export class ServerlessPDFService {
       if (pinyinTextImage && pinyinTextImage.length > 50) {
         try {
           // Position Pinyin below Chinese characters  
-          // Height = 1/2 of Chinese (72/2=36) for better visibility, Width = 80% of page for full display
-          const pinyinImageHeight = 72 / 2;  // 36px - larger for visibility
+          // Height = 1/2 of Chinese (288/2=144) for better visibility, Width = 80% of page for full display
+          const pinyinImageHeight = 288 / 2;  // 144px - scaled up for high DPI
           const pinyinImageWidth = pageWidth * 0.8;  // 80% of page width for full display
           const pinyinX = (pageWidth - pinyinImageWidth) / 2;
           const pinyinY = (pageHeight - pinyinImageHeight) / 2 + 40;
