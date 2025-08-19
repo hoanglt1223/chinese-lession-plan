@@ -627,11 +627,11 @@ export class ServerlessPDFService {
         chineseTextImage,
         pinyinTextImage
       ] = await Promise.all([
-        // CHINESE TEXT - text-to-image with larger font for main display
-        callChineseTextAPI(card.word || "朋友", "text-to-image", 120, "900", "AaBiMoHengZiZhenBaoKaiShu"),
+        // CHINESE TEXT - text-to-image with larger font for main display  
+        callChineseTextAPI(card.word || "朋友", "text-to-image", 200, "900", "AaBiMoHengZiZhenBaoKaiShu"),
         
         // PINYIN TEXT - text-to-image with smaller font for pronunciation
-        callChineseTextAPI(card.pinyin || "péngyǒu", "text-to-image", 24, "400", "Montserrat")
+        callChineseTextAPI(card.pinyin || "péngyǒu", "text-to-image", 50, "400", "Montserrat")
       ]);
 
       const apiCallsEndTime = Date.now();
@@ -644,10 +644,10 @@ export class ServerlessPDFService {
       if (chineseTextImage && chineseTextImage.length > 50) {
         try {
           // Position Chinese characters in the center of the page
-          // API returns fontSize(120) * 5 = 600px width, fontSize(120) * 1.2 = 144px height
-          // Scale down to fit nicely on PDF: maintain aspect ratio (600:144 = 4.17:1)
-          const chineseImageWidth = 150;
-          const chineseImageHeight = 36;
+          // API returns fontSize(200) * 5 = 1000px width, fontSize(200) * 1.2 = 240px height
+          // Scale down to fit nicely on PDF: maintain aspect ratio (1000:240 = 4.17:1)
+          const chineseImageWidth = 200;
+          const chineseImageHeight = 48;
           const chineseX = (pageWidth - chineseImageWidth) / 2;
           const chineseY = (pageHeight - chineseImageHeight) / 2 - 15;
 
@@ -669,10 +669,10 @@ export class ServerlessPDFService {
       if (pinyinTextImage && pinyinTextImage.length > 50) {
         try {
           // Position Pinyin below Chinese characters
-          // API returns fontSize(24) * 5 = 120px width, fontSize(24) * 1.2 = 28.8px height
-          // Scale to match actual API dimensions: maintain aspect ratio (120:29 = 4.14:1)
-          const pinyinImageWidth = 60;
-          const pinyinImageHeight = 14.5;
+          // API returns fontSize(50) * 5 = 250px width, Math.max(50 * 1.2, 120) = 120px height
+          // Scale to match actual API dimensions: maintain aspect ratio (250:120 = 2.08:1)
+          const pinyinImageWidth = 100;
+          const pinyinImageHeight = 48;
           const pinyinX = (pageWidth - pinyinImageWidth) / 2;
           const pinyinY = (pageHeight - pinyinImageHeight) / 2 + 40;
 
