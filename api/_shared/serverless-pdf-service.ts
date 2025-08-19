@@ -61,7 +61,7 @@ async function callChineseTextAPI(
           fontFamily,
           fontWeight,
           width: fontSize * 5,
-          height: Math.max(fontSize * 1.2, 120),
+          height: fontSize * 1.2,
           backgroundColor: "transparent",
           textColor: "#000000",
           padding: 20,
@@ -645,8 +645,8 @@ export class ServerlessPDFService {
         try {
           // Position Chinese characters in the center of the page
           // Use exact API aspect ratio: 1000px:240px = 4.17:1 (no scaling distortion)
-          const chineseImageWidth = 250;  // Keep original API ratio
-          const chineseImageHeight = 60;   // 250:60 = 4.17:1 ratio
+          const chineseImageWidth = 400;  // Increased width for multi-character words
+          const chineseImageHeight = 96;   // 400:96 = 4.17:1 ratio
           const chineseX = (pageWidth - chineseImageWidth) / 2;
           const chineseY = (pageHeight - chineseImageHeight) / 2 - 15;
 
@@ -669,8 +669,8 @@ export class ServerlessPDFService {
         try {
           // Position Pinyin below Chinese characters  
           // Use exact API aspect ratio: 250px:120px = 2.08:1 (no scaling distortion)
-          const pinyinImageWidth = 125;   // Keep original API ratio
-          const pinyinImageHeight = 60;   // 125:60 = 2.08:1 ratio
+          const pinyinImageWidth = 200;   // Increased width for longer pinyin
+          const pinyinImageHeight = 96;   // 200:96 = 2.08:1 ratio
           const pinyinX = (pageWidth - pinyinImageWidth) / 2;
           const pinyinY = (pageHeight - pinyinImageHeight) / 2 + 40;
 
