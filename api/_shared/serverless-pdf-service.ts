@@ -644,10 +644,9 @@ export class ServerlessPDFService {
       if (chineseTextImage && chineseTextImage.length > 50) {
         try {
           // Position Chinese characters in the center of the page
-          // Visual size should reflect fontSize(200) - make Chinese much larger than Pinyin
-          // Chinese characters are wider than tall, so increase width
-          const chineseImageWidth = 400;
-          const chineseImageHeight = 200;
+          // Use exact API aspect ratio: 1000px:240px = 4.17:1 (no scaling distortion)
+          const chineseImageWidth = 250;  // Keep original API ratio
+          const chineseImageHeight = 60;   // 250:60 = 4.17:1 ratio
           const chineseX = (pageWidth - chineseImageWidth) / 2;
           const chineseY = (pageHeight - chineseImageHeight) / 2 - 15;
 
@@ -669,10 +668,9 @@ export class ServerlessPDFService {
       if (pinyinTextImage && pinyinTextImage.length > 50) {
         try {
           // Position Pinyin below Chinese characters  
-          // Visual size should reflect fontSize(50) - much smaller than Chinese
-          // Pinyin also needs wider space for multiple syllables
-          const pinyinImageWidth = 200;
-          const pinyinImageHeight = 50;
+          // Use exact API aspect ratio: 250px:120px = 2.08:1 (no scaling distortion)
+          const pinyinImageWidth = 125;   // Keep original API ratio
+          const pinyinImageHeight = 60;   // 125:60 = 2.08:1 ratio
           const pinyinX = (pageWidth - pinyinImageWidth) / 2;
           const pinyinY = (pageHeight - pinyinImageHeight) / 2 + 40;
 
