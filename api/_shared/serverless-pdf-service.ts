@@ -669,7 +669,7 @@ export class ServerlessPDFService {
         callChineseTextAPI(card.word || "朋友", "ultimate-text-to-image", 120, "bold", "AaBiMoHengZiZhenBaoKaiShu"),
         
         // PINYIN TEXT - ultimate-text-to-image for better quality, no border
-        callChineseTextAPI(card.pinyin || "péngyǒu", "ultimate-text-to-image", 30, "300", "Montserrat")
+        callChineseTextAPI(card.pinyin || "péngyǒu", "ultimate-text-to-image", 80, "300", "Montserrat")
       ]);
 
       const apiCallsEndTime = Date.now();
@@ -693,8 +693,8 @@ export class ServerlessPDFService {
           console.log(`📏 Chinese DYNAMIC sizing - actual API response: ${chineseImageProps.width}x${chineseImageProps.height} (aspect ratio: ${originalAspectRatio.toFixed(3)}:1)`);
           
           // EXACT ASPECT RATIO PRESERVATION - Scale to fit within bounds while maintaining proportions
-          const maxWidth = pageWidth * 0.6; // Max 60% of page width
-          const maxHeight = pageHeight * 0.3; // Max 30% of page height
+          const maxWidth = pageWidth * 0.8; // Max 80% of page width for larger text
+          const maxHeight = pageHeight * 0.4; // Max 40% of page height for larger text
           
           // Calculate scaling factors for both dimensions
           const scaleX = maxWidth / chineseImageProps.width;
@@ -750,8 +750,8 @@ export class ServerlessPDFService {
           console.log(`📏 Pinyin DYNAMIC sizing - actual API response: ${pinyinImageProps.width}x${pinyinImageProps.height} (aspect ratio: ${originalAspectRatio.toFixed(3)}:1)`);
           
           // EXACT ASPECT RATIO PRESERVATION - Scale to fit within bounds while maintaining proportions
-          const maxWidth = pageWidth * 0.8; // Max 80% of page width for full display
-          const maxHeight = pageHeight * 0.15; // Max 15% of page height (smaller than Chinese)
+          const maxWidth = pageWidth * 0.9; // Max 90% of page width for full display
+          const maxHeight = pageHeight * 0.25; // Max 25% of page height for larger pinyin
           
           // Calculate scaling factors for both dimensions
           const scaleX = maxWidth / pinyinImageProps.width;
