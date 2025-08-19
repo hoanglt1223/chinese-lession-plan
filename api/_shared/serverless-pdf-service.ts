@@ -60,8 +60,8 @@ async function callChineseTextAPI(
           fontSize,
           fontFamily,
           fontWeight,
-          width: fontSize * 5,
-          height: fontSize * 1.2,
+          width: 800,
+          height: 240,
           backgroundColor: "#ffffff",
           textColor: "#000000",
           padding: 0,
@@ -311,7 +311,7 @@ export class ServerlessPDFService {
       const pdf = new jsPDF({
         orientation: "landscape", 
         unit: "px",
-        format: [1200, 800], // Reasonable high resolution without breaking rendering
+        format: [1754, 1240], // Reasonable high resolution without breaking rendering
       });
 
       // Set Chinese language support
@@ -524,8 +524,8 @@ export class ServerlessPDFService {
     cardNumber: number,
     templateImage: string
   ): Promise<void> {
-    const pageWidth = 1200; // Reasonable high resolution width
-    const pageHeight = 800; // Reasonable high resolution height
+    const pageWidth = 1754; // Updated high resolution width
+    const pageHeight = 1240; // Updated high resolution height
     
     // Add template as background image (landscape orientation)
     pdf.addImage(templateImage, "JPEG", 0, 0, pageWidth, pageHeight);
@@ -639,8 +639,8 @@ export class ServerlessPDFService {
     cardNumber: number,
     templateImage: string
   ): Promise<void> {
-    const pageWidth = 1200; // Reasonable high resolution width
-    const pageHeight = 800; // Reasonable high resolution height
+    const pageWidth = 1754; // Updated high resolution width
+    const pageHeight = 1240; // Updated high resolution height
     
     // Add template as background image (landscape orientation)
     pdf.addImage(templateImage, "JPEG", 0, 0, pageWidth, pageHeight);
