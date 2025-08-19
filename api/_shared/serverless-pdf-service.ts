@@ -17,7 +17,7 @@ export interface FlashcardPDFOptions {
 // External API function for Chinese text conversion with smart defaults
 async function callChineseTextAPI(
   text: string,
-  method: "svg" | "text-to-image" | "png" = "png",
+  method: "svg" | "text-to-image" | "ultimate-text-to-image" | "png" = "ultimate-text-to-image",
   fontSize: number = 48,
   fontWeight:
     | "100"
@@ -48,7 +48,7 @@ async function callChineseTextAPI(
           fontSize,
           fontFamily,
           fontWeight,
-          width: fontSize * 1.2,
+          width: fontSize * 3,
           height: fontSize * 1.2,
           backgroundColor: "#ffffff",
           textColor: "#000000",
@@ -629,7 +629,7 @@ export class ServerlessPDFService {
          callChineseTextAPI(card.word || "朋友", "text-to-image", 200, "900", "AaBiMoHengZiZhenBaoKaiShu"),
          callChineseTextAPI(card.word || "朋友", "png", 200, "900", "AaBiMoHengZiZhenBaoKaiShu"),
          
-         // PINYIN TEXT - 3 methods (columns 4-6) - using Montserrat 50px
+         // PINYIN TEXT - 3 methods (columns 4-6) - try AaBiMoHengZiZhenBaoKaiShu instead of Montserrat
          callChineseTextAPI(card.pinyin || "péngyǒu", "svg", 50, "500", "Montserrat"),
          callChineseTextAPI(card.pinyin || "péngyǒu", "text-to-image", 50, "500", "Montserrat"),
          callChineseTextAPI(card.pinyin || "péngyǒu", "png", 50, "500", "Montserrat")
@@ -637,6 +637,10 @@ export class ServerlessPDFService {
 
        const apiCallsEndTime = Date.now();
        console.log(`⚡ Completed 6 parallel API calls in ${apiCallsEndTime - apiCallsStartTime}ms`);
+       
+       // Debug: Check which calls succeeded/failed
+       console.log(`🔍 API Results - Chinese SVG: ${chineseSvg?.length || 'FAILED'}, Text-to-Image: ${chineseTextToImage?.length || 'FAILED'}, PNG: ${chinesePng?.length || 'FAILED'}`);
+       console.log(`🔍 API Results - Pinyin SVG: ${pinyinSvg?.length || 'FAILED'}, Text-to-Image: ${pinyinTextToImage?.length || 'FAILED'}, PNG: ${pinyinPng?.length || 'FAILED'}`);
 
       // Display all 6 columns with compact sizing for single words
       const imageWidth = colWidth * 0.8;
