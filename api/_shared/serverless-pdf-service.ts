@@ -719,7 +719,7 @@ export class ServerlessPDFService {
           }
           
           const chineseX = (pageWidth - chineseImageWidth) / 2;
-          const chineseY = (pageHeight - chineseImageHeight) / 2 - 50;
+          const chineseY = (pageHeight - chineseImageHeight) / 2 - 30; // Closer to center
 
           pdf.addImage(
             chineseTextImage,
@@ -776,7 +776,7 @@ export class ServerlessPDFService {
           }
           
           const pinyinX = (pageWidth - pinyinImageWidth) / 2;
-          const pinyinY = (pageHeight - pinyinImageHeight) / 2 + 80;
+          const pinyinY = (pageHeight - pinyinImageHeight) / 2 + 50; // Closer to Chinese text
 
           pdf.addImage(
             pinyinTextImage,
