@@ -63,19 +63,34 @@ async function callChineseTextAPI(
     );
 
     if (!response.ok) {
-      throw new Error(`API request failed: ${response.status}`);
+      // Try to get error message from JSON response like frontend code
+      let errorMessage = `API request failed: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.message || errorMessage;
+      } catch {
+        // If not JSON, use status text or default message
+        errorMessage = response.statusText || errorMessage;
+      }
+      throw new Error(errorMessage);
     }
 
-    // Get the response as binary data since API returns image file
-    const arrayBuffer = await response.arrayBuffer();
-    const imageBuffer = Buffer.from(arrayBuffer);
-
-    // Get content type from response headers or default to PNG
+    // Handle response based on content type like frontend code
     const contentType = response.headers.get("content-type") || "image/png";
-
-    // Convert to data URI
-    const base64 = imageBuffer.toString("base64");
-    return `data:${contentType};base64,${base64}`;
+    
+    if (contentType.includes('application/json')) {
+      // Handle JSON responses (errors or special cases)
+      const jsonData = await response.json();
+      throw new Error(jsonData.message || 'Unexpected JSON response from image API');
+    } else {
+      // Handle binary file responses (images)
+      const arrayBuffer = await response.arrayBuffer();
+      const imageBuffer = Buffer.from(arrayBuffer);
+      
+      // Convert to data URI
+      const base64 = imageBuffer.toString("base64");
+      return `data:${contentType};base64,${base64}`;
+    }
   } catch (error) {
     console.error("Chinese text API call failed:", error);
     throw error;

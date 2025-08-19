@@ -48,8 +48,8 @@ async function callChineseTextAPI(
           fontSize,
           fontFamily,
           fontWeight,
-          width: 200,
-          height: 200,
+          width: fontSize * 1.2,
+          height: fontSize * 1.2,
           backgroundColor: "#ffffff",
           textColor: "#000000",
           padding: 20,
@@ -61,19 +61,34 @@ async function callChineseTextAPI(
     );
 
     if (!response.ok) {
-      throw new Error(`API request failed: ${response.status}`);
+      // Try to get error message from JSON response like frontend code
+      let errorMessage = `API request failed: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.message || errorMessage;
+      } catch {
+        // If not JSON, use status text or default message
+        errorMessage = response.statusText || errorMessage;
+      }
+      throw new Error(errorMessage);
     }
 
-    // Get the response as binary data since API returns image file
-    const arrayBuffer = await response.arrayBuffer();
-    const imageBuffer = Buffer.from(arrayBuffer);
-
-    // Get content type from response headers or default to PNG
+    // Handle response based on content type like frontend code
     const contentType = response.headers.get("content-type") || "image/png";
-
-    // Convert to data URI
-    const base64 = imageBuffer.toString("base64");
-    return `data:${contentType};base64,${base64}`;
+    
+    if (contentType.includes('application/json')) {
+      // Handle JSON responses (errors or special cases)
+      const jsonData = await response.json();
+      throw new Error(jsonData.message || 'Unexpected JSON response from image API');
+    } else {
+      // Handle binary file responses (images)
+      const arrayBuffer = await response.arrayBuffer();
+      const imageBuffer = Buffer.from(arrayBuffer);
+      
+      // Convert to data URI
+      const base64 = imageBuffer.toString("base64");
+      return `data:${contentType};base64,${base64}`;
+    }
     } catch (error) {
     console.error(`🚨 Chinese text API call failed for "${text}" (${method}):`, error);
     throw error; // Re-throw the error without fallback
@@ -610,9 +625,9 @@ export class ServerlessPDFService {
          pinyinPng
        ] = await Promise.all([
          // CHINESE TEXT - 3 methods (columns 1-3) - using AaBiMoHengZiZhenBaoKaiShu 200px
-         callChineseTextAPI(card.word || "朋友", "svg", 200, "bold"),
-         callChineseTextAPI(card.word || "朋友", "text-to-image", 200, "bold"),
-         callChineseTextAPI(card.word || "朋友", "png", 200, "bold"),
+         callChineseTextAPI(card.word || "朋友", "svg", 200, "900", "AaBiMoHengZiZhenBaoKaiShu"),
+         callChineseTextAPI(card.word || "朋友", "text-to-image", 200, "900", "AaBiMoHengZiZhenBaoKaiShu"),
+         callChineseTextAPI(card.word || "朋友", "png", 200, "900", "AaBiMoHengZiZhenBaoKaiShu"),
          
          // PINYIN TEXT - 3 methods (columns 4-6) - using Montserrat 50px
          callChineseTextAPI(card.pinyin || "péngyǒu", "svg", 50, "500", "Montserrat"),
