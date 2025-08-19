@@ -555,7 +555,7 @@ export class ServerlessPDFService {
       }
 
       // Calculate dynamic positioning to prevent overlap
-      const gap = 40;
+      const gap = 100;
       const totalContentHeight = chineseImageHeight + pinyinImageHeight + gap;
       const startY = (pageHeight - totalContentHeight) / 2;
 
