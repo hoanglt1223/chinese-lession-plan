@@ -599,12 +599,12 @@ export class ServerlessPDFService {
       `🚀 Generating flashcard back for: "${card.word}" with pinyin: "${card.pinyin}"`
     );
     console.log(
-      `🔥 NEW VERSION: Using 6-column Chinese API layout (not old Vietnamese layout)`
+      `🔥 NEW VERSION: Using 4-column Chinese API layout (removed PNG method)`
     );
 
     try {
-      // 6-column layout to test all 3 methods for both Chinese and Pinyin
-      const colWidth = pageWidth / 6;
+      // 4-column layout to test 2 methods for both Chinese and Pinyin
+      const colWidth = pageWidth / 4;
       const colHeight = pageHeight * 0.6;
     const startY = 30;
 
@@ -613,36 +613,32 @@ export class ServerlessPDFService {
       );
 
              // Make all 6 API calls in parallel for maximum performance
-       console.log(`⚡ Starting 6 parallel API calls...`);
+       console.log(`⚡ Starting 4 parallel API calls...`);
        const apiCallsStartTime = Date.now();
 
        const [
-         chineseSvg,
+         chineseUltimate,
          chineseTextToImage, 
-         chinesePng,
-         pinyinSvg,
-         pinyinTextToImage,
-         pinyinPng
+         pinyinUltimate,
+         pinyinTextToImage
        ] = await Promise.all([
-         // CHINESE TEXT - 3 methods (columns 1-3) - using AaBiMoHengZiZhenBaoKaiShu 200px
+         // CHINESE TEXT - 2 methods (columns 1-2) - using AaBiMoHengZiZhenBaoKaiShu 200px
          callChineseTextAPI(card.word || "朋友", "ultimate-text-to-image", 200, "900", "AaBiMoHengZiZhenBaoKaiShu"),
          callChineseTextAPI(card.word || "朋友", "text-to-image", 200, "900", "AaBiMoHengZiZhenBaoKaiShu"),
-         callChineseTextAPI(card.word || "朋友", "png", 200, "900", "AaBiMoHengZiZhenBaoKaiShu"),
          
-         // PINYIN TEXT - 3 methods (columns 4-6) - try AaBiMoHengZiZhenBaoKaiShu instead of Montserrat
+         // PINYIN TEXT - 2 methods (columns 3-4) - using Montserrat 50px
          callChineseTextAPI(card.pinyin || "péngyǒu", "ultimate-text-to-image", 50, "500", "Montserrat"),
-         callChineseTextAPI(card.pinyin || "péngyǒu", "text-to-image", 50, "500", "Montserrat"),
-         callChineseTextAPI(card.pinyin || "péngyǒu", "png", 50, "500", "Montserrat")
+         callChineseTextAPI(card.pinyin || "péngyǒu", "text-to-image", 50, "500", "Montserrat")
        ]);
 
        const apiCallsEndTime = Date.now();
-       console.log(`⚡ Completed 6 parallel API calls in ${apiCallsEndTime - apiCallsStartTime}ms`);
+       console.log(`⚡ Completed 4 parallel API calls in ${apiCallsEndTime - apiCallsStartTime}ms`);
        
        // Debug: Check which calls succeeded/failed
-       console.log(`🔍 API Results - Chinese SVG: ${chineseSvg?.length || 'FAILED'}, Text-to-Image: ${chineseTextToImage?.length || 'FAILED'}, PNG: ${chinesePng?.length || 'FAILED'}`);
-       console.log(`🔍 API Results - Pinyin SVG: ${pinyinSvg?.length || 'FAILED'}, Text-to-Image: ${pinyinTextToImage?.length || 'FAILED'}, PNG: ${pinyinPng?.length || 'FAILED'}`);
+       console.log(`🔍 API Results - Chinese Ultimate: ${chineseUltimate?.length || 'FAILED'}, Text-to-Image: ${chineseTextToImage?.length || 'FAILED'}`);
+       console.log(`🔍 API Results - Pinyin Ultimate: ${pinyinUltimate?.length || 'FAILED'}, Text-to-Image: ${pinyinTextToImage?.length || 'FAILED'}`);
 
-      // Display all 6 columns with proper sizing for readable text
+      // Display all 4 columns with proper sizing for readable text
       const imageWidth = colWidth * 0.9;
       const imageHeight = 80;
       const imageY = startY + 20;
@@ -678,18 +674,16 @@ export class ServerlessPDFService {
           }
         };
 
-      // Add all 6 columns safely (SVG columns will be skipped due to jsPDF limitation)
-      safeAddImage(chineseSvg, "Chinese SVG", 0);
+      // Add all 4 columns safely (only working methods)
+      safeAddImage(chineseUltimate, "Chinese Ultimate", 0);
       safeAddImage(chineseTextToImage, "Chinese Text-to-Image", 1);
-      safeAddImage(chinesePng, "Chinese PNG", 2);
-      safeAddImage(pinyinSvg, "Pinyin SVG", 3);
-      safeAddImage(pinyinTextToImage, "Pinyin Text-to-Image", 4);
-      safeAddImage(pinyinPng, "Pinyin PNG", 5);
+      safeAddImage(pinyinUltimate, "Pinyin Ultimate", 2);
+      safeAddImage(pinyinTextToImage, "Pinyin Text-to-Image", 3);
 
       // Add column divider lines
       pdf.setDrawColor(180, 180, 180);
       pdf.setLineWidth(0.3);
-      for (let i = 1; i < 6; i++) {
+      for (let i = 1; i < 4; i++) {
         const x = i * colWidth;
         pdf.line(x, startY + 20, x, imageY + imageHeight + 25);
       }
@@ -706,12 +700,10 @@ export class ServerlessPDFService {
       pdf.setFontSize(7);
       pdf.setTextColor(120, 120, 120);
       const labels = [
-        "SVG",
+        "Ultimate",
         "Text-to-Image",
-        "PNG",
-        "SVG",
+        "Ultimate",
         "Text-to-Image",
-        "PNG",
       ];
 
       for (let i = 0; i < labels.length; i++) {
