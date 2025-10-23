@@ -633,7 +633,13 @@ function HomeContent() {
               </div>
             </div>
           </div>
-          <KanbanBoard />
+          <KanbanBoard 
+          selectedLesson={selectedLesson}
+          lesson={lesson || null}
+          onLessonSelect={handleSelectLesson}
+          currentStep={currentStep}
+          onStepUpdate={updateStep}
+        />
         </section>
 
         {/* Recent Lessons & Workflow Integration */}
@@ -787,7 +793,7 @@ function HomeContent() {
               <div className="bg-gray-50 p-3 rounded-lg space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">User:</span>
-                  <span className="font-medium">{user?.email || 'Not logged in'}</span>
+                  <span className="font-medium">{user?.username || 'Not logged in'}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Credits:</span>
