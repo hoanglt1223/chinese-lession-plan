@@ -646,7 +646,7 @@ export default function Tools() {
                 <div className="flex items-center space-x-2 lg:space-x-4">
                   <Badge variant="secondary" className="flex items-center gap-1 text-xs lg:text-sm">
                     <DollarSign className="h-3 w-3 lg:h-4 lg:w-4" />
-                    <span className="hidden sm:inline">${user.creditBalance}</span>
+                    <span className="hidden sm:inline">{user.creditBalance}</span>
                     <span className="hidden lg:inline">Credits</span>
                   </Badge>
                   <span className="text-xs lg:text-sm text-muted-foreground hidden md:block">

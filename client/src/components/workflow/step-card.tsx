@@ -360,7 +360,7 @@ export function StepCard({
     switch (step.id) {
       case 0: // Input
         return (
-          <div className="space-y-4">
+          <div className="space-y-2">
             <FileUpload
               onFilesChange={setFiles}
               accept=".pdf"
@@ -391,8 +391,8 @@ export function StepCard({
         const analysisData = analysis || lesson?.aiAnalysis;
         
         return (
-          <div className="space-y-4">
-            <div className="bg-gradient-to-r from-accent/10 to-accent/5 rounded-lg p-4">
+          <div className="space-y-3">
+            <div className="bg-gradient-to-r from-accent/10 to-accent/5 rounded-lg p-3">
               <div className="flex items-center space-x-2 mb-2">
                 <Bot className="text-accent w-4 h-4" />
                 <span className="text-sm font-medium text-accent">AI Analysis</span>
@@ -430,12 +430,12 @@ export function StepCard({
             </div>
             
             {analysisData && (
-              <div className="space-y-3">
-                <div className="p-3 bg-muted/50 rounded-lg">
+              <div className="space-y-2">
+                <div className="p-2 bg-muted/50 rounded-lg">
                   <h4 className="text-sm font-medium text-foreground mb-1">Detected Level</h4>
                   <Badge variant="secondary">{analysisData.detectedLevel} - {analysisData.ageAppropriate}</Badge>
                 </div>
-                <div className="p-3 bg-muted/50 rounded-lg">
+                <div className="p-2 bg-muted/50 rounded-lg">
                   <h4 className="text-sm font-medium text-foreground mb-1">Key Vocabulary (Editable)</h4>
                   <VocabularyEditor
                     vocabulary={analysisData.vocabulary || []}
@@ -454,7 +454,7 @@ export function StepCard({
                     }}
                   />
                 </div>
-                <div className="p-3 bg-muted/50 rounded-lg">
+                <div className="p-2 bg-muted/50 rounded-lg">
                   <h4 className="text-sm font-medium text-foreground mb-1">Learning Activities</h4>
                   <ul className="text-xs text-muted-foreground space-y-1">
                     {analysisData.activities?.map((activity: string, index: number) => (
@@ -464,7 +464,7 @@ export function StepCard({
                 </div>
                 
                 {/* Vietnamese Debug Info */}
-                <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+                <div className="p-2 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
                   <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">🇻🇳 Vietnamese Translation (Debug)</h4>
                   <div className="space-y-2 text-xs">
                     <div>
@@ -561,9 +561,9 @@ export function StepCard({
         
         
         return (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {generatePlanMutation.isPending && (
-              <div className="bg-gradient-to-r from-accent/10 to-accent/5 rounded-lg p-4">
+              <div className="bg-gradient-to-r from-accent/10 to-accent/5 rounded-lg p-3">
                 <div className="flex items-center space-x-2 mb-2">
                   <Loader2 className="w-4 h-4 animate-spin text-accent" />
                   <span className="text-sm font-medium text-accent">Generating 4-Lesson Plan</span>
@@ -577,7 +577,7 @@ export function StepCard({
             
             {/* Display individual lesson plans if available */}
             {plansData.length > 0 ? (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {/* Lesson selector tabs */}
                 <div className="flex flex-wrap gap-2 border-b border-border pb-2">
                   {plansData.map((plan: any, index: any) => (
@@ -660,13 +660,13 @@ export function StepCard({
                 )}
               </div>
             ) : (
-              <div className="text-center py-8 text-muted-foreground">
+              <div className="text-center py-2 text-muted-foreground">
                 <p>No lesson plans available. Generate lesson plans to view them here.</p>
               </div>
             )}
             
             {/* Step 2 is now complete - no additional buttons needed */}
-            <div className="text-center py-4 text-muted-foreground">
+            <div className="text-center py-2 text-muted-foreground">
               <p className="text-sm">✓ Lesson plan generated. You can now proceed to Step 4 (Summary).</p>
             </div>
           </div>
@@ -681,7 +681,7 @@ export function StepCard({
         const vocabularyList = currentAnalysis?.vocabulary || [];
         
         return (
-          <div className="space-y-4">
+          <div className="space-y-2">
             {/* Vocabulary Editor */}
             <div className="border border-border rounded-lg overflow-hidden">
               <div className="bg-muted/50 px-3 py-2 border-b border-border">
@@ -689,7 +689,7 @@ export function StepCard({
                   Edit Vocabulary Words
                 </span>
               </div>
-              <div className="p-4">
+              <div className="p-2">
                 <VocabularyEditor
                   vocabulary={vocabularyList}
                   onChange={async (newVocabulary) => {
@@ -711,8 +711,8 @@ export function StepCard({
                 />
                 
                 {/* Photo Source Selection */}
-                <div className="mt-3 p-3 bg-muted/30 rounded-lg">
-                  <div className="text-xs font-medium text-muted-foreground mb-2">Photo Source</div>
+                <div className="mt-2 p-2 bg-muted/30 rounded-lg">
+                  <div className="text-xs font-medium text-muted-foreground mb-1">Photo Source</div>
                   <div className="flex gap-2">
                     <Button
                       variant={photoSource === 'api' ? 'default' : 'outline'}
@@ -737,7 +737,7 @@ export function StepCard({
                 </div>
                 
                 <Button 
-                  className="w-full mt-3"
+                  className="w-full mt-2"
                   onClick={() => {
                     if (vocabularyList.length > 0) {
                       generateFlashcardsMutation.mutate();
@@ -758,8 +758,8 @@ export function StepCard({
             </div>
 
             {generateFlashcardsMutation.isPending && (
-              <div className="bg-gradient-to-r from-accent/10 to-accent/5 rounded-lg p-4">
-                <div className="flex items-center space-x-2 mb-2">
+              <div className="bg-gradient-to-r from-accent/10 to-accent/5 rounded-lg p-2">
+                <div className="flex items-center space-x-2 mb-1">
                   <Loader2 className="w-4 h-4 animate-spin text-accent" />
                   <span className="text-sm font-medium text-accent">Generating Flashcards</span>
                 </div>
@@ -790,7 +790,7 @@ export function StepCard({
             )}
             
             {/* Step 3 is now independent - no summary generation button needed here */}
-            <div className="text-center py-4 text-muted-foreground">
+            <div className="text-center py-2 text-muted-foreground">
               <p className="text-sm">✓ Flashcards are independent. Summary generation is now available in Step 4.</p>
             </div>
           </div>
@@ -802,10 +802,10 @@ export function StepCard({
         
         
         return (
-          <div className="space-y-4">
+          <div className="space-y-2">
             {/* Generate Summary Button - now available directly from Step 4 */}
             {summariesData.length === 0 && !generateSummaryMutation.isPending && (
-              <div className="space-y-4">
+              <div className="space-y-2">
                 <Button 
                   className="w-full"
                   onClick={() => {
@@ -833,8 +833,8 @@ export function StepCard({
             )}
 
             {generateSummaryMutation.isPending && (
-              <div className="bg-gradient-to-r from-accent/10 to-accent/5 rounded-lg p-4">
-                <div className="flex items-center space-x-2 mb-2">
+              <div className="bg-gradient-to-r from-accent/10 to-accent/5 rounded-lg p-2">
+                <div className="flex items-center space-x-2 mb-1">
                   <Loader2 className="w-4 h-4 animate-spin text-accent" />
                   <span className="text-sm font-medium text-accent">Generating 4 Lesson Summaries</span>
                 </div>
@@ -844,7 +844,7 @@ export function StepCard({
             
             {/* Display individual lesson summaries if available */}
             {summariesData.length > 0 ? (
-              <div className="space-y-4">
+              <div className="space-y-2">
                 {/* Summary selector tabs */}
                 <div className="flex flex-wrap gap-2 border-b border-border pb-2">
                   {summariesData.map((summaryItem: any, index: any) => (
@@ -880,7 +880,7 @@ export function StepCard({
                           Lesson {summariesData[selectedSummaryIndex].lessonNumber} Summary - {summariesData[selectedSummaryIndex].title}
                         </span>
                       </div>
-                      <div className="p-4 h-64 overflow-y-auto text-xs">
+                      <div className="p-2 h-48 overflow-y-auto text-xs">
                         <pre className="whitespace-pre-wrap text-foreground">
                           {summariesData[selectedSummaryIndex].content}
                         </pre>
@@ -907,12 +907,12 @@ export function StepCard({
                 )}
               </div>
             ) : (
-              <div className="text-center py-8 text-muted-foreground">
+              <div className="text-center py-2 text-muted-foreground">
                 <p>No summaries available. Generate summaries to view them here.</p>
               </div>
             )}
             
-            <div className="space-y-2 text-xs text-muted-foreground">
+            <div className="space-y-1 text-xs text-muted-foreground">
               <div className="flex items-center space-x-2">
                 <CheckCircle className="w-4 h-4" />
                 <span>Vietnamese translations included</span>
@@ -936,8 +936,8 @@ export function StepCard({
       isActive && "active",
       isCompleted && "completed"
     )}>
-      <CardContent className="p-6">
-        <div className="flex items-center space-x-2 mb-4">
+      <CardContent className="p-3 md:p-4">
+        <div className="flex items-center space-x-2 mb-2">
           <div className={cn(
             "step-indicator",
             isActive ? "active" : isCompleted ? "completed" : "pending"
@@ -945,7 +945,7 @@ export function StepCard({
             {isCompleted ? <CheckCircle className="w-4 h-4" /> : step.id}
           </div>
           <div>
-            <h3 className="font-semibold text-foreground">{step.title}</h3>
+            <h3 className="font-semibold text-foreground text-sm md:text-base">{step.title}</h3>
             <p className="text-xs text-muted-foreground">{step.description}</p>
           </div>
         </div>

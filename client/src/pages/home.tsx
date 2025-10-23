@@ -2,6 +2,9 @@ import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { ExportBar } from "@/components/export/export-bar";
 import { KanbanBoard } from "@/components/workflow/kanban-board";
 import { useWorkflow } from "@/hooks/use-workflow";
@@ -15,6 +18,7 @@ import { GraduationCap, Clock, FolderInput, Layers, Settings, Zap, Loader2, LogO
 
 function HomeContent() {
   const [selectedLesson, setSelectedLesson] = useState<string | null>(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const { lesson, currentStep, updateStep } = useWorkflow(selectedLesson);
   const { user } = useAuth();
   const { settings: aiSettings, updateModel, updateLanguage } = useAI();
@@ -38,6 +42,374 @@ function HomeContent() {
   });
 
   const recentLessons = Array.isArray(lessons) ? lessons.slice(0, 4) : [];
+  const totalSteps = 5; // Total workflow steps
+
+  // Handler functions
+  const handleSelectLesson = (lessonId: string) => {
+    setSelectedLesson(lessonId);
+  };
+
+  const handleExportLesson = async (lessonId: string) => {
+    try {
+      // Find the lesson to export
+      const lessonToExport = Array.isArray(lessons) ? lessons.find(l => l.id === lessonId) : null;
+      
+      if (!lessonToExport) {
+        console.error('Lesson not found for export:', lessonId);
+        return;
+      }
+
+      // Use the same export logic as GlobalExportBar
+      const exports = [];
+
+      // Export analysis results if available
+      if (lessonToExport.aiAnalysis) {
+        exports.push(exportAnalysisData(lessonToExport.aiAnalysis));
+      }
+
+      // Export lesson plans if available
+      if (lessonToExport.lessonPlans && Array.isArray(lessonToExport.lessonPlans) && lessonToExport.lessonPlans.length > 0) {
+        exports.push(exportLessonPlans(lessonToExport.lessonPlans));
+      }
+
+      // Export flashcards if available
+      if (lessonToExport.flashcards && Array.isArray(lessonToExport.flashcards) && lessonToExport.flashcards.length > 0) {
+        exports.push(exportFlashcardsData(lessonToExport.flashcards));
+      }
+
+      // Export summaries if available
+      if (lessonToExport.summaries && Array.isArray(lessonToExport.summaries) && lessonToExport.summaries.length > 0) {
+        exports.push(exportSummaries(lessonToExport.summaries));
+      }
+
+      if (exports.length === 0) {
+        console.log('No exportable data found in lesson:', lessonId);
+        return;
+      }
+
+      // Execute all exports in parallel
+      await Promise.all(exports);
+      console.log('Successfully exported lesson:', lessonId);
+    } catch (error) {
+      console.error('Error exporting lesson:', error);
+    }
+  };
+
+  // Helper function to download files
+  const downloadFile = (blob: Blob, filename: string) => {
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  };
+
+  // Helper function to export analysis data
+  const exportAnalysisData = async (analysisData: any) => {
+    // Export as DOCX
+    const docxResponse = await fetch('/api/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        documentType: 'docx',
+        content: formatAnalysisForExport(analysisData),
+        step: 1
+      }),
+    });
+
+    if (docxResponse.ok) {
+      const docxBlob = await docxResponse.blob();
+      downloadFile(docxBlob, 'analysis_results.docx');
+    }
+
+    // Export as MD
+    const mdContent = formatAnalysisForMarkdown(analysisData);
+    const mdBlob = new Blob([mdContent], { type: 'text/markdown' });
+    downloadFile(mdBlob, 'analysis_results.md');
+
+    // Export as PDF
+    const pdfResponse = await fetch('/api/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        documentType: 'pdf',
+        analysisData,
+        step: 1
+      }),
+    });
+
+    if (pdfResponse.ok) {
+      const pdfBlob = await pdfResponse.blob();
+      downloadFile(pdfBlob, 'analysis_results.pdf');
+    }
+  };
+
+  // Helper function to export lesson plans
+  const exportLessonPlans = async (lessonPlans: any[]) => {
+    // Export each lesson plan as DOCX and MD
+    const exportPromises = lessonPlans.map(async (lessonPlan) => {
+      // DOCX export
+      const docxResponse = await fetch('/api/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          documentType: 'docx',
+          content: lessonPlan.content || 'No content available',
+          step: 2,
+          singleLesson: true
+        }),
+      });
+
+      if (docxResponse.ok) {
+        const docxBlob = await docxResponse.blob();
+        const filename = `${lessonPlan.filename || `lesson_${lessonPlan.lessonNumber || 'unknown'}`}.docx`;
+        downloadFile(docxBlob, filename);
+      }
+
+      // MD export
+      const mdContent = `# Lesson ${lessonPlan.lessonNumber || 'Unknown'}: ${lessonPlan.title || 'Untitled'}\n\n**Type:** ${lessonPlan.type || 'N/A'}\n\n${lessonPlan.content || 'No content available'}`;
+      const mdBlob = new Blob([mdContent], { type: 'text/markdown' });
+      const mdFilename = `${lessonPlan.filename || `lesson_${lessonPlan.lessonNumber || 'unknown'}`}.md`;
+      downloadFile(mdBlob, mdFilename);
+    });
+
+    await Promise.all(exportPromises);
+  };
+
+  // Helper function to export flashcards data
+  const exportFlashcardsData = async (flashcards: any[]) => {
+    const pdfResponse = await fetch('/api/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        documentType: 'pdf',
+        flashcards,
+        step: 3
+      }),
+    });
+
+    if (pdfResponse.ok) {
+      const pdfBlob = await pdfResponse.blob();
+      downloadFile(pdfBlob, 'flashcards.pdf');
+    }
+  };
+
+  // Helper function to export summaries
+  const exportSummaries = async (summaries: any[]) => {
+    const exportPromises = summaries.map(async (summary) => {
+      // DOCX export
+      const docxResponse = await fetch('/api/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          documentType: 'docx',
+          content: summary.content || 'No content available',
+          step: 4,
+          singleSummary: true
+        }),
+      });
+
+      if (docxResponse.ok) {
+        const docxBlob = await docxResponse.blob();
+        const filename = `${summary.filename || `summary_${summary.lessonNumber || 'unknown'}`}.docx`;
+        downloadFile(docxBlob, filename);
+      }
+
+      // MD export
+      const mdContent = `# Lesson ${summary.lessonNumber || 'Unknown'}: ${summary.title || 'Untitled'}\n\n${summary.content || 'No content available'}`;
+      const mdBlob = new Blob([mdContent], { type: 'text/markdown' });
+      const mdFilename = `${summary.filename || `summary_${summary.lessonNumber || 'unknown'}`}.md`;
+      downloadFile(mdBlob, mdFilename);
+    });
+
+    await Promise.all(exportPromises);
+  };
+
+  // Helper function to format analysis data for export
+  const formatAnalysisForExport = (analysisData: any) => {
+    let content = 'Analysis Results\n\n';
+    content += `Detected Level: ${analysisData.detectedLevel || 'N/A'}\n`;
+    content += `Age Appropriate: ${analysisData.ageAppropriate || 'N/A'}\n`;
+    content += `Main Theme: ${analysisData.mainTheme || 'N/A'}\n\n`;
+    
+    if (analysisData.vocabulary && analysisData.vocabulary.length > 0) {
+      content += 'Vocabulary:\n';
+      analysisData.vocabulary.forEach((word: string) => {
+        content += `- ${word}\n`;
+      });
+      content += '\n';
+    }
+    
+    if (analysisData.activities && analysisData.activities.length > 0) {
+      content += 'Learning Activities:\n';
+      analysisData.activities.forEach((activity: string) => {
+        content += `- ${activity}\n`;
+      });
+    }
+    
+    return content;
+  };
+
+  // Helper function to format analysis data for markdown
+  const formatAnalysisForMarkdown = (analysisData: any) => {
+    let content = '# Analysis Results\n\n';
+    content += `**Detected Level:** ${analysisData.detectedLevel || 'N/A'}\n`;
+    content += `**Age Appropriate:** ${analysisData.ageAppropriate || 'N/A'}\n`;
+    content += `**Main Theme:** ${analysisData.mainTheme || 'N/A'}\n\n`;
+    
+    if (analysisData.vocabulary && analysisData.vocabulary.length > 0) {
+      content += '## Vocabulary\n';
+      analysisData.vocabulary.forEach((word: string) => {
+        content += `- ${word}\n`;
+      });
+      content += '\n';
+    }
+    
+    if (analysisData.activities && analysisData.activities.length > 0) {
+      content += '## Learning Activities\n';
+      analysisData.activities.forEach((activity: string) => {
+        content += `- ${activity}\n`;
+      });
+    }
+    
+    return content;
+  };
+
+  const handleQuickTestFlow = () => {
+    quickStartMutation.mutate();
+  };
+
+  const handleBatchProcess = async () => {
+    try {
+      if (!lessons || !Array.isArray(lessons) || lessons.length === 0) {
+        console.log('No lessons available for batch processing');
+        return;
+      }
+
+      console.log(`Starting batch process for ${lessons.length} lessons`);
+      
+      // Process each lesson that has incomplete steps
+      const batchPromises = lessons.map(async (lesson) => {
+        try {
+          // Check if lesson needs processing (has files but missing analysis/plans/etc)
+          const needsProcessing = lesson.files && lesson.files.length > 0 && (
+            !lesson.aiAnalysis || 
+            !lesson.lessonPlans || 
+            !lesson.flashcards || 
+            !lesson.summaries
+          );
+
+          if (!needsProcessing) {
+            console.log(`Lesson ${lesson.id} already processed, skipping`);
+            return;
+          }
+
+          console.log(`Processing lesson ${lesson.id}`);
+
+          // Step 1: Generate analysis if missing
+          if (!lesson.aiAnalysis && lesson.files && lesson.files.length > 0) {
+            const analysisResponse = await fetch('/api/analyze', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                lessonId: lesson.id,
+                files: lesson.files,
+                model: aiSettings.selectedModel,
+                outputLanguage: aiSettings.outputLanguage
+              }),
+            });
+
+            if (analysisResponse.ok) {
+              const analysisData = await analysisResponse.json();
+              console.log(`Analysis completed for lesson ${lesson.id}`);
+            }
+          }
+
+          // Step 2: Generate lesson plans if missing
+          if (!lesson.lessonPlans && lesson.aiAnalysis) {
+            const plansResponse = await fetch('/api/generate-lesson-plans', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                lessonId: lesson.id,
+                analysisData: lesson.aiAnalysis,
+                model: aiSettings.selectedModel,
+                outputLanguage: aiSettings.outputLanguage
+              }),
+            });
+
+            if (plansResponse.ok) {
+              const plansData = await plansResponse.json();
+              console.log(`Lesson plans generated for lesson ${lesson.id}`);
+            }
+          }
+
+          // Step 3: Generate flashcards if missing
+          if (!lesson.flashcards && lesson.aiAnalysis) {
+            const flashcardsResponse = await fetch('/api/generate-flashcards', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                lessonId: lesson.id,
+                vocabulary: lesson.aiAnalysis.vocabulary || [],
+                model: aiSettings.selectedModel,
+                outputLanguage: aiSettings.outputLanguage
+              }),
+            });
+
+            if (flashcardsResponse.ok) {
+              const flashcardsData = await flashcardsResponse.json();
+              console.log(`Flashcards generated for lesson ${lesson.id}`);
+            }
+          }
+
+          // Step 4: Generate summaries if missing
+          if (!lesson.summaries && lesson.lessonPlans) {
+            const summariesResponse = await fetch('/api/generate-summaries', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                lessonId: lesson.id,
+                lessonPlans: lesson.lessonPlans,
+                model: aiSettings.selectedModel,
+                outputLanguage: aiSettings.outputLanguage
+              }),
+            });
+
+            if (summariesResponse.ok) {
+              const summariesData = await summariesResponse.json();
+              console.log(`Summaries generated for lesson ${lesson.id}`);
+            }
+          }
+
+          console.log(`Completed processing lesson ${lesson.id}`);
+        } catch (error) {
+          console.error(`Error processing lesson ${lesson.id}:`, error);
+        }
+      });
+
+      // Execute all batch processes in parallel (with some concurrency limit)
+      const BATCH_SIZE = 3; // Process 3 lessons at a time to avoid overwhelming the API
+      for (let i = 0; i < batchPromises.length; i += BATCH_SIZE) {
+        const batch = batchPromises.slice(i, i + BATCH_SIZE);
+        await Promise.all(batch);
+        console.log(`Completed batch ${Math.floor(i / BATCH_SIZE) + 1} of ${Math.ceil(batchPromises.length / BATCH_SIZE)}`);
+      }
+
+      // Refresh the lessons data after batch processing
+      queryClient.invalidateQueries({ queryKey: ['lessons'] });
+      console.log('Batch processing completed successfully');
+    } catch (error) {
+      console.error('Error during batch processing:', error);
+    }
+  };
+
+  const handleSettings = () => {
+    setIsSettingsOpen(true);
+  };
 
   // Quick action to auto-load input.pdf and start workflow
   const quickStartMutation = useMutation({
@@ -91,20 +463,20 @@ function HomeContent() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="export-bar border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8">
+        <div className="max-w-7xl mx-auto px-2 sm:px-3 lg:px-6">
           {/* Main header row */}
-          <div className="flex items-center justify-between h-14 sm:h-16">
+          <div className="flex items-center justify-between h-12 sm:h-14">
             {/* Logo and brand */}
-            <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
-              <div className="flex items-center space-x-2 sm:space-x-3">
-                <div className="w-7 h-7 sm:w-8 sm:h-8 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
-                  <GraduationCap className="text-primary-foreground w-4 h-4 sm:w-5 sm:h-5" />
+            <div className="flex items-center space-x-1 sm:space-x-2 min-w-0 flex-1">
+              <div className="flex items-center space-x-1 sm:space-x-2">
+                <div className="w-6 h-6 sm:w-7 sm:h-7 bg-primary rounded-md flex items-center justify-center flex-shrink-0">
+                  <GraduationCap className="text-primary-foreground w-3 h-3 sm:w-4 sm:h-4" />
                 </div>
                 <div className="min-w-0">
-                  <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-foreground truncate">
+                  <h1 className="text-base sm:text-lg lg:text-xl font-bold text-foreground truncate">
                     EduFlow
                   </h1>
-                  <p className="text-xs sm:text-sm text-muted-foreground hidden md:block truncate">
+                  <p className="text-xs text-muted-foreground hidden md:block truncate">
                     Chinese Lesson Planning Assistant
                   </p>
                 </div>
@@ -112,11 +484,11 @@ function HomeContent() {
             </div>
             
             {/* User info and actions */}
-            <nav className="flex items-center space-x-2 sm:space-x-3">
+            <nav className="flex items-center space-x-1 sm:space-x-2">
               {/* User credit balance */}
               {user && (
-                <Badge variant="secondary" className="flex items-center gap-1 text-xs sm:text-sm px-2 py-1">
-                  <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                <Badge variant="secondary" className="flex items-center gap-1 text-xs px-1.5 py-0.5">
+                  <DollarSign className="h-3 w-3 flex-shrink-0" />
                   <span className="font-medium">
                     {user.creditBalance}
                   </span>
@@ -129,19 +501,19 @@ function HomeContent() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="p-2"
+                  className="p-1.5"
                   onClick={() => {
                     // Could toggle a mobile menu here
                   }}
                 >
-                  <Settings className="h-4 w-4" />
+                  <Settings className="h-3.5 w-3.5" />
                 </Button>
               </div>
               
               {/* Desktop settings */}
-              <div className="hidden lg:flex items-center space-x-2">
+              <div className="hidden lg:flex items-center space-x-1">
                 <select 
-                  className="px-2 py-1 border rounded-md text-xs bg-background hover:bg-accent transition-colors min-w-0"
+                  className="px-1.5 py-0.5 border rounded text-xs bg-background hover:bg-accent transition-colors min-w-0"
                   value={aiSettings.selectedModel}
                   onChange={(e) => updateModel(e.target.value)}
                 >
@@ -150,7 +522,7 @@ function HomeContent() {
                   <option value="gpt-4o">GPT-4o</option>
                 </select>
                 <select 
-                  className="px-2 py-1 border rounded-md text-xs bg-background hover:bg-accent transition-colors min-w-0"
+                  className="px-1.5 py-0.5 border rounded text-xs bg-background hover:bg-accent transition-colors min-w-0"
                   value={aiSettings.outputLanguage}
                   onChange={(e) => updateLanguage(e.target.value)}
                 >
@@ -167,11 +539,11 @@ function HomeContent() {
                 variant="ghost" 
                 size="sm" 
                 onClick={() => window.location.href = '/tools'}
-                className="hidden sm:flex px-3"
+                className="hidden sm:flex px-2"
               >
-                <Layers className="h-4 w-4 mr-2" />
-                <span className="hidden md:inline">AI Tools</span>
-                <span className="md:hidden">Tools</span>
+                <Layers className="h-3.5 w-3.5 mr-1" />
+                <span className="hidden md:inline text-xs">AI Tools</span>
+                <span className="md:hidden text-xs">Tools</span>
               </Button>
               
               {/* Mobile tools button */}
@@ -179,9 +551,9 @@ function HomeContent() {
                 variant="ghost" 
                 size="sm" 
                 onClick={() => window.location.href = '/tools'}
-                className="sm:hidden p-2"
+                className="sm:hidden p-1.5"
               >
-                <Layers className="h-4 w-4" />
+                <Layers className="h-3.5 w-3.5" />
               </Button>
               
               {/* Logout button */}
@@ -191,14 +563,14 @@ function HomeContent() {
                   size="sm"
                   onClick={() => logoutMutation.mutate()}
                   disabled={logoutMutation.isPending}
-                  className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3"
+                  className="flex items-center gap-1 px-2"
                 >
                   {logoutMutation.isPending ? (
-                    <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
+                    <Loader2 className="h-3 w-3 animate-spin" />
                   ) : (
-                    <LogOut className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <LogOut className="h-3 w-3" />
                   )}
-                  <span className="hidden sm:inline">Logout</span>
+                  <span className="hidden sm:inline text-xs">Logout</span>
                 </Button>
               )}
             </nav>
@@ -206,14 +578,14 @@ function HomeContent() {
           
           {/* Secondary header row for user greeting on mobile */}
           {user && (
-            <div className="md:hidden pb-2 border-t border-border/50 pt-2 mt-2">
+            <div className="md:hidden pb-1.5 border-t border-border/50 pt-1.5 mt-1">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">
+                <span className="text-xs text-muted-foreground">
                   Welcome, {user.username}
                 </span>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-1">
                   <select 
-                    className="px-2 py-1 border rounded text-xs bg-background w-24"
+                    className="px-1.5 py-0.5 border rounded text-xs bg-background w-20"
                     value={aiSettings.selectedModel}
                     onChange={(e) => updateModel(e.target.value)}
                   >
@@ -222,7 +594,7 @@ function HomeContent() {
                     <option value="gpt-4o">4o</option>
                   </select>
                   <select 
-                    className="px-2 py-1 border rounded text-xs bg-background w-20"
+                    className="px-1.5 py-0.5 border rounded text-xs bg-background w-16"
                     value={aiSettings.outputLanguage}
                     onChange={(e) => updateLanguage(e.target.value)}
                   >
@@ -239,249 +611,203 @@ function HomeContent() {
         </div>
       </header>
 
-      {/* Mobile AI Settings and Export Bar */}
-      <div className="lg:hidden border-b bg-background">
-        <div className="max-w-7xl mx-auto px-2 sm:px-4">
-          <div className="flex items-center justify-between py-2">
-            <div className="flex items-center space-x-2 text-sm">
-              <select className="p-1 border rounded text-xs bg-background">
-                <option value="gpt-5-nano">GPT-5-nano</option>
-                <option value="gpt-4o">GPT-4o</option>
-                <option value="gpt-4o-mini">GPT-4o-mini</option>
-              </select>
-              <select className="p-1 border rounded text-xs bg-background">
-                <option value="auto">Auto</option>
-                <option value="chinese">中文</option>
-                <option value="vietnamese">Tiếng Việt</option>
-                <option value="english">English</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      <main className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-4 lg:py-8">
-        {/* Workflow Progress */}
-        <div className="mb-6 lg:mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 space-y-2 sm:space-y-0">
-            <h2 className="text-xl lg:text-2xl font-bold text-foreground">Lesson Creation Workflow</h2>
-            <div className="flex items-center space-x-2 text-xs lg:text-sm text-muted-foreground">
-              <Clock className="w-3 h-3 lg:w-4 lg:h-4" />
-              <span>Est. 15-20 minutes</span>
+
+      {/* Main Content */}
+      <main className="flex-1 p-3 md:p-4 lg:p-6 space-y-4 md:space-y-6">
+        {/* Lesson Creation Workflow */}
+        <section className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 md:p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg md:text-xl font-semibold text-gray-800">
+              Lesson Creation Workflow
+            </h2>
+            <div className="flex items-center space-x-2">
+              <span className="text-xs md:text-sm text-gray-500">
+                Progress: {Math.round((currentStep / totalSteps) * 100)}%
+              </span>
+              <div className="w-16 md:w-20 bg-gray-200 rounded-full h-1.5 md:h-2">
+                <div
+                  className="bg-blue-600 h-1.5 md:h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${(currentStep / totalSteps) * 100}%` }}
+                ></div>
+              </div>
             </div>
           </div>
-          
-          {/* Progress Bar */}
-          <div className="flex flex-wrap items-center gap-2 mb-6">
-            {["Input", "Review", "Plan", "Flashcards", "Summary"].map((step, index) => (
-              <div key={step} className="flex items-center space-x-1 lg:space-x-2">
-                <div className={`step-indicator ${
-                  index === currentStep ? 'active' : 
-                  index < currentStep ? 'completed' : 'pending'
-                }`}>
-                  {index + 1}
+          <KanbanBoard />
+        </section>
+
+        {/* Recent Lessons & Workflow Integration */}
+        <section className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 md:p-4">
+          <h2 className="text-lg md:text-xl font-semibold text-gray-800 mb-3">
+            Recent Lessons & Workflow Integration
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+            {recentLessons.map((lesson) => (
+              <div
+                key={lesson.id}
+                className="border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow"
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <h3 className="font-medium text-gray-800 text-sm md:text-base truncate">
+                    {lesson.title}
+                  </h3>
+                  <span className="text-xs text-gray-500 ml-2 flex-shrink-0">
+                    {lesson.date}
+                  </span>
                 </div>
-                <span className={`text-xs lg:text-sm ${
-                  index <= currentStep ? 'font-medium text-foreground' : 'text-muted-foreground'
-                }`}>
-                  {step}
-                </span>
-                {index < 4 && <div className="hidden lg:block flex-1 h-px bg-border min-w-[20px]"></div>}
+                <div className="mb-2">
+                  <div className="flex justify-between text-xs text-gray-600 mb-1">
+                    <span>Progress</span>
+                    <span>{lesson.progress}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-1.5">
+                    <div
+                      className="bg-green-600 h-1.5 rounded-full"
+                      style={{ width: `${lesson.progress}%` }}
+                    ></div>
+                  </div>
+                </div>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => handleSelectLesson(lesson.id)}
+                    className="flex-1 bg-blue-600 text-white px-2 py-1.5 rounded text-xs hover:bg-blue-700 transition-colors"
+                  >
+                    Select
+                  </button>
+                  <button
+                    onClick={() => handleExportLesson(lesson.id)}
+                    className="flex-1 bg-gray-600 text-white px-2 py-1.5 rounded text-xs hover:bg-gray-700 transition-colors"
+                  >
+                    Export
+                  </button>
+                </div>
               </div>
             ))}
           </div>
-        </div>
-
-        {/* Kanban Board */}
-        <KanbanBoard 
-          selectedLesson={selectedLesson}
-          lesson={lesson || null}
-          onLessonSelect={setSelectedLesson}
-          currentStep={currentStep}
-          onStepUpdate={updateStep}
-        />
-
-        {/* Recent Lessons Integration */}
-        {recentLessons.length > 0 && (
-          <Card className="mt-6 lg:mt-8">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="w-5 h-5" />
-                Recent Lessons & Workflow Integration
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {recentLessons.map((lesson: any) => (
-                  <div 
-                    key={lesson.id} 
-                    className={`p-4 border rounded-lg transition-all duration-200 cursor-pointer ${
-                      selectedLesson === lesson.id 
-                        ? 'border-primary bg-primary/5 shadow-md' 
-                        : 'hover:bg-muted/50 hover:border-muted-foreground'
-                    }`}
-                    onClick={() => setSelectedLesson(lesson.id)}
-                  >
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
-                        <h4 className="font-medium text-foreground mb-1 truncate">{lesson.title}</h4>
-                        <div className="flex items-center gap-2 mb-2">
-                          <Badge variant="secondary" className="text-xs">
-                            {lesson.level}
-                          </Badge>
-                          <Badge variant="outline" className="text-xs">
-                            {lesson.ageGroup}
-                          </Badge>
-                        </div>
-                      </div>
-                      {selectedLesson === lesson.id && (
-                        <Badge variant="default" className="text-xs">
-                          Active
-                        </Badge>
-                      )}
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">Progress</span>
-                        <span className="text-muted-foreground">
-                          {lesson.status === 'completed' ? '100%' : 
-                           lesson.status === 'in-progress' ? '60%' : '20%'}
-                        </span>
-                      </div>
-                      <div className="w-full bg-muted rounded-full h-2">
-                        <div 
-                          className={`h-2 rounded-full transition-all duration-300 ${
-                            lesson.status === 'completed' ? 'bg-green-500' : 
-                            lesson.status === 'in-progress' ? 'bg-blue-500' : 'bg-yellow-500'
-                          }`}
-                          style={{ 
-                            width: lesson.status === 'completed' ? '100%' : 
-                                   lesson.status === 'in-progress' ? '60%' : '20%'
-                          }}
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center justify-between mt-3">
-                      <span className="text-xs text-muted-foreground">
-                        {lesson.createdAt && new Date(lesson.createdAt).toLocaleDateString()}
-                      </span>
-                      <div className="flex gap-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          className="h-7 px-2 text-xs"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedLesson(lesson.id);
-                          }}
-                        >
-                          {selectedLesson === lesson.id ? 'Working' : 'Select'}
-                        </Button>
-                        {lesson.status === 'completed' && (
-                          <Button 
-                            variant="secondary" 
-                            size="sm"
-                            className="h-7 px-2 text-xs"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              // TODO: Export lesson functionality
-                            }}
-                          >
-                            Export
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              
-              {recentLessons.length > 0 && (
-                <div className="pt-3 border-t">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">
-                      {recentLessons.length} recent lesson{recentLessons.length === 1 ? '' : 's'}
-                    </span>
-                    <Button variant="ghost" size="sm" className="text-xs">
-                      View All Lessons →
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
+        </section>
 
         {/* Quick Actions */}
-        <Card className="mt-6 lg:mt-8">
-          <CardContent className="p-4 lg:p-6">
-            <h3 className="text-base lg:text-lg font-semibold text-foreground mb-4">Quick Actions</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
-              <Button 
-                variant="outline" 
-                className="activity-button h-auto p-4 justify-start"
-                onClick={() => quickStartMutation.mutate()}
-                disabled={quickStartMutation.isPending}
-              >
-                <div className="activity-icon bg-accent/10">
-                  {quickStartMutation.isPending ? (
-                    <Loader2 className="text-accent w-5 h-5 animate-spin" />
-                  ) : (
-                    <Zap className="text-accent w-5 h-5" />
-                  )}
-                </div>
-                <div className="text-left">
-                  <h4 className="font-medium text-foreground">
-                    {quickStartMutation.isPending ? 'Loading...' : 'Quick Test Flow'}
-                  </h4>
-                  <p className="text-xs text-muted-foreground">
-                    {quickStartMutation.isPending ? 'Auto-loading input.pdf...' : 'Auto-load input.pdf & test complete workflow'}
-                  </p>
-                </div>
-              </Button>
-              
-              <Button 
-                variant="outline" 
-                className="activity-button h-auto p-4 justify-start"
-                onClick={() => {/* TODO: Batch processing */}}
-              >
-                <div className="activity-icon bg-secondary/10">
-                  <Layers className="text-secondary w-5 h-5" />
-                </div>
-                <div className="text-left">
-                  <h4 className="font-medium text-foreground">Batch Process</h4>
-                  <p className="text-xs text-muted-foreground">Process multiple lessons at once</p>
-                </div>
-              </Button>
-              
-              <Button 
-                variant="outline" 
-                className="activity-button h-auto p-4 justify-start"
-                onClick={() => {/* TODO: Settings */}}
-              >
-                <div className="activity-icon bg-accent/10">
-                  <Settings className="text-accent w-5 h-5" />
-                </div>
-                <div className="text-left">
-                  <h4 className="font-medium text-foreground">Settings</h4>
-                  <p className="text-xs text-muted-foreground">Configure AI and templates</p>
-                </div>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-
+        <section className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 md:p-4">
+          <h2 className="text-lg md:text-xl font-semibold text-gray-800 mb-3">
+            Quick Actions
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <button
+              onClick={handleQuickTestFlow}
+              className="bg-green-600 text-white p-3 rounded-lg hover:bg-green-700 transition-colors text-sm md:text-base"
+            >
+              <div className="text-center">
+                <div className="text-lg md:text-xl mb-1">🚀</div>
+                <div className="font-medium">Quick Test Flow</div>
+                <div className="text-xs opacity-90 mt-1">Start testing immediately</div>
+              </div>
+            </button>
+            <button
+              onClick={handleBatchProcess}
+              className="bg-purple-600 text-white p-3 rounded-lg hover:bg-purple-700 transition-colors text-sm md:text-base"
+            >
+              <div className="text-center">
+                <div className="text-lg md:text-xl mb-1">⚡</div>
+                <div className="font-medium">Batch Process</div>
+                <div className="text-xs opacity-90 mt-1">Process multiple lessons</div>
+              </div>
+            </button>
+            <button
+              onClick={handleSettings}
+              className="bg-gray-600 text-white p-3 rounded-lg hover:bg-gray-700 transition-colors text-sm md:text-base"
+            >
+              <div className="text-center">
+                <div className="text-lg md:text-xl mb-1">⚙️</div>
+                <div className="font-medium">Settings</div>
+                <div className="text-xs opacity-90 mt-1">Configure preferences</div>
+              </div>
+            </button>
+          </div>
+        </section>
       </main>
 
       {/* Signature */}
-      <footer className="mt-8 text-center">
-        <p className="text-sm text-muted-foreground italic">
+      <footer className="mt-4 md:mt-6 text-center p-3">
+        <p className="text-xs md:text-sm text-muted-foreground italic">
           Thanh Hoàng tặng vợ iu Thu Thảo
         </p>
       </footer>
+
+      {/* Settings Modal */}
+      <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings className="w-5 h-5" />
+              Settings
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6 py-4">
+            {/* AI Model Settings */}
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">AI Model</Label>
+              <Select value={aiSettings.selectedModel} onValueChange={updateModel}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select AI model" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="gpt-5-nano">GPT-5 Nano (Fast)</SelectItem>
+                  <SelectItem value="gpt-5-mini">GPT-5 Mini (Balanced)</SelectItem>
+                  <SelectItem value="gpt-4o">GPT-4o (Advanced)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Choose the AI model for lesson generation and analysis
+              </p>
+            </div>
+
+            {/* Output Language Settings */}
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Output Language</Label>
+              <Select value={aiSettings.outputLanguage} onValueChange={updateLanguage}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select output language" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">Auto Detect</SelectItem>
+                  <SelectItem value="chinese">中文 (Chinese)</SelectItem>
+                  <SelectItem value="vietnamese">Tiếng Việt (Vietnamese)</SelectItem>
+                  <SelectItem value="english">English</SelectItem>
+                  <SelectItem value="bilingual">中文 + Tiếng Việt (Bilingual)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Set the preferred language for generated content
+              </p>
+            </div>
+
+            {/* User Information */}
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Account Information</Label>
+              <div className="bg-gray-50 p-3 rounded-lg space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">User:</span>
+                  <span className="font-medium">{user?.email || 'Not logged in'}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Credits:</span>
+                  <span className="font-medium text-green-600">$1000</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button variant="outline" onClick={() => setIsSettingsOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={() => setIsSettingsOpen(false)}>
+                Save Settings
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
