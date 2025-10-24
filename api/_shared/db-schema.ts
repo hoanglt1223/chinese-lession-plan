@@ -51,6 +51,32 @@ export const translationCache = pgTable('translation_cache', {
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 
+// Prompt templates table for customizable AI prompts
+export const promptTemplates = pgTable('prompt_templates', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: varchar('name', { length: 255 }).notNull(),
+  type: varchar('type', { length: 50 }).notNull(), // 'analysis', 'lesson_plan', 'flashcard', 'summary'
+  description: text('description'),
+  isDefault: boolean('is_default').notNull().default(false),
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Prompt components table for modular prompt parts
+export const promptComponents = pgTable('prompt_components', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  templateId: uuid('template_id').references(() => promptTemplates.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 255 }).notNull(), // e.g., 'role_definition', 'task_instructions', 'output_format'
+  type: varchar('type', { length: 50 }).notNull(), // 'system', 'user', 'instruction', 'example'
+  content: text('content').notNull(),
+  order: integer('order').notNull().default(0), // Order of component in the prompt
+  variables: jsonb('variables'), // Array of variable names used in this component: {name, type, description, defaultValue}
+  isRequired: boolean('is_required').notNull().default(true),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
 // Relations
 export const lessonsRelations = relations(lessons, ({ many }) => ({
   workflows: many(workflows),
@@ -63,6 +89,17 @@ export const workflowsRelations = relations(workflows, ({ one }) => ({
   }),
 }));
 
+export const promptTemplatesRelations = relations(promptTemplates, ({ many }) => ({
+  components: many(promptComponents),
+}));
+
+export const promptComponentsRelations = relations(promptComponents, ({ one }) => ({
+  template: one(promptTemplates, {
+    fields: [promptComponents.templateId],
+    references: [promptTemplates.id],
+  }),
+}));
+
 // Types for export
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
@@ -72,3 +109,7 @@ export type Workflow = typeof workflows.$inferSelect;
 export type InsertWorkflow = typeof workflows.$inferInsert;
 export type TranslationCache = typeof translationCache.$inferSelect;
 export type InsertTranslationCache = typeof translationCache.$inferInsert;
+export type PromptTemplate = typeof promptTemplates.$inferSelect;
+export type InsertPromptTemplate = typeof promptTemplates.$inferInsert;
+export type PromptComponent = typeof promptComponents.$inferSelect;
+export type InsertPromptComponent = typeof promptComponents.$inferInsert;

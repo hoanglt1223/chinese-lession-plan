@@ -546,15 +546,37 @@ function HomeContent() {
                 <span className="md:hidden text-xs">Tools</span>
               </Button>
               
-              {/* Mobile tools button */}
+              {/* Prompts button */}
               <Button 
                 variant="ghost" 
                 size="sm" 
-                onClick={() => window.location.href = '/tools'}
-                className="sm:hidden p-1.5"
+                onClick={() => window.location.href = '/prompts'}
+                className="hidden sm:flex px-2"
               >
-                <Layers className="h-3.5 w-3.5" />
+                <Settings className="h-3.5 w-3.5 mr-1" />
+                <span className="hidden md:inline text-xs">Prompts</span>
+                <span className="md:hidden text-xs">Prompts</span>
               </Button>
+              
+              {/* Mobile tools and prompts buttons */}
+              <div className="sm:hidden flex space-x-1">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => window.location.href = '/tools'}
+                  className="p-1.5"
+                >
+                  <Layers className="h-3.5 w-3.5" />
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => window.location.href = '/prompts'}
+                  className="p-1.5"
+                >
+                  <Settings className="h-3.5 w-3.5" />
+                </Button>
+              </div>
               
               {/* Logout button */}
               {user && (

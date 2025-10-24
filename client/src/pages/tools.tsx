@@ -654,6 +654,15 @@ export default function Tools() {
                   </span>
                 </div>
               )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => window.location.href = '/prompts'}
+                className="flex items-center gap-1 lg:gap-2 px-2 lg:px-3"
+              >
+                <Settings className="h-3 w-3 lg:h-4 lg:w-4" />
+                <span className="hidden sm:inline">Prompts</span>
+              </Button>
               {user && (
                 <Button
                   variant="outline"

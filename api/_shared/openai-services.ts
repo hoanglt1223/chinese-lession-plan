@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { cacheGet, cacheSet } from './redis.js';
 import { createHash } from 'crypto';
 import type { FlashcardData, FlashcardImage } from '../../shared/schema.js';
+import { PromptService, buildAnalysisPrompt, buildLessonPlanPrompt, buildFlashcardPrompt, buildSummaryPrompt } from './prompt-service.js';
 
 // Using gpt-5-nano as requested
 const openai = new OpenAI({
@@ -94,41 +95,28 @@ export async function analyzePDFContent(
         outputLanguage as keyof typeof languageInstructions
       ] || languageInstructions.auto;
 
+    // Use the new prompt service to get analysis prompts
+    const promptResult = await buildAnalysisPrompt({
+      content: content.substring(0, 10000),
+      langInstruction
+    });
+    
+    if (!promptResult) {
+      throw new Error('Failed to build analysis prompt');
+    }
+    
+    const { systemPrompt, userPrompt } = promptResult;
+
     const response = await openai.chat.completions.create({
       model: aiModel,
       messages: [
         {
           role: "system",
-          content: `You are an expert Chinese language education analyst. Your task is to analyze the exact content provided and extract ONLY vocabulary words that are explicitly mentioned in the lesson text. Do not add, infer, or assume any vocabulary words that are not clearly present in the source material. Do not use examples from your training data. ${langInstruction}. Respond with valid JSON only.`,
+          content: systemPrompt,
         },
         {
           role: "user",
-          content: `Analyze this Chinese lesson content and extract key information:
-
-Content to analyze:
-${content.substring(0, 10000)}
-
-CRITICAL ANALYSIS INSTRUCTIONS:
-1. LEVEL DETECTION: Look carefully for level indicators like "N1", "N2", "N3", etc. in the content. If you see "N1" anywhere in the text, the level is "N1". Do NOT confuse or change this to any other number.
-
-2. VOCABULARY EXTRACTION: Extract ONLY vocabulary words that are explicitly mentioned in the lesson content - maximum 4-5 words.
-
-3. THEME DETECTION: Look for the main lesson title or theme, often containing phrases like "小鸟找朋友", "第一课", etc.
-
-4. DURATION: Look for time indicators like "75分钟", "60分钟", etc.
-
-5. AGE GROUP: Look for indicators like "学期：第一学期" (preschool), "小学" (primary), "中学" (secondary).
-
-Provide JSON response with:
-- detectedLevel: exact level found in content (N1, N2, N3, etc.) - be very careful with this
-- vocabulary: array of 2-6 key Chinese words from lesson content
-- activities: array of teaching activities mentioned
-- learningObjectives: array of learning goals
-- ageAppropriate: "preschool", "primary", or "secondary"
-- mainTheme: main lesson topic/title from content
-- duration: lesson duration from content
-
-IMPORTANT: Only extract vocabulary that actually appears in the lesson content - do not use examples or assume any specific words.`,
+          content: userPrompt,
         },
       ],
       response_format: { type: "json_object" },
@@ -470,102 +458,31 @@ export async function generateLessonPlan(
     const validatedModel = validateModel(aiModel);
     console.log(`Generating lesson plan with model: ${validatedModel}`);
     
+    // Use the new prompt service to get lesson plan prompts
+    const promptResult = await buildLessonPlanPrompt({
+      vocabulary: analysis.vocabulary.join(", "),
+      theme: analysis.mainTheme,
+      ageGroup,
+      vocabularyJoined: analysis.vocabulary.join("、")
+    });
+    
+    if (!promptResult) {
+      throw new Error('Failed to build lesson plan prompt');
+    }
+    
+    const { systemPrompt, userPrompt } = promptResult;
+
     const response = await openai.chat.completions.create({
       model: validatedModel,
       messages: [
         {
           role: "system",
-          content: `You are an expert Chinese language curriculum developer for Vietnamese students. Create a comprehensive 4-lesson unit plan following the YUEXUELE methodology with detailed teacher instructions and student activities. Each lesson plan must be extremely detailed and practical for classroom implementation, including:
-
-1. SPECIFIC teacher actions and verbal instructions
-2. DETAILED student activities and expected responses  
-3. COMPLETE materials list with preparation instructions
-4. STEP-BY-STEP procedures with timing
-5. ASSESSMENT criteria and observation points
-6. DIFFERENTIATION strategies for various learning levels
-7. TROUBLESHOOTING tips for common classroom challenges
-
-The lesson plans should be detailed enough that any teacher can follow them successfully without additional preparation.`,
+          content: systemPrompt,
         },
-                 {
-           role: "user",
-           content: `Create 4 detailed lesson plans based on this analysis:
-
-Vocabulary: ${analysis.vocabulary.join(", ")}
-Theme: ${analysis.mainTheme}
-Age Group: ${ageGroup}
-
-CRITICAL: Return the response as structured JSON data for each lesson plan. DO NOT use HTML tags or complex markdown tables.
-
-Return this EXACT JSON structure:
-
-{
-  "lessons": [
-    {
-      "lessonNumber": 1,
-      "title": "Learn",
-      "type": "综合课",
-      "header": {
-        "level": "N1",
-        "unit": "第1课：${analysis.mainTheme}",
-        "lesson": "第1节课",
-        "references": "参考资料",
-        "lessonAim": "教学目标：\\n认知领域：通过游戏形式，学生能够掌握重点字词：${analysis.vocabulary.join("、")}\\n技能领域：在老师的引导下，学生能够模仿老师的发音，说出本课的重点字词。",
-        "subAim": "营造包容开放有爱的课堂氛围，让学生适应华文课堂，建立师生信任，培养规则意识",
-        "materials": "学习资料、规则闪卡、魔术盒、苍蝇拍",
-        "duration": "45 分钟",
-        "vocabulary": "${analysis.vocabulary.join("、")}"
-      },
-      "activities": [
         {
-          "stageName": "Warm up 热身",
-          "description": "让学生重新适应课堂环境，做好上课准备",
-          "timing": "5分钟",
-          "procedures": "● 老师走进教室，用\\"你好\\"跟学生打招呼\\n● 老师播放热身歌曲《如果开心你就跟我拍拍手》\\n● 教师跟着音乐跳舞，鼓励学生模仿",
-          "materials": "如果开心你就跟我拍拍手音乐"
-        }
-      ]
-    }
-  ]
-}
-
-**LESSON-SPECIFIC REQUIREMENTS:**
-
-**LESSON 1: LEARN (综合课)** - Vocabulary introduction through games and activities
-- Type: 综合课
-- Activities: Warm up (5min), Rules (8min), Lead-in 魔术盒 (3min), Presentation 呈现目标词汇 (8min), Practice 拍一拍 (15min), Production 蹦蹦跳跳 (6min)
-
-**LESSON 2: STORY (听说课)** - Story-based listening and speaking practice  
-- Type: 听说课  
-- Activities: Warm up 粘球大战 (15min), Rules (7min), Lead-in (3min), Presentation 主旨听力 (7min), Practice (8min), Production (5min)
-
-**LESSON 3: SING (听说课)** - Song and rhythm-based phonetic practice
-- Type: 听说课
-- Activities: Warm up Bang Bang (10min), Rules (5min), Lead-in 导入与范例呈现 (5min), Presentation 口语准备 (10min), Practice 儿歌 (10min), Production 戏剧表演 (5min)
-
-**LESSON 4: WRITE (写作课)** - Character writing and fine motor skills  
-- Type: 写作课
-- Activities: Warm up 朗读时间 (10min), Rules (5min), Lead-in 深度理解 (8min), Presentation 写作准备 (7min), Practice 学笔画 (7min), Production 画一画贴一贴 (8min)
-
-CRITICAL REQUIREMENTS FOR ALL LESSONS:
-1. **Extremely detailed procedures** with step-by-step teacher and student actions
-2. **Each activity must include:**
-   - **教师说：** "[EXACT CHINESE DIALOGUE]" - 老师具体说什么话
-   - **教师做：** [SPECIFIC PHYSICAL ACTIONS] - 老师具体做什么动作  
-   - **学生听到：** [WHAT STUDENTS HEAR] - 学生听到什么
-   - **学生看到：** [WHAT STUDENTS SEE] - 学生看到什么
-   - **学生做：** [STUDENT PHYSICAL RESPONSE] - 学生具体做什么
-   - **学生说：** [STUDENT VERBAL RESPONSE] - 学生说什么话
-3. **问题应对策略** for each step: 如果学生不反应怎么办
-4. **个别差异处理**: 能力强的学生做什么, 需要帮助的学生怎么办
-5. **成功标准** with specific percentages and observable behaviors
-6. **备用方案** for equipment failure or student difficulties
-
-**SUBSTITUTE TEACHER TEST:** 
-A substitute teacher with no Chinese teaching experience should be able to follow these plans successfully just by reading the step-by-step instructions.
-
-Generate extremely detailed, practical lesson plans in clean JSON format. Each activity should have complete step-by-step instructions that any teacher can follow.`,
-         },
+          role: "user",
+          content: userPrompt,
+        },
       ],
     });
 
@@ -613,46 +530,30 @@ export async function generateFlashcards(
     const validatedModel = validateModel(aiModel);
     console.log(`Generating flashcards with model: ${validatedModel}`);
 
+    // Use the new prompt service to get flashcard prompts
+    const promptResult = await buildFlashcardPrompt({
+      vocabulary: vocabulary.join(", "),
+      theme: theme || 'General Chinese Learning',
+      level: level || 'Beginner',
+      ageGroup: ageGroup || 'Primary'
+    });
+    
+    if (!promptResult) {
+      throw new Error('Failed to build flashcard prompt');
+    }
+    
+    const { systemPrompt, userPrompt } = promptResult;
+
     const response = await openai.chat.completions.create({
       model: validatedModel,
       messages: [
         {
           role: "system",
-          content:
-            "You are a Chinese language education expert creating flashcards for Vietnamese students. Always respond with a JSON object containing a 'flashcards' array. Each flashcard must have all required fields.",
+          content: systemPrompt,
         },
         {
           role: "user",
-          content: `Create flashcard data for these Chinese vocabulary words: ${vocabulary.join(", ")}
-
-Context:
-- Theme: ${theme || 'General Chinese Learning'}
-- Level: ${level || 'Beginner'}
-- Age Group: ${ageGroup || 'Primary'}
-
-Return a JSON object with this exact structure:
-{
-  "flashcards": [
-    {
-      "word": "Chinese characters",
-      "pinyin": "pinyin with tone marks", 
-      "vietnamese": "Vietnamese translation",
-      "partOfSpeech": "grammatical category (名词, 动词, etc.)",
-      "imageQuery": "descriptive English phrase for direct image generation"
-    }
-  ]
-}
-
-Create one flashcard for each vocabulary word. Use accurate translations and clear, direct image descriptions that immediately show the word's meaning. 
-
-IMPORTANT GUIDELINES FOR IMAGE QUERIES:
-- Create direct, clear descriptions that immediately represent the word's meaning
-- For nouns: describe the exact object (e.g., "red apple", "wooden table", "running dog")
-- For verbs: describe the action clearly and simply (e.g., "person eating", "child running", "bird flying")  
-- For adjectives: show the quality clearly (e.g., "big elephant", "small mouse", "red car")
-- Make descriptions specific and unambiguous - students should instantly recognize the word
-- Focus on recognizable representations rather than abstract or themed illustrations
-- Only 1 object per image`,
+          content: userPrompt,
         },
       ],
       response_format: { type: "json_object" },
@@ -679,20 +580,23 @@ IMPORTANT GUIDELINES FOR IMAGE QUERIES:
 
     let unsplashResults: any = {};
     let svgIconResults: any = {};
+    let freepikResults: any = {};
     
     if (photoSource !== 'ai') {
-      // Import Unsplash and high-quality SVG icon services only when needed
+      // Import Unsplash, SVG icon, and Freepik services only when needed
       const { batchGetFlashcardImages } = await import('./unsplash-service.js');
       const { batchGetFlashcardSVGIcons } = await import('./svg-icon-service.js');
+      const { batchGetFlashcardIcons } = await import('./freepik-service.js');
       
       // Extract image queries for search
       const imageQueries = flashcards.map((card: FlashcardData) => card.imageQuery || card.word);
       
-      // Get images from Unsplash and high-quality SVG icons in parallel
-      console.log('🔍 Fetching Unsplash images and high-quality SVG icons...');
-      [unsplashResults, svgIconResults] = await Promise.all([
+      // Get images from Unsplash, SVG icons, and Freepik icons in parallel
+      console.log('🔍 Fetching Unsplash images, SVG icons, and Freepik icons...');
+      [unsplashResults, svgIconResults, freepikResults] = await Promise.all([
         batchGetFlashcardImages(imageQueries),
-        batchGetFlashcardSVGIcons(imageQueries)
+        batchGetFlashcardSVGIcons(imageQueries),
+        batchGetFlashcardIcons(imageQueries)
       ]);
     }
     
@@ -922,66 +826,28 @@ export async function generateSummary(
     const validatedModel = validateModel(aiModel);
     console.log(`Generating summary with model: ${validatedModel}`);
     
+    // Use the new prompt service to get summary prompts
+    const promptResult = await buildSummaryPrompt({
+      lessonPlan,
+      vocabulary: vocabulary.join(", ")
+    });
+    
+    if (!promptResult) {
+      throw new Error('Failed to build summary prompt');
+    }
+    
+    const { systemPrompt, userPrompt } = promptResult;
+
     const response = await openai.chat.completions.create({
       model: validatedModel,
       messages: [
         {
           role: "system",
-          content: "You are creating individual lesson summaries for Vietnamese families following the YUEXUELE methodology. Create 4 separate summaries for each lesson (Learn, Story, Sing, Write) with vocabulary, homework, and practice tips.",
+          content: systemPrompt,
         },
         {
           role: "user",
-          content: `Create 4 individual lesson summaries based on this 4-lesson unit plan:
-
-${lessonPlan}
-
-Key vocabulary: ${vocabulary.join(", ")}
-
-Create 4 separate lesson summaries, each following this exact format:
-
-**LESSON SUMMARY**
-
-|**Program:** Yuexuele Little Warriors<br>**Name:** …………………………………………|**Lesson:** [Lesson Number]<br>**Level:** N1|
-| :- | :- |
-
-|**Lesson overview**|
-| :-: |
-
-|**Unit 1: [Theme Name]**<br>**Lesson [Number]**|
-| :-: |
-
-**Vocabulary**: 
-
-|[Chinese Word]<br>/[pinyin]/|(词性)|[Vietnamese translation]|
-| :- | :-: | :- |
-|[Next word]<br>/[pinyin]/|(词性)|[Vietnamese translation]|
-
-|**Homework**|
-| :-: |
-
-## LESSON 1 SUMMARY (Learn - 综合课)
-[Generate individual summary for Lesson 1 - vocabulary introduction and games]
-
-## LESSON 2 SUMMARY (Story - 听说课)  
-[Generate individual summary for Lesson 2 - story-based learning]
-
-## LESSON 3 SUMMARY (Sing - 听说课)
-[Generate individual summary for Lesson 3 - songs and performance]
-
-## LESSON 4 SUMMARY (Write - 写作课)
-[Generate individual summary for Lesson 4 - writing and hands-on activities]
-
-REQUIREMENTS:
-1. Use the exact vocabulary: ${vocabulary.join(", ")}
-2. Include pinyin and Vietnamese translations for all vocabulary
-3. Provide specific homework for each lesson type
-4. Make it family-friendly for Vietnamese parents
-5. Include practice tips appropriate for each lesson focus
-6. Use proper word types (名词, 动词, etc.) in Chinese
-7. Keep consistent formatting across all 4 summaries
-8. Each summary should reflect the specific lesson's learning objectives
-
-Make each summary practical for Vietnamese families with clear instructions.`,
+          content: userPrompt,
         },
       ],
     });

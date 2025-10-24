@@ -10,6 +10,7 @@ import { TranslationProvider } from "@/contexts/TranslationContext";
 import { useAuth } from "@/hooks/useAuth";
 import Home from "@/pages/home";
 import Tools from "@/pages/tools";
+import Prompts from "@/pages/prompts";
 import Login from "@/pages/login";
 import NotFound from "@/pages/not-found";
 
@@ -36,6 +37,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/tools" component={Tools} />
+      <Route path="/prompts" component={Prompts} />
       <Route component={NotFound} />
     </Switch>
   );
