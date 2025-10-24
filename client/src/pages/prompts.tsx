@@ -53,12 +53,18 @@ export default function PromptsPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [loading, setLoading] = useState(true);
   
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   
   const logoutMutation = useMutation({
-    mutationFn: logout,
+    mutationFn: async () => {
+      const response = await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      });
+      return response.json();
+    },
     onSuccess: () => {
-      window.location.href = '/login';
+      window.location.href = "/";
     },
   });
   const [previewMode, setPreviewMode] = useState(false);
@@ -245,11 +251,11 @@ export default function PromptsPage() {
             </div>
             
             <nav className="flex items-center gap-2 lg:gap-4">
-              {user?.credits !== undefined && (
+              {user?.creditBalance !== undefined && (
                 <div className="flex items-center gap-1 lg:gap-2 px-2 lg:px-3 py-1 bg-green-50 rounded-lg border border-green-200">
                   <DollarSign className="h-3 w-3 lg:h-4 lg:w-4 text-green-600" />
                   <span className="text-xs lg:text-sm font-medium text-green-700">
-                    {user.credits} credits
+                    {user.creditBalance} credits
                   </span>
                 </div>
               )}

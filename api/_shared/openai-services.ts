@@ -732,6 +732,7 @@ export async function generateFlashcards(
             // Get Unsplash images and Freepik icons even if AI fails (only if using API source)
             const unsplashImages = photoSource !== 'ai' ? unsplashResults[flashcard.imageQuery || flashcard.word] : null;
             const freepikIcons = photoSource !== 'ai' ? (freepikResults[flashcard.imageQuery || flashcard.word] || []) : [];
+            const svgIcons = photoSource !== 'ai' ? (svgIconResults[flashcard.imageQuery || flashcard.word] || []) : [];
             
             // Combine all image options (only if using API source)
             const allImages = photoSource !== 'ai' ? [

@@ -22,7 +22,7 @@ export async function getPromptTemplates(req: Request, res: Response) {
 
     res.json({ templates });
   } catch (error) {
-    handleError(error, res);
+    handleError(res as any, error, 'getPromptTemplates');
   }
 }
 
@@ -46,7 +46,7 @@ export async function getPromptTemplate(req: Request, res: Response) {
 
     res.json({ template });
   } catch (error) {
-    handleError(error, res);
+    handleError(res as any, error, 'getPromptTemplate');
   }
 }
 
@@ -70,7 +70,7 @@ export async function getPromptTemplatesByType(req: Request, res: Response) {
 
     res.json({ templates });
   } catch (error) {
-    handleError(error, res);
+    handleError(res as any, error, 'getPromptTemplatesByType');
   }
 }
 
@@ -134,7 +134,7 @@ export async function createPromptTemplate(req: Request, res: Response) {
 
     res.status(201).json({ template: completeTemplate });
   } catch (error) {
-    handleError(error, res);
+    handleError(res as any, error, 'createPromptTemplate');
   }
 }
 
@@ -207,7 +207,7 @@ export async function updatePromptTemplate(req: Request, res: Response) {
 
     res.json({ template: updatedTemplate });
   } catch (error) {
-    handleError(error, res);
+    handleError(res as any, error, 'updatePromptTemplate');
   }
 }
 
@@ -231,7 +231,7 @@ export async function deletePromptTemplate(req: Request, res: Response) {
 
     res.json({ message: 'Prompt template deleted successfully' });
   } catch (error) {
-    handleError(error, res);
+    handleError(res as any, error, 'deletePromptTemplate');
   }
 }
 
@@ -259,7 +259,7 @@ export async function getDefaultPromptTemplate(req: Request, res: Response) {
 
     res.json({ template });
   } catch (error) {
-    handleError(error, res);
+    handleError(res as any, error, 'getDefaultPromptTemplate');
   }
 }
 
@@ -307,7 +307,7 @@ export async function buildPrompt(req: Request, res: Response) {
       }
     });
   } catch (error) {
-    handleError(error, res);
+    handleError(res as any, error, 'buildPrompt');
   }
 }
 
@@ -316,4 +316,48 @@ function replaceVariables(content: string, variables: Record<string, any>): stri
   return content.replace(/\{\{(\w+)\}\}/g, (match, varName) => {
     return variables[varName] !== undefined ? String(variables[varName]) : match;
   });
+}
+
+// Default export handler for Vercel
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  setCorsHeaders(res);
+  
+  if (req.method === 'OPTIONS') {
+    return handleOptions(res);
+  }
+
+  // Initialize database on first request
+  await initializeDatabase();
+
+  try {
+    const { method, url } = req;
+    const urlPath = new URL(url!, `http://${req.headers.host}`).pathname;
+    
+    // Route to appropriate handler based on method and path
+    if (method === 'GET') {
+      if (urlPath === '/api/prompts') {
+        return await getPromptTemplates(req as any, res as any);
+      } else if (urlPath.match(/^\/api\/prompts\/[^\/]+$/)) {
+        return await getPromptTemplate(req as any, res as any);
+      } else if (urlPath.match(/^\/api\/prompts\/type\/[^\/]+$/)) {
+        return await getPromptTemplatesByType(req as any, res as any);
+      } else if (urlPath.match(/^\/api\/prompts\/default\/[^\/]+$/)) {
+        return await getDefaultPromptTemplate(req as any, res as any);
+      }
+    } else if (method === 'POST') {
+      if (urlPath === '/api/prompts') {
+        return await createPromptTemplate(req as any, res as any);
+      } else if (urlPath === '/api/prompts/build') {
+        return await buildPrompt(req as any, res as any);
+      }
+    } else if (method === 'PUT' && urlPath.match(/^\/api\/prompts\/[^\/]+$/)) {
+      return await updatePromptTemplate(req as any, res as any);
+    } else if (method === 'DELETE' && urlPath.match(/^\/api\/prompts\/[^\/]+$/)) {
+      return await deletePromptTemplate(req as any, res as any);
+    }
+
+    return res.status(404).json({ error: 'Not found' });
+  } catch (error) {
+    handleError(res as any, error, 'handler');
+  }
 }

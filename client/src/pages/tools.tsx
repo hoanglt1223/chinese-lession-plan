@@ -26,7 +26,8 @@ import {
   LogOut,
   Mic,
   FileAudio,
-  Plus
+  Plus,
+  Settings
 } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
