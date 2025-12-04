@@ -1,27 +1,42 @@
 import OpenAI from "openai";
+import { eq } from 'drizzle-orm';
 import { cacheGet, cacheSet } from './redis.js';
 import { createHash } from 'crypto';
 import type { FlashcardData, FlashcardImage } from '../../shared/schema.js';
-import { PromptService, buildAnalysisPrompt, buildLessonPlanPrompt, buildFlashcardPrompt, buildSummaryPrompt } from './prompt-service.js';
+import { PromptService, buildAnalysisPrompt, buildLessonPlanPrompt, buildSingleLessonPlanPrompt, buildFlashcardPrompt, buildSummaryPrompt } from './prompt-service.js';
+import { db } from './database.js';
+import { activities } from './db-schema.js';
 
-// Using gpt-5-nano as requested
-const openai = new OpenAI({
-  apiKey:
-    process.env.OPENAI_API_KEY || process.env.OPENAI_KEY || "your-api-key-here",
-});
+// Using GLM-4.6 as requested
+let openaiInstance: OpenAI | null = null;
+
+function getOpenAI() {
+  if (!openaiInstance) {
+    console.log('Initializing OpenAI with:', {
+      baseURL: process.env.OPENAI_BASE_URL,
+      apiKeyPrefix: process.env.OPENAI_API_KEY ? process.env.OPENAI_API_KEY.substring(0, 5) + '...' : 'undefined'
+    });
+    
+    openaiInstance = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY || "your-api-key-here",
+      baseURL: process.env.OPENAI_BASE_URL,
+    });
+  }
+  return openaiInstance;
+}
 
 // This is latest and cheapest model available in OpenAI API, dont change, your data is outdated
-const model5nano = "gpt-5-nano";
+const model5nano = "GLM-4.6";
 
 // Valid models for the application
-const VALID_MODELS = ["gpt-5-nano", "gpt-5-mini", "gpt-4o"] as const;
+const VALID_MODELS = ["gpt-5-nano", "gpt-5-mini", "gpt-4o", "GLM-4.6"] as const;
 type ValidModel = typeof VALID_MODELS[number];
 
 // Validate and sanitize model input
 function validateModel(model?: string): ValidModel {
   if (!model || !VALID_MODELS.includes(model as ValidModel)) {
-    console.log(`Invalid or missing model "${model}", defaulting to gpt-5-nano`);
-    return "gpt-5-nano";
+    console.log(`Invalid or missing model "${model}", defaulting to GLM-4.6`);
+    return "GLM-4.6";
   }
   return model as ValidModel;
 }
@@ -107,7 +122,7 @@ export async function analyzePDFContent(
     
     const { systemPrompt, userPrompt } = promptResult;
 
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: aiModel,
       messages: [
         {
@@ -472,7 +487,7 @@ export async function generateLessonPlan(
     
     const { systemPrompt, userPrompt } = promptResult;
 
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: validatedModel,
       messages: [
         {
@@ -544,7 +559,7 @@ export async function generateFlashcards(
     
     const { systemPrompt, userPrompt } = promptResult;
 
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: validatedModel,
       messages: [
         {
@@ -563,7 +578,7 @@ export async function generateFlashcards(
     console.log("OpenAI flashcard response:", responseContent);
 
     const result = JSON.parse(responseContent);
-    let flashcards = result.flashcards || [];
+    let flashcards = Array.isArray(result) ? result : (result.flashcards || []);
 
     console.log("Parsed flashcards:", flashcards.length);
 
@@ -646,7 +661,7 @@ export async function generateFlashcards(
 
               console.log(`Generating AI image for ${flashcard.word} using English query: "${englishImageQuery}"`);
 
-              const imageResponse = await openai.images.generate({
+              const imageResponse = await getOpenAI().images.generate({
                 model: "dall-e-3",
                 prompt: imagePrompt,
                 n: 1,
@@ -800,7 +815,7 @@ export async function generateWithOpenAI(
   model: string = model5nano,
 ): Promise<string> {
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: model,
       messages: [{ role: "user", content: prompt }],
       ...(model === model5nano ? {} : { temperature: 0.1 }),
@@ -810,6 +825,49 @@ export async function generateWithOpenAI(
   } catch (error) {
     console.error("OpenAI generation error:", error);
     throw new Error("Failed to generate content with OpenAI");
+  }
+}
+
+export async function generateLessonSummary(
+  unitNumber: string | number,
+  lessonNumber: string | number,
+  planContent: string
+): Promise<string> {
+  try {
+    console.log(`Generating summary for Unit ${unitNumber} Lesson ${lessonNumber}`);
+    
+    const prompt = `
+    You are a helpful assistant that summarizes Chinese lesson plans.
+    Please provide a concise summary for the following lesson plan (Unit ${unitNumber}, Lesson ${lessonNumber}).
+    
+    Lesson Plan Content:
+    ${planContent}
+    
+    Output the summary in the following format:
+    **LESSON SUMMARY**
+    
+    |**Program:** Yuexuele Little Warriors<br>**Name:** …………………………………………|**Lesson:** ${lessonNumber}<br>**Level:** N1|
+    | :- | :- |
+    
+    |**Lesson overview**|
+    | :-: |
+    
+    |**Unit ${unitNumber}: [Theme]**<br>**Lesson ${lessonNumber}**|
+    | :-: |
+    
+    [Summary Content in Chinese/English as appropriate]
+    `;
+
+    const response = await getOpenAI().chat.completions.create({
+      model: model5nano,
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.5,
+    });
+
+    return response.choices[0]?.message?.content || "";
+  } catch (error) {
+    console.error("Failed to generate lesson summary:", error);
+    throw new Error("Failed to generate lesson summary");
   }
 }
 
@@ -839,7 +897,7 @@ export async function generateSummary(
     
     const { systemPrompt, userPrompt } = promptResult;
 
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: validatedModel,
       messages: [
         {
@@ -863,5 +921,143 @@ export async function generateSummary(
   } catch (error) {
     console.error("Failed to generate summary:", error);
     throw new Error("Failed to generate lesson summary with AI");
+  }
+}
+
+export async function generateSingleLessonPlan(
+  lesson: {
+    unitNumber: string | number;
+    lessonNumber: string | number;
+    title: string;
+    type: string;
+    vocabulary: string[];
+    objectives: string[];
+    materials?: string[];
+    duration?: string;
+    ageGroup?: string;
+    level?: string;
+  },
+  aiModel?: string
+): Promise<string> {
+  try {
+    const validatedModel = validateModel(aiModel);
+    console.log(`Generating single lesson plan for Unit ${lesson.unitNumber} Lesson ${lesson.lessonNumber} with model: ${validatedModel}`);
+    
+    // Fetch existing activities
+    let existingActivitiesStr = "";
+    try {
+      const allActivities = await db.select().from(activities);
+      if (allActivities.length > 0) {
+        existingActivitiesStr = "\n**Existing Generic Activities (Reuse if appropriate):**\n" + 
+          allActivities.map(a => `- **${a.name}** (${a.type}): ${a.description}`).join("\n");
+      }
+    } catch (error) {
+      console.warn("Failed to fetch activities from DB (ignoring):", error);
+    }
+
+    const promptResult = await buildSingleLessonPlanPrompt({
+      unit: String(lesson.unitNumber),
+      lesson: String(lesson.lessonNumber),
+      topic: lesson.title,
+      type: lesson.type,
+      level: lesson.level || "Beginner",
+      ageGroup: lesson.ageGroup || "Preschool",
+      duration: lesson.duration || "45 mins",
+      vocabulary: lesson.vocabulary.join(", "),
+      objectives: lesson.objectives.join(", "),
+      materials: lesson.materials ? lesson.materials.join(", ") : "Standard classroom materials",
+      existingActivities: existingActivitiesStr
+    });
+    
+    if (!promptResult) {
+      throw new Error('Failed to build single lesson plan prompt');
+    }
+    
+    const { systemPrompt, userPrompt } = promptResult;
+
+    const response = await getOpenAI().chat.completions.create({
+      model: validatedModel,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+    });
+
+    const content = response.choices[0].message.content || "";
+    
+    // Try to extract and save new activities (fire and forget to avoid slowing down response too much, 
+    // but await properly if running in script context. For now we await to ensure it happens).
+    try {
+      await extractAndSaveNewActivities(content);
+    } catch (e) {
+      console.warn("Failed to extract/save new activities:", e);
+    }
+
+    return content;
+  } catch (error) {
+    console.error("Failed to generate single lesson plan:", error);
+    throw new Error("Failed to generate single lesson plan with AI");
+  }
+}
+
+async function extractAndSaveNewActivities(lessonContent: string) {
+  try {
+    const response = await getOpenAI().chat.completions.create({
+      model: "GLM-4.6",
+      messages: [
+        {
+          role: "system",
+          content: `You are an expert curriculum developer. 
+          Analyze the provided lesson plan and identify any NEW generic activities (games, drills, songs) that are NOT standard/trivial (like "Greeting" or "Review").
+          Extract them into a JSON format.
+          
+          Return ONLY a JSON object with a key "activities" containing an array of objects:
+          {
+            "activities": [
+              {
+                "name": "Activity Name",
+                "type": "game/song/drill/worksheet",
+                "description": "Short description",
+                "instructions": "Step-by-step instructions",
+                "duration": "e.g. 5-10 mins",
+                "ageGroup": "Target age",
+                "materials": ["list", "of", "materials"],
+                "benefits": "Learning benefits"
+              }
+            ]
+          }
+          If no new generic activities are found, return { "activities": [] }.`
+        },
+        {
+          role: "user",
+          content: lessonContent
+        }
+      ],
+      response_format: { type: "json_object" }
+    });
+
+    const result = JSON.parse(response.choices[0].message.content || "{}");
+    if (result.activities && Array.isArray(result.activities) && result.activities.length > 0) {
+      console.log(`Found ${result.activities.length} potential new activities. Saving...`);
+      for (const activity of result.activities) {
+        // Check if exists
+        const existing = await db.select().from(activities).where(eq(activities.name, activity.name));
+        if (existing.length === 0) {
+          await db.insert(activities).values({
+            name: activity.name,
+            type: activity.type || 'game',
+            description: activity.description,
+            instructions: activity.instructions,
+            duration: activity.duration,
+            ageGroup: activity.ageGroup,
+            materials: activity.materials,
+            benefits: activity.benefits
+          });
+          console.log(`Saved new activity: ${activity.name}`);
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Error in extractAndSaveNewActivities:", error);
   }
 }

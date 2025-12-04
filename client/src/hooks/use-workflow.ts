@@ -9,14 +9,11 @@ export function useWorkflow(lessonId: string | null) {
 
   // Get lesson data instead of workflow data
   const { data: lesson, isLoading } = useQuery<Lesson | null>({
-    queryKey: ["/api/lessons", lessonId],
+    queryKey: ["/api/course-ops", "lessons", lessonId],
     queryFn: async () => {
       if (!lessonId) throw new Error("No lesson ID");
       
-      const response = await apiRequest('POST', '/api/lessons', {
-        action: 'get',
-        lessonId: lessonId
-      });
+      const response = await apiRequest('GET', `/api/course-ops?action=lessons&id=${lessonId}`);
       const result = await response.json();
       
       // Handle null response gracefully (lesson not found)
@@ -44,15 +41,16 @@ export function useWorkflow(lessonId: string | null) {
       console.log('🚀 updateStep mutation - lessonId:', lessonId);
       
       // Update lesson with the new data using body parameters
-      const response = await apiRequest('PUT', '/api/lessons', {
-        id: lessonId,
+      const response = await apiRequest('POST', '/api/course-ops', {
+        action: 'update-lesson',
+        lessonId: lessonId,
         ...data
       });
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('❌ PUT request failed:', response.status, errorText);
-        throw new Error(`PUT request failed: ${response.status}`);
+        console.error('❌ POST request failed:', response.status, errorText);
+        throw new Error(`POST request failed: ${response.status}`);
       }
       
       const result = await response.json();
@@ -68,8 +66,8 @@ export function useWorkflow(lessonId: string | null) {
     },
     onSuccess: (result) => {
       console.log('✅ updateStep onSuccess - invalidating queries');
-      queryClient.invalidateQueries({ queryKey: ["/api/lessons", lessonId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/lessons"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/course-ops", "lessons", lessonId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/course-ops", "lessons"] });
     },
     onError: (error) => {
       console.error('❌ updateStep mutation error:', error);

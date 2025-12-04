@@ -134,6 +134,15 @@ Note: Some PDFs with complex formatting or scanned images may not process correc
 奖励学生贴纸，并给予积极的评价和肯定。- Hardcoded`;
   }
 
+  async processImage(buffer: Buffer, filename: string): Promise<ProcessedFile> {
+    return {
+      name: filename,
+      content: "[Image content - OCR not implemented]",
+      type: 'image',
+      size: buffer.length
+    };
+  }
+
   async convertMarkdownToDocx(markdown: string): Promise<Buffer> {
     // For serverless, return markdown as text - would need docx library for proper conversion
     const content = `# Lesson Summary\n\n${markdown}`;

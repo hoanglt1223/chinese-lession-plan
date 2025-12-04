@@ -100,6 +100,21 @@ export const promptComponentsRelations = relations(promptComponents, ({ one }) =
   }),
 }));
 
+// Generic Activities table for reusable lesson activities
+export const activities = pgTable('activities', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: varchar('name', { length: 255 }).notNull().unique(), // e.g., "Sticky Ball", "Fruit Squat"
+  type: varchar('type', { length: 50 }).notNull().default('game'), // 'game', 'song', 'worksheet', 'drill'
+  description: text('description'), // Short description
+  instructions: text('instructions'), // Detailed how-to-play
+  duration: varchar('duration', { length: 50 }), // e.g., "5-10 mins"
+  ageGroup: varchar('age_group', { length: 100 }), // e.g., "Preschool", "Primary"
+  materials: jsonb('materials'), // Array of required materials
+  benefits: text('benefits'), // Learning outcomes/benefits
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
 // Types for export
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;

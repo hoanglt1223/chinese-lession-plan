@@ -1,0 +1,18 @@
+
+| Level 1 | N1 | Unit 4 | Unit 4 Lesson 3 | Lesson 3 | 第3节课 |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **References:** | 参考资料 | YCT Standard Course 1 (YCT标准教程 1) | | | |
+| **Lesson aim:** | 教学目标 | **Cognitive domain:** | 认识并说出4-5种水果的名称。 | **Skill domain:** | 能用简单句型询问和回答关于水果的问题，如‘这是什么？’‘这是…。’ |
+| **Sub aim:** | 次要教学目标 | 培养参与课堂游戏和角色扮演的积极性。 | | | |
+| **Type of lesson** | 课型 | 听说课 | **Materials required:** | 教具 | 水果闪卡(苹果、香蕉、橙子、葡萄、草莓), 真实水果或塑料水果玩具, 黏球, 一个不透明的袋子, 白板/黑板和磁铁。 |
+| **Lesson content** | 教学内容 | **Vocabulary:** | 苹果 (píngguǒ), 香蕉 (xiāngjiāo), 橙子 (chéngzi), 葡萄 (pútáo), 草莓 (cǎoméi). | **Grammar/Other:** | 句型：这是什么？(Zhè shì shénme?) - What is this?; 这是… (Zhè shì...) - This is... |
+| **Duration:** | 课时 | 45 mins | | | |
+
+| Stage & aim 教学环节与目标 | Activities ideas & Procedures 活动设计与教学步骤 | Materials / 教具 |
+| :--- | :--- | :--- |
+| **Warm up 热身**<br>(Aim: To get students energized and ready to learn in Chinese.) | Greet students with a "Hello Song" (你好歌). Then, lead a simple "Fruit Chant" with clapping and actions to introduce the topic of fruits. | Music player, fruit flashcards. |
+| **Rules 规则**<br>(Aim: Remind class rules for smooth lesson flow.) | Quickly review 3 key classroom rules with gestures: 1. 听 (tīng) - point to ears. 2. 看 (kàn) - point to eyes. 3. 坐好 (zuò hǎo) - hands on lap. | None. |
+| **Review / Presentation**<br>(Aim: To introduce new vocabulary and sentence patterns in a clear and engaging way.) | **Presentation:** 1. Show real or plastic fruit one by one. Say the name clearly, e.g., "这是苹果" (zhè shì píngguǒ). Have students repeat. 2. Introduce the flashcard with the character, pinyin, and picture. 3. Introduce the question "这是什么？" (zhè shì shénme?) and have students practice asking it while pointing to a fruit. 4. Model the full Q&A dialogue several times. | Real/plastic fruit, fruit flashcards. |
+| **Practice**<br>(Aim: To reinforce vocabulary and sentence patterns through interactive games.) | **Activity 1: Mystery Bag game**<br>Place one fruit toy in a bag. Invite a student to put their hand in and feel it. Ask the student "这是什么？" (What is this?). The student guesses "这是...?" (e.g., "这是苹果？"). Reveal the fruit and praise the correct answer. Repeat with other students and fruits. <br><br> **Activity 2: Sticky Ball game**<br>Stick the fruit flashcards on the board. The teacher says a fruit name, e.g., "香蕉！" (Banana!). A student comes to the front and throws a sticky ball at the correct flashcard. The whole class then says the word together. | A non-transparent bag, real/plastic fruit, sticky balls, fruit flashcards, whiteboard. |
+| **Production**<br>(Aim: To encourage students to use the target language communicatively in a simulated scenario.) | **Market Role-play game:**<br>Set up a small "fruit market" at a table with the fruit toys and flashcards. One student acts as the seller. The teacher and other students are customers. Customers approach and ask "这是什么？" pointing to a fruit. The seller answers "这是...". Encourage students to switch roles. The teacher can model "我要这个" (wǒ yào zhège - I want this one) for more advanced students. | Table, real/plastic fruit, fruit flashcards. |
+| **Wrap up 总结**<br>(Aim: To review the lesson content and end on a positive note.) | Quickly show all the fruit flashcards and have students chorally say the names. Sing a "Goodbye Song" (再见歌) that incorporates the fruit names, e.g., "再见，苹果！再见，香蕉！". | Fruit flashcards, music player. |

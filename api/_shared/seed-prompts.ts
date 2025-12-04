@@ -344,10 +344,91 @@ Key vocabulary: {{vocabulary}}`,
     }
   ]);
 
+  // Single Lesson Plan prompt template
+  const [singleLessonPlanTemplate] = await db.insert(promptTemplates).values({
+    name: 'Single Lesson Plan (Detailed)',
+    type: 'single_lesson_plan',
+    description: 'Generates a detailed single lesson plan',
+    isDefault: true,
+    isActive: true
+  }).returning();
+
+  await db.insert(promptComponents).values([
+    {
+      templateId: singleLessonPlanTemplate.id,
+      name: 'role_definition',
+      type: 'system',
+      content: 'You are an expert Chinese language teacher creating a detailed lesson plan for a specific lesson.',
+      order: 1,
+      variables: [],
+      isRequired: true
+    },
+    {
+      templateId: singleLessonPlanTemplate.id,
+      name: 'lesson_context',
+      type: 'user',
+      content: `Create a detailed lesson plan for:
+- **Unit**: {{unit}}
+- **Lesson**: {{lesson}}
+- **Topic**: {{topic}}
+- **Type**: {{type}}
+- **Level**: {{level}}
+- **Age Group**: {{ageGroup}}
+- **Duration**: {{duration}}`,
+      order: 1,
+      variables: [
+        { name: 'unit', type: 'string', description: 'Unit number/name' },
+        { name: 'lesson', type: 'string', description: 'Lesson number/name' },
+        { name: 'topic', type: 'string', description: 'Lesson topic' },
+        { name: 'type', type: 'string', description: 'Lesson type' },
+        { name: 'level', type: 'string', description: 'Proficiency level' },
+        { name: 'ageGroup', type: 'string', description: 'Student age group' },
+        { name: 'duration', type: 'string', description: 'Lesson duration' }
+      ],
+      isRequired: true
+    },
+    {
+      templateId: singleLessonPlanTemplate.id,
+      name: 'content_requirements',
+      type: 'user',
+      content: `**Content**:
+- **Vocabulary**: {{vocabulary}}
+- **Objectives**: {{objectives}}
+- **Materials**: {{materials}}`,
+      order: 2,
+      variables: [
+        { name: 'vocabulary', type: 'string', description: 'Vocabulary list' },
+        { name: 'objectives', type: 'string', description: 'Learning objectives' },
+        { name: 'materials', type: 'string', description: 'Materials needed' }
+      ],
+      isRequired: true
+    },
+    {
+      templateId: singleLessonPlanTemplate.id,
+      name: 'structure_instructions',
+      type: 'user',
+      content: `Generate the lesson plan in Markdown format with the following sections:
+1.  **Header Table**: Unit, Lesson, Topic, Objectives, Materials, Duration.
+2.  **Procedure Table**: Columns for Stage/Time, Teacher Activity, Student Activity, Materials/Media.
+    *   Include Warm-up, Presentation, Practice, Production, and Wrap-up stages.
+    *   Make activities highly interactive and suitable for {{ageGroup}}.
+    *   Include specific game instructions (like "Fruit Squat", "Sticky Ball", etc. if relevant).
+
+**Style**:
+- Professional, clear, and easy to read.
+- Use tables for structure.
+- Bilingual headings (English/Chinese) where appropriate.`,
+      order: 3,
+      variables: [],
+      isRequired: true
+    }
+  ]);
+
   console.log('✅ Prompt templates seeded successfully!');
   console.log(`Created templates:
   - Analysis: ${analysisTemplate.id}
   - Lesson Plan: ${lessonPlanTemplate.id}
+  - Single Lesson Plan: ${singleLessonPlanTemplate.id}
   - Flashcard: ${flashcardTemplate.id}
   - Summary: ${summaryTemplate.id}`);
 }

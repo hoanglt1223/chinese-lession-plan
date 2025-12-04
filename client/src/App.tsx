@@ -13,6 +13,8 @@ import Tools from "@/pages/tools";
 import Prompts from "@/pages/prompts";
 import Login from "@/pages/login";
 import NotFound from "@/pages/not-found";
+import CourseManager from "@/pages/course-manager";
+import BatchManager from "@/pages/batch-manager";
 
 function Router() {
   const { isAuthenticated, isLoading, user } = useAuth();
@@ -38,6 +40,8 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/tools" component={Tools} />
       <Route path="/prompts" component={Prompts} />
+      <Route path="/course-manager" component={CourseManager} />
+      <Route path="/batch-manager" component={BatchManager} />
       <Route component={NotFound} />
     </Switch>
   );

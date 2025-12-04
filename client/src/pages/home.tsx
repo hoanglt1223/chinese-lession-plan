@@ -1,849 +1,397 @@
-import React, { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+import React, { useState, useRef, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Link } from "wouter";
+import { 
+  Layout, BookOpen, FileText, Image as ImageIcon, List, 
+  Play, Save, Loader2, Upload, Search, ChevronRight, 
+  CheckCircle, AlertCircle, RefreshCw, Layers
+} from "lucide-react";
+
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { ExportBar } from "@/components/export/export-bar";
-import { KanbanBoard } from "@/components/workflow/kanban-board";
-import { useWorkflow } from "@/hooks/use-workflow";
-import { WorkflowProvider } from "@/contexts/WorkflowContext";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/api";
-import { queryClient } from "@/lib/queryClient";
-import { useAuth } from "@/hooks/useAuth";
-import { useAI } from "@/contexts/AIContext";
-import { GraduationCap, Clock, FolderInput, Layers, Settings, Zap, Loader2, LogOut, DollarSign } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { useToast } from "@/hooks/use-toast";
+import { MarkdownEditor } from "@/components/editor/markdown-editor";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
-function HomeContent() {
-  const [selectedLesson, setSelectedLesson] = useState<string | null>(null);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const { lesson, currentStep, updateStep } = useWorkflow(selectedLesson);
-  const { user } = useAuth();
-  const { settings: aiSettings, updateModel, updateLanguage } = useAI();
+// --- Types ---
+interface Lesson {
+  unitNumber: number;
+  lessonNumber: number;
+  title: string;
+  type: string;
+  vocabulary: string[];
+  objectives: string[];
+}
 
-  const logoutMutation = useMutation({
-    mutationFn: async () => {
-      const response = await fetch("/api/auth/logout", {
+interface CourseStructure {
+  structure: Record<string, Lesson[]>;
+  totalLessons: number;
+  filePath: string;
+}
+
+// --- Components ---
+
+export default function Home() {
+  const [selectedLesson, setSelectedLesson] = useState<{unit: number, lesson: number, title: string} | null>(null);
+  const [activeTab, setActiveTab] = useState("plan");
+  const [forceRegenerate, setForceRegenerate] = useState(false);
+  const [skipFlashcards, setSkipFlashcards] = useState(false);
+  const [editorContent, setEditorContent] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // --- Queries & Mutations ---
+
+  const { data: courseData, isLoading: isCourseLoading, refetch: refetchCourse } = useQuery<CourseStructure>({
+    queryKey: ["/api/course-ops?action=structure"],
+    queryFn: async () => {
+      const res = await fetch("/api/course-ops?action=structure");
+      if (!res.ok) throw new Error("Failed to fetch course structure");
+      return res.json();
+    }
+  });
+
+  const fileContentMutation = useMutation({
+    mutationFn: async (params: { action: 'read' | 'write', unit: number, lesson: number, content?: string }) => {
+      const res = await fetch("/api/content-ops", {
         method: "POST",
-        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...params,
+          action: params.action === 'read' ? 'read-file' : 'write-file'
+        }),
       });
-      return response.json();
+      if (!res.ok) {
+         if (params.action === 'read' && res.status === 404) return { content: '' };
+         throw new Error("Failed to access file content");
+      }
+      return res.json();
+    }
+  });
+
+  const generateMutation = useMutation({
+    mutationFn: async (params: { unit: number; lesson: number; force: boolean; skipFlashcards: boolean }) => {
+      const res = await fetch("/api/course-ops", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          action: 'generate',
+          unitNumber: params.unit, 
+          lessonNumber: params.lesson,
+          force: params.force,
+          skipFlashcards: params.skipFlashcards
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || "Generation failed");
+      }
+      return res.json();
     },
     onSuccess: () => {
-      window.location.href = "/";
+      toast({ title: "Generation Complete", description: "Lesson plan and materials generated." });
+      // Refresh content if we are looking at it
+      if (selectedLesson) {
+        loadFileContent(selectedLesson.unit, selectedLesson.lesson);
+      }
     },
-  });
-  
-  const { data: lessons } = useQuery({
-    queryKey: ["/api/lessons"],
-    enabled: true,
+    onError: (error) => {
+      toast({ title: "Generation Failed", description: error.message, variant: "destructive" });
+    }
   });
 
-  const recentLessons = Array.isArray(lessons) ? lessons.slice(0, 4) : [];
-  const totalSteps = 5; // Total workflow steps
-
-  // Handler functions
-  const handleSelectLesson = (lessonId: string) => {
-    setSelectedLesson(lessonId);
-  };
-
-  const handleExportLesson = async (lessonId: string) => {
-    try {
-      // Find the lesson to export
-      const lessonToExport = Array.isArray(lessons) ? lessons.find(l => l.id === lessonId) : null;
-      
-      if (!lessonToExport) {
-        console.error('Lesson not found for export:', lessonId);
-        return;
-      }
-
-      // Use the same export logic as GlobalExportBar
-      const exports = [];
-
-      // Export analysis results if available
-      if (lessonToExport.aiAnalysis) {
-        exports.push(exportAnalysisData(lessonToExport.aiAnalysis));
-      }
-
-      // Export lesson plans if available
-      if (lessonToExport.lessonPlans && Array.isArray(lessonToExport.lessonPlans) && lessonToExport.lessonPlans.length > 0) {
-        exports.push(exportLessonPlans(lessonToExport.lessonPlans));
-      }
-
-      // Export flashcards if available
-      if (lessonToExport.flashcards && Array.isArray(lessonToExport.flashcards) && lessonToExport.flashcards.length > 0) {
-        exports.push(exportFlashcardsData(lessonToExport.flashcards));
-      }
-
-      // Export summaries if available
-      if (lessonToExport.summaries && Array.isArray(lessonToExport.summaries) && lessonToExport.summaries.length > 0) {
-        exports.push(exportSummaries(lessonToExport.summaries));
-      }
-
-      if (exports.length === 0) {
-        console.log('No exportable data found in lesson:', lessonId);
-        return;
-      }
-
-      // Execute all exports in parallel
-      await Promise.all(exports);
-      console.log('Successfully exported lesson:', lessonId);
-    } catch (error) {
-      console.error('Error exporting lesson:', error);
-    }
-  };
-
-  // Helper function to download files
-  const downloadFile = (blob: Blob, filename: string) => {
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
-  };
-
-  // Helper function to export analysis data
-  const exportAnalysisData = async (analysisData: any) => {
-    // Export as DOCX
-    const docxResponse = await fetch('/api/export', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        documentType: 'docx',
-        content: formatAnalysisForExport(analysisData),
-        step: 1
-      }),
-    });
-
-    if (docxResponse.ok) {
-      const docxBlob = await docxResponse.blob();
-      downloadFile(docxBlob, 'analysis_results.docx');
-    }
-
-    // Export as MD
-    const mdContent = formatAnalysisForMarkdown(analysisData);
-    const mdBlob = new Blob([mdContent], { type: 'text/markdown' });
-    downloadFile(mdBlob, 'analysis_results.md');
-
-    // Export as PDF
-    const pdfResponse = await fetch('/api/export', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        documentType: 'pdf',
-        analysisData,
-        step: 1
-      }),
-    });
-
-    if (pdfResponse.ok) {
-      const pdfBlob = await pdfResponse.blob();
-      downloadFile(pdfBlob, 'analysis_results.pdf');
-    }
-  };
-
-  // Helper function to export lesson plans
-  const exportLessonPlans = async (lessonPlans: any[]) => {
-    // Export each lesson plan as DOCX and MD
-    const exportPromises = lessonPlans.map(async (lessonPlan) => {
-      // DOCX export
-      const docxResponse = await fetch('/api/export', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          documentType: 'docx',
-          content: lessonPlan.content || 'No content available',
-          step: 2,
-          singleLesson: true
-        }),
-      });
-
-      if (docxResponse.ok) {
-        const docxBlob = await docxResponse.blob();
-        const filename = `${lessonPlan.filename || `lesson_${lessonPlan.lessonNumber || 'unknown'}`}.docx`;
-        downloadFile(docxBlob, filename);
-      }
-
-      // MD export
-      const mdContent = `# Lesson ${lessonPlan.lessonNumber || 'Unknown'}: ${lessonPlan.title || 'Untitled'}\n\n**Type:** ${lessonPlan.type || 'N/A'}\n\n${lessonPlan.content || 'No content available'}`;
-      const mdBlob = new Blob([mdContent], { type: 'text/markdown' });
-      const mdFilename = `${lessonPlan.filename || `lesson_${lessonPlan.lessonNumber || 'unknown'}`}.md`;
-      downloadFile(mdBlob, mdFilename);
-    });
-
-    await Promise.all(exportPromises);
-  };
-
-  // Helper function to export flashcards data
-  const exportFlashcardsData = async (flashcards: any[]) => {
-    const pdfResponse = await fetch('/api/export', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        documentType: 'pdf',
-        flashcards,
-        step: 3
-      }),
-    });
-
-    if (pdfResponse.ok) {
-      const pdfBlob = await pdfResponse.blob();
-      downloadFile(pdfBlob, 'flashcards.pdf');
-    }
-  };
-
-  // Helper function to export summaries
-  const exportSummaries = async (summaries: any[]) => {
-    const exportPromises = summaries.map(async (summary) => {
-      // DOCX export
-      const docxResponse = await fetch('/api/export', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          documentType: 'docx',
-          content: summary.content || 'No content available',
-          step: 4,
-          singleSummary: true
-        }),
-      });
-
-      if (docxResponse.ok) {
-        const docxBlob = await docxResponse.blob();
-        const filename = `${summary.filename || `summary_${summary.lessonNumber || 'unknown'}`}.docx`;
-        downloadFile(docxBlob, filename);
-      }
-
-      // MD export
-      const mdContent = `# Lesson ${summary.lessonNumber || 'Unknown'}: ${summary.title || 'Untitled'}\n\n${summary.content || 'No content available'}`;
-      const mdBlob = new Blob([mdContent], { type: 'text/markdown' });
-      const mdFilename = `${summary.filename || `summary_${summary.lessonNumber || 'unknown'}`}.md`;
-      downloadFile(mdBlob, mdFilename);
-    });
-
-    await Promise.all(exportPromises);
-  };
-
-  // Helper function to format analysis data for export
-  const formatAnalysisForExport = (analysisData: any) => {
-    let content = 'Analysis Results\n\n';
-    content += `Detected Level: ${analysisData.detectedLevel || 'N/A'}\n`;
-    content += `Age Appropriate: ${analysisData.ageAppropriate || 'N/A'}\n`;
-    content += `Main Theme: ${analysisData.mainTheme || 'N/A'}\n\n`;
-    
-    if (analysisData.vocabulary && analysisData.vocabulary.length > 0) {
-      content += 'Vocabulary:\n';
-      analysisData.vocabulary.forEach((word: string) => {
-        content += `- ${word}\n`;
-      });
-      content += '\n';
-    }
-    
-    if (analysisData.activities && analysisData.activities.length > 0) {
-      content += 'Learning Activities:\n';
-      analysisData.activities.forEach((activity: string) => {
-        content += `- ${activity}\n`;
-      });
-    }
-    
-    return content;
-  };
-
-  // Helper function to format analysis data for markdown
-  const formatAnalysisForMarkdown = (analysisData: any) => {
-    let content = '# Analysis Results\n\n';
-    content += `**Detected Level:** ${analysisData.detectedLevel || 'N/A'}\n`;
-    content += `**Age Appropriate:** ${analysisData.ageAppropriate || 'N/A'}\n`;
-    content += `**Main Theme:** ${analysisData.mainTheme || 'N/A'}\n\n`;
-    
-    if (analysisData.vocabulary && analysisData.vocabulary.length > 0) {
-      content += '## Vocabulary\n';
-      analysisData.vocabulary.forEach((word: string) => {
-        content += `- ${word}\n`;
-      });
-      content += '\n';
-    }
-    
-    if (analysisData.activities && analysisData.activities.length > 0) {
-      content += '## Learning Activities\n';
-      analysisData.activities.forEach((activity: string) => {
-        content += `- ${activity}\n`;
-      });
-    }
-    
-    return content;
-  };
-
-  const handleQuickTestFlow = () => {
-    quickStartMutation.mutate();
-  };
-
-  const handleBatchProcess = async () => {
-    try {
-      if (!lessons || !Array.isArray(lessons) || lessons.length === 0) {
-        console.log('No lessons available for batch processing');
-        return;
-      }
-
-      console.log(`Starting batch process for ${lessons.length} lessons`);
-      
-      // Process each lesson that has incomplete steps
-      const batchPromises = lessons.map(async (lesson) => {
-        try {
-          // Check if lesson needs processing (has files but missing analysis/plans/etc)
-          const needsProcessing = lesson.files && lesson.files.length > 0 && (
-            !lesson.aiAnalysis || 
-            !lesson.lessonPlans || 
-            !lesson.flashcards || 
-            !lesson.summaries
-          );
-
-          if (!needsProcessing) {
-            console.log(`Lesson ${lesson.id} already processed, skipping`);
-            return;
-          }
-
-          console.log(`Processing lesson ${lesson.id}`);
-
-          // Step 1: Generate analysis if missing
-          if (!lesson.aiAnalysis && lesson.files && lesson.files.length > 0) {
-            const analysisResponse = await fetch('/api/analyze', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                lessonId: lesson.id,
-                files: lesson.files,
-                model: aiSettings.selectedModel,
-                outputLanguage: aiSettings.outputLanguage
-              }),
-            });
-
-            if (analysisResponse.ok) {
-              const analysisData = await analysisResponse.json();
-              console.log(`Analysis completed for lesson ${lesson.id}`);
-            }
-          }
-
-          // Step 2: Generate lesson plans if missing
-          if (!lesson.lessonPlans && lesson.aiAnalysis) {
-            const plansResponse = await fetch('/api/generate-lesson-plans', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                lessonId: lesson.id,
-                analysisData: lesson.aiAnalysis,
-                model: aiSettings.selectedModel,
-                outputLanguage: aiSettings.outputLanguage
-              }),
-            });
-
-            if (plansResponse.ok) {
-              const plansData = await plansResponse.json();
-              console.log(`Lesson plans generated for lesson ${lesson.id}`);
-            }
-          }
-
-          // Step 3: Generate flashcards if missing
-          if (!lesson.flashcards && lesson.aiAnalysis) {
-            const flashcardsResponse = await fetch('/api/generate-flashcards', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                lessonId: lesson.id,
-                vocabulary: lesson.aiAnalysis.vocabulary || [],
-                model: aiSettings.selectedModel,
-                outputLanguage: aiSettings.outputLanguage
-              }),
-            });
-
-            if (flashcardsResponse.ok) {
-              const flashcardsData = await flashcardsResponse.json();
-              console.log(`Flashcards generated for lesson ${lesson.id}`);
-            }
-          }
-
-          // Step 4: Generate summaries if missing
-          if (!lesson.summaries && lesson.lessonPlans) {
-            const summariesResponse = await fetch('/api/generate-summaries', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                lessonId: lesson.id,
-                lessonPlans: lesson.lessonPlans,
-                model: aiSettings.selectedModel,
-                outputLanguage: aiSettings.outputLanguage
-              }),
-            });
-
-            if (summariesResponse.ok) {
-              const summariesData = await summariesResponse.json();
-              console.log(`Summaries generated for lesson ${lesson.id}`);
-            }
-          }
-
-          console.log(`Completed processing lesson ${lesson.id}`);
-        } catch (error) {
-          console.error(`Error processing lesson ${lesson.id}:`, error);
-        }
-      });
-
-      // Execute all batch processes in parallel (with some concurrency limit)
-      const BATCH_SIZE = 3; // Process 3 lessons at a time to avoid overwhelming the API
-      for (let i = 0; i < batchPromises.length; i += BATCH_SIZE) {
-        const batch = batchPromises.slice(i, i + BATCH_SIZE);
-        await Promise.all(batch);
-        console.log(`Completed batch ${Math.floor(i / BATCH_SIZE) + 1} of ${Math.ceil(batchPromises.length / BATCH_SIZE)}`);
-      }
-
-      // Refresh the lessons data after batch processing
-      queryClient.invalidateQueries({ queryKey: ['lessons'] });
-      console.log('Batch processing completed successfully');
-    } catch (error) {
-      console.error('Error during batch processing:', error);
-    }
-  };
-
-  const handleSettings = () => {
-    setIsSettingsOpen(true);
-  };
-
-  // Quick action to auto-load input.pdf and start workflow
-  const quickStartMutation = useMutation({
-    mutationFn: async () => {
-      // First, fetch the input.pdf file from the attached assets
-      const response = await fetch('/attached_assets/input.pdf');
-      const blob = await response.blob();
-      
-      // Create a File object to mimic the upload
-      const file = new File([blob], 'input.pdf', { type: 'application/pdf' });
+  const uploadMutation = useMutation({
+    mutationFn: async (file: File) => {
       const formData = new FormData();
-      formData.append('files', file);
-      
-      // Upload the file
-      const uploadResponse = await fetch('/api/upload', {
-        method: 'POST',
+      formData.append('file', file);
+      // Add action param to URL for multer handling check
+      const res = await fetch("/api/course-ops?action=import", {
+        method: "POST",
         body: formData,
       });
-      const uploadResult = await uploadResponse.json();
-      
-      // Create a lesson with required fields
-      const lessonResponse = await apiRequest('POST', '/api/lessons', {
-        title: `Quick Test: ${uploadResult.files[0].name}`,
-        level: 'N5',
-        ageGroup: 'primary',
-        status: 'draft'
-      });
-      const lessonData = await lessonResponse.json();
-      
-      // Start analysis immediately
-      const analysisResponse = await apiRequest('POST', '/api/analyze', {
-        content: uploadResult.files[0].content
-      });
-      const analysisData = await analysisResponse.json();
-      
-      // Update lesson with analysis
-      await apiRequest('PUT', '/api/lessons', {
-        id: lessonData.lesson.id,
-        aiAnalysis: analysisData
-      });
-      
-      return { lessonId: lessonData.lesson.id, analysis: analysisData };
+      if (!res.ok) throw new Error("Failed to upload course outline");
+      return res.json();
     },
-    onSuccess: (data) => {
-      setSelectedLesson(data.lessonId);
-      queryClient.invalidateQueries({ queryKey: ['/api/lessons'] });
+    onSuccess: () => {
+      toast({ title: "Course Outline Updated", description: "The course structure has been refreshed." });
+      refetchCourse();
+    },
+    onError: (error) => {
+      toast({ title: "Upload Failed", description: error.message, variant: "destructive" });
     }
   });
 
-  return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="export-bar border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-2 sm:px-3 lg:px-6">
-          {/* Main header row */}
-          <div className="flex items-center justify-between h-12 sm:h-14">
-            {/* Logo and brand */}
-            <div className="flex items-center space-x-1 sm:space-x-2 min-w-0 flex-1">
-              <div className="flex items-center space-x-1 sm:space-x-2">
-                <div className="w-6 h-6 sm:w-7 sm:h-7 bg-primary rounded-md flex items-center justify-center flex-shrink-0">
-                  <GraduationCap className="text-primary-foreground w-3 h-3 sm:w-4 sm:h-4" />
-                </div>
-                <div className="min-w-0">
-                  <h1 className="text-base sm:text-lg lg:text-xl font-bold text-foreground truncate">
-                    EduFlow
-                  </h1>
-                  <p className="text-xs text-muted-foreground hidden md:block truncate">
-                    Chinese Lesson Planning Assistant
-                  </p>
-                </div>
-              </div>
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedLesson) return;
+      await fileContentMutation.mutateAsync({
+        action: 'write',
+        unit: selectedLesson.unit,
+        lesson: selectedLesson.lesson,
+        content: editorContent
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "Saved", description: "Lesson plan updated." });
+    },
+    onError: () => {
+      toast({ title: "Save Failed", variant: "destructive" });
+    }
+  });
+
+  // --- Handlers ---
+
+  const loadFileContent = async (unit: number, lesson: number) => {
+    setEditorContent("Loading content...");
+    try {
+      const data = await fileContentMutation.mutateAsync({ action: 'read', unit, lesson });
+      setEditorContent(data.content || "# No generated content yet.\n\nClick 'Generate Lesson' to start.");
+    } catch (error) {
+      setEditorContent("Error loading content.");
+    }
+  };
+
+  const handleSelectLesson = (unit: number, lesson: number, title: string) => {
+    setSelectedLesson({ unit, lesson, title });
+    loadFileContent(unit, lesson);
+  };
+
+  const handleGenerate = () => {
+    if (!selectedLesson) return;
+    generateMutation.mutate({
+      unit: selectedLesson.unit,
+      lesson: selectedLesson.lesson,
+      force: forceRegenerate,
+      skipFlashcards: skipFlashcards
+    });
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      uploadMutation.mutate(e.target.files[0]);
+    }
+  };
+
+  // --- Render Helpers ---
+
+  const renderSidebar = () => (
+    <div className="w-80 border-r bg-muted/10 flex flex-col h-[calc(100vh-4rem)]">
+      <div className="p-4 border-b space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold text-lg">Course Structure</h2>
+          <Button variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()} title="Upload Outline">
+            <Upload className="h-4 w-4" />
+          </Button>
+          <input type="file" accept=".xlsx" className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
+        </div>
+        <div className="relative">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input 
+            placeholder="Search lessons..." 
+            className="pl-8" 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+      </div>
+      
+      <ScrollArea className="flex-1">
+        {isCourseLoading ? (
+          <div className="flex justify-center p-8">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <Accordion type="multiple" className="w-full" defaultValue={Object.keys(courseData?.structure || {}).slice(0, 1)}>
+            {Object.entries(courseData?.structure || {})
+              .filter(([unitName]) => unitName.toLowerCase().includes(searchTerm.toLowerCase()) || true) // Simple unit filter
+              .map(([unitName, lessons]) => (
+              <AccordionItem value={unitName} key={unitName}>
+                <AccordionTrigger className="px-4 hover:no-underline py-3 text-sm">
+                  <span className="font-medium">{unitName}</span>
+                  <Badge variant="secondary" className="ml-2 text-xs">{lessons.length}</Badge>
+                </AccordionTrigger>
+                <AccordionContent className="px-0 pb-2">
+                  {lessons
+                    .filter(l => l.title.toLowerCase().includes(searchTerm.toLowerCase()))
+                    .map((lesson) => (
+                    <div 
+                      key={`${lesson.unitNumber}-${lesson.lessonNumber}`}
+                      className={`
+                        flex items-center px-4 py-2 cursor-pointer text-sm transition-colors
+                        ${selectedLesson?.unit === lesson.unitNumber && selectedLesson?.lesson === lesson.lessonNumber 
+                          ? "bg-primary/10 text-primary font-medium border-r-2 border-primary" 
+                          : "hover:bg-muted/50 text-muted-foreground hover:text-foreground"}
+                      `}
+                      onClick={() => handleSelectLesson(lesson.unitNumber, lesson.lessonNumber, lesson.title)}
+                    >
+                      <div className="flex-1 truncate">
+                        <span className="mr-2 opacity-70">{lesson.lessonNumber}.</span>
+                        {lesson.title}
+                      </div>
+                    </div>
+                  ))}
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        )}
+      </ScrollArea>
+      
+      <div className="p-4 border-t bg-background">
+        <Link href="/batch-manager">
+          <Button variant="outline" className="w-full justify-between">
+            Batch Manager <ChevronRight className="h-4 w-4" />
+          </Button>
+        </Link>
+      </div>
+    </div>
+  );
+
+  const renderMainContent = () => {
+    if (!selectedLesson) {
+      return (
+        <div className="flex-1 flex items-center justify-center text-muted-foreground">
+          <div className="text-center space-y-4">
+            <div className="p-4 bg-muted rounded-full w-fit mx-auto">
+              <BookOpen className="h-8 w-8" />
             </div>
-            
-            {/* User info and actions */}
-            <nav className="flex items-center space-x-1 sm:space-x-2">
-              {/* User credit balance */}
-              {user && (
-                <Badge variant="secondary" className="flex items-center gap-1 text-xs px-1.5 py-0.5">
-                  <DollarSign className="h-3 w-3 flex-shrink-0" />
-                  <span className="font-medium">
-                    {user.creditBalance}
-                  </span>
-                  <span className="hidden lg:inline text-xs">Credits</span>
-                </Badge>
-              )}
-              
-              {/* Settings dropdown for mobile */}
-              <div className="flex lg:hidden">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="p-1.5"
-                  onClick={() => {
-                    // Could toggle a mobile menu here
-                  }}
-                >
-                  <Settings className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-              
-              {/* Desktop settings */}
-              <div className="hidden lg:flex items-center space-x-1">
-                <select 
-                  className="px-1.5 py-0.5 border rounded text-xs bg-background hover:bg-accent transition-colors min-w-0"
-                  value={aiSettings.selectedModel}
-                  onChange={(e) => updateModel(e.target.value)}
-                >
-                  <option value="gpt-5-nano">GPT-5-nano</option>
-                  <option value="gpt-5-mini">GPT-5-mini</option>
-                  <option value="gpt-4o">GPT-4o</option>
-                </select>
-                <select 
-                  className="px-1.5 py-0.5 border rounded text-xs bg-background hover:bg-accent transition-colors min-w-0"
-                  value={aiSettings.outputLanguage}
-                  onChange={(e) => updateLanguage(e.target.value)}
-                >
-                  <option value="auto">Auto</option>
-                  <option value="chinese">中文</option>
-                  <option value="vietnamese">Tiếng Việt</option>
-                  <option value="english">English</option>
-                  <option value="bilingual">中文+Tiếng Việt</option>
-                </select>
-              </div>
-              
-              {/* Tools button */}
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => window.location.href = '/tools'}
-                className="hidden sm:flex px-2"
-              >
-                <Layers className="h-3.5 w-3.5 mr-1" />
-                <span className="hidden md:inline text-xs">AI Tools</span>
-                <span className="md:hidden text-xs">Tools</span>
-              </Button>
-              
-              {/* Prompts button */}
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => window.location.href = '/prompts'}
-                className="hidden sm:flex px-2"
-              >
-                <Settings className="h-3.5 w-3.5 mr-1" />
-                <span className="hidden md:inline text-xs">Prompts</span>
-                <span className="md:hidden text-xs">Prompts</span>
-              </Button>
-              
-              {/* Mobile tools and prompts buttons */}
-              <div className="sm:hidden flex space-x-1">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => window.location.href = '/tools'}
-                  className="p-1.5"
-                >
-                  <Layers className="h-3.5 w-3.5" />
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => window.location.href = '/prompts'}
-                  className="p-1.5"
-                >
-                  <Settings className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-              
-              {/* Logout button */}
-              {user && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => logoutMutation.mutate()}
-                  disabled={logoutMutation.isPending}
-                  className="flex items-center gap-1 px-2"
-                >
-                  {logoutMutation.isPending ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <LogOut className="h-3 w-3" />
-                  )}
-                  <span className="hidden sm:inline text-xs">Logout</span>
-                </Button>
-              )}
-            </nav>
+            <h3 className="text-xl font-semibold text-foreground">Select a Lesson</h3>
+            <p>Choose a lesson from the sidebar to start working.</p>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex-1 flex flex-col h-[calc(100vh-4rem)] overflow-hidden">
+        {/* Toolbar */}
+        <div className="border-b p-4 flex items-center justify-between bg-background/95 backdrop-blur z-10">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span>Unit {selectedLesson.unit}</span>
+              <ChevronRight className="h-3 w-3" />
+              <span>Lesson {selectedLesson.lesson}</span>
+            </div>
+            <h1 className="text-2xl font-bold">{selectedLesson.title}</h1>
           </div>
           
-          {/* Secondary header row for user greeting on mobile */}
-          {user && (
-            <div className="md:hidden pb-1.5 border-t border-border/50 pt-1.5 mt-1">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">
-                  Welcome, {user.username}
-                </span>
-                <div className="flex items-center space-x-1">
-                  <select 
-                    className="px-1.5 py-0.5 border rounded text-xs bg-background w-20"
-                    value={aiSettings.selectedModel}
-                    onChange={(e) => updateModel(e.target.value)}
-                  >
-                    <option value="gpt-5-nano">5-nano</option>
-                    <option value="gpt-5-mini">5-mini</option>
-                    <option value="gpt-4o">4o</option>
-                  </select>
-                  <select 
-                    className="px-1.5 py-0.5 border rounded text-xs bg-background w-16"
-                    value={aiSettings.outputLanguage}
-                    onChange={(e) => updateLanguage(e.target.value)}
-                  >
-                    <option value="auto">Auto</option>
-                    <option value="chinese">中文</option>
-                    <option value="vietnamese">Việt</option>
-                    <option value="english">EN</option>
-                    <option value="bilingual">中+Việt</option>
-                  </select>
-                </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4 mr-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox id="force" checked={forceRegenerate} onCheckedChange={(c) => setForceRegenerate(!!c)} />
+                <Label htmlFor="force">Force</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox id="skip" checked={skipFlashcards} onCheckedChange={(c) => setSkipFlashcards(!!c)} />
+                <Label htmlFor="skip">Skip Cards</Label>
               </div>
             </div>
-          )}
+
+            <Button 
+              onClick={handleGenerate} 
+              disabled={generateMutation.isPending}
+              className="min-w-[140px]"
+            >
+              {generateMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating...
+                </>
+              ) : (
+                <>
+                  <Play className="mr-2 h-4 w-4" /> Generate
+                </>
+              )}
+            </Button>
+            
+            <Button 
+              variant="secondary" 
+              onClick={() => saveMutation.mutate()}
+              disabled={saveMutation.isPending}
+            >
+              {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            </Button>
+          </div>
+        </div>
+
+        {/* Tabs Content */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
+          <div className="px-4 pt-2 border-b bg-muted/5">
+            <TabsList>
+              <TabsTrigger value="plan" className="gap-2"><FileText className="h-4 w-4" /> Lesson Plan</TabsTrigger>
+              <TabsTrigger value="flashcards" className="gap-2"><ImageIcon className="h-4 w-4" /> Flashcards</TabsTrigger>
+              <TabsTrigger value="summary" className="gap-2"><List className="h-4 w-4" /> Summary</TabsTrigger>
+            </TabsList>
+          </div>
+
+          <div className="flex-1 overflow-hidden relative bg-background">
+            <TabsContent value="plan" className="h-full m-0 border-0">
+               <MarkdownEditor
+                  value={editorContent}
+                  onChange={setEditorContent}
+                  className="h-full border-0 rounded-none"
+               />
+            </TabsContent>
+            
+            <TabsContent value="flashcards" className="h-full m-0 p-8 overflow-auto">
+              <div className="flex flex-col items-center justify-center h-full text-muted-foreground space-y-4">
+                <ImageIcon className="h-12 w-12 opacity-20" />
+                <p>Flashcard preview coming soon. Check generated files.</p>
+                <Button variant="outline" disabled>View PDF</Button>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="summary" className="h-full m-0 p-8 overflow-auto">
+               <div className="flex flex-col items-center justify-center h-full text-muted-foreground space-y-4">
+                <List className="h-12 w-12 opacity-20" />
+                <p>Summary preview coming soon. Check generated files.</p>
+              </div>
+            </TabsContent>
+          </div>
+        </Tabs>
+      </div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* App Header */}
+      <header className="h-14 border-b px-6 flex items-center justify-between bg-card">
+        <div className="flex items-center gap-2 font-bold text-xl text-primary">
+          <Layout className="h-6 w-6" />
+          <span>Lesson Planner</span>
+        </div>
+        <div className="flex items-center gap-4">
+          <Link href="/course-manager">
+             <Button variant="ghost" size="sm">Course Manager</Button>
+          </Link>
+          <Link href="/batch-manager">
+             <Button variant="ghost" size="sm">Batch Manager (Old Home)</Button>
+          </Link>
+          <Link href="/tools">
+             <Button variant="ghost" size="sm">Tools</Button>
+          </Link>
+          <Link href="/prompts">
+             <Button variant="ghost" size="sm">Prompts</Button>
+          </Link>
         </div>
       </header>
 
-
-
-      {/* Main Content */}
-      <main className="flex-1 p-3 md:p-4 lg:p-6 space-y-4 md:space-y-6">
-        {/* Lesson Creation Workflow */}
-        <section className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 md:p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg md:text-xl font-semibold text-gray-800">
-              Lesson Creation Workflow
-            </h2>
-            <div className="flex items-center space-x-2">
-              <span className="text-xs md:text-sm text-gray-500">
-                Progress: {Math.round((currentStep / totalSteps) * 100)}%
-              </span>
-              <div className="w-16 md:w-20 bg-gray-200 rounded-full h-1.5 md:h-2">
-                <div
-                  className="bg-blue-600 h-1.5 md:h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${(currentStep / totalSteps) * 100}%` }}
-                ></div>
-              </div>
-            </div>
-          </div>
-          <KanbanBoard 
-          selectedLesson={selectedLesson}
-          lesson={lesson || null}
-          onLessonSelect={handleSelectLesson}
-          currentStep={currentStep}
-          onStepUpdate={updateStep}
-        />
-        </section>
-
-        {/* Recent Lessons & Workflow Integration */}
-        <section className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 md:p-4">
-          <h2 className="text-lg md:text-xl font-semibold text-gray-800 mb-3">
-            Recent Lessons & Workflow Integration
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
-            {recentLessons.map((lesson) => (
-              <div
-                key={lesson.id}
-                className="border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow"
-              >
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="font-medium text-gray-800 text-sm md:text-base truncate">
-                    {lesson.title}
-                  </h3>
-                  <span className="text-xs text-gray-500 ml-2 flex-shrink-0">
-                    {lesson.date}
-                  </span>
-                </div>
-                <div className="mb-2">
-                  <div className="flex justify-between text-xs text-gray-600 mb-1">
-                    <span>Progress</span>
-                    <span>{lesson.progress}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-1.5">
-                    <div
-                      className="bg-green-600 h-1.5 rounded-full"
-                      style={{ width: `${lesson.progress}%` }}
-                    ></div>
-                  </div>
-                </div>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => handleSelectLesson(lesson.id)}
-                    className="flex-1 bg-blue-600 text-white px-2 py-1.5 rounded text-xs hover:bg-blue-700 transition-colors"
-                  >
-                    Select
-                  </button>
-                  <button
-                    onClick={() => handleExportLesson(lesson.id)}
-                    className="flex-1 bg-gray-600 text-white px-2 py-1.5 rounded text-xs hover:bg-gray-700 transition-colors"
-                  >
-                    Export
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Quick Actions */}
-        <section className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 md:p-4">
-          <h2 className="text-lg md:text-xl font-semibold text-gray-800 mb-3">
-            Quick Actions
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            <button
-              onClick={handleQuickTestFlow}
-              className="bg-green-600 text-white p-3 rounded-lg hover:bg-green-700 transition-colors text-sm md:text-base"
-            >
-              <div className="text-center">
-                <div className="text-lg md:text-xl mb-1">🚀</div>
-                <div className="font-medium">Quick Test Flow</div>
-                <div className="text-xs opacity-90 mt-1">Start testing immediately</div>
-              </div>
-            </button>
-            <button
-              onClick={handleBatchProcess}
-              className="bg-purple-600 text-white p-3 rounded-lg hover:bg-purple-700 transition-colors text-sm md:text-base"
-            >
-              <div className="text-center">
-                <div className="text-lg md:text-xl mb-1">⚡</div>
-                <div className="font-medium">Batch Process</div>
-                <div className="text-xs opacity-90 mt-1">Process multiple lessons</div>
-              </div>
-            </button>
-            <button
-              onClick={handleSettings}
-              className="bg-gray-600 text-white p-3 rounded-lg hover:bg-gray-700 transition-colors text-sm md:text-base"
-            >
-              <div className="text-center">
-                <div className="text-lg md:text-xl mb-1">⚙️</div>
-                <div className="font-medium">Settings</div>
-                <div className="text-xs opacity-90 mt-1">Configure preferences</div>
-              </div>
-            </button>
-          </div>
-        </section>
-      </main>
-
-      {/* Signature */}
-      <footer className="mt-4 md:mt-6 text-center p-3">
-        <p className="text-xs md:text-sm text-muted-foreground italic">
-          Thanh Hoàng tặng vợ iu Thu Thảo
-        </p>
-      </footer>
-
-      {/* Settings Modal */}
-      <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Settings className="w-5 h-5" />
-              Settings
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-6 py-4">
-            {/* AI Model Settings */}
-            <div className="space-y-3">
-              <Label className="text-sm font-medium">AI Model</Label>
-              <Select value={aiSettings.selectedModel} onValueChange={updateModel}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select AI model" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="gpt-5-nano">GPT-5 Nano (Fast)</SelectItem>
-                  <SelectItem value="gpt-5-mini">GPT-5 Mini (Balanced)</SelectItem>
-                  <SelectItem value="gpt-4o">GPT-4o (Advanced)</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Choose the AI model for lesson generation and analysis
-              </p>
-            </div>
-
-            {/* Output Language Settings */}
-            <div className="space-y-3">
-              <Label className="text-sm font-medium">Output Language</Label>
-              <Select value={aiSettings.outputLanguage} onValueChange={updateLanguage}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select output language" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="auto">Auto Detect</SelectItem>
-                  <SelectItem value="chinese">中文 (Chinese)</SelectItem>
-                  <SelectItem value="vietnamese">Tiếng Việt (Vietnamese)</SelectItem>
-                  <SelectItem value="english">English</SelectItem>
-                  <SelectItem value="bilingual">中文 + Tiếng Việt (Bilingual)</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Set the preferred language for generated content
-              </p>
-            </div>
-
-            {/* User Information */}
-            <div className="space-y-3">
-              <Label className="text-sm font-medium">Account Information</Label>
-              <div className="bg-gray-50 p-3 rounded-lg space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">User:</span>
-                  <span className="font-medium">{user?.username || 'Not logged in'}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Credits:</span>
-                  <span className="font-medium text-green-600">$1000</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex justify-end space-x-2 pt-4">
-              <Button variant="outline" onClick={() => setIsSettingsOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={() => setIsSettingsOpen(false)}>
-                Save Settings
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Main Layout */}
+      <div className="flex-1 flex overflow-hidden">
+        {renderSidebar()}
+        {renderMainContent()}
+      </div>
     </div>
-  );
-}
-
-export default function Home() {
-  return (
-    <WorkflowProvider>
-      <HomeContent />
-    </WorkflowProvider>
   );
 }

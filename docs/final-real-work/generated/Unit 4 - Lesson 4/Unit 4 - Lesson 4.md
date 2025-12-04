@@ -1,0 +1,18 @@
+
+| Level 1 | N1 | Unit 4 | Unit 4 Lesson 4 | Lesson 4 | 第4节课 |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **References:** | 参考资料 | Easy Steps to Chinese for Kids (Vol. 1) | | | |
+| **Lesson aim:** | 教学目标 | **Cognitive domain:** | Identify and name the fruits: 苹果 , 香蕉 , 梨 . | **Skill domain:** | Use the sentence pattern "我喜欢..."  to express preference for fruits. |
+| **Sub aim:** | 次要教学目标 | | | Foster a positive attitude towards participating in class games. | |
+| **Type of lesson** | 课型 | 听说课 | **Materials required:** | 教具 | 水果闪卡，真实水果或模型，神秘袋，黏球，白板，播放器，音乐 |
+| **Lesson content** | 教学内容 | **Vocabulary:** | 苹果 , 香蕉 , 梨  | **Grammar/Other:** | Sentence pattern: 我喜欢...  |
+| **Duration:** | 课时 | 45 mins | | | |
+
+| Stage & aim 教学环节与目标 | Activities ideas & Procedures 活动设计与教学步骤 | Materials / 教具 |
+| :--- | :--- | :--- |
+| **Warm up 热身**<br>(Aim: To get students' attention and create a Chinese-speaking atmosphere.) | Sing a "Hello Song" (你好歌). The teacher leads with actions like waving and students follow, singing "你好，你好!"  to greet each other. | 播放器，音乐 |
+| **Rules 规则**<br>(Aim: To remind students of class expectations for behavior and participation.) | Quickly review classroom rules with TPR (Total Physical Response):<br>1. "小手放好"  - Students fold their hands.<br>2. "耳朵听好"  - Students cup their ears to listen. | 无 |
+| **Presentation**<br>(Aim: To introduce the new vocabulary and sentence pattern in an engaging way.) | **Mystery Bag Game:**<br>1. Teacher places a real fruit (or model, e.g., an apple) inside the "Mystery Bag".<br>2. Teacher shakes the bag and asks "这是什么？" .<br>3. Teacher invites students to touch the bag and guess.<br>4. Teacher reveals the apple, says "这是苹果" , and has students repeat several times.<br>5. Teacher says "我喜欢苹果"  with a happy expression.<br>6. Repeat steps 1-5 for 香蕉  and 梨 . | 神秘袋，真实水果或模型（苹果，香蕉，梨），水果闪卡 |
+| **Practice**<br>(Aim: To reinforce students' recognition and pronunciation of the new words through fun games.) | **Sticky Ball Game:**<br>1. Stick the flashcards for 苹果, 香蕉, and 梨 on the board.<br>2. Teacher calls out a fruit, e.g., "香蕉！".<br>3. A student comes to the front, throws the sticky ball, and tries to hit the correct flashcard. The whole class says the word when it's hit.<br><br>**True or False Game:**<br>1. Teacher holds up a flashcard (e.g., a pear).<br>2. Teacher says a sentence, e.g., "我喜欢苹果" .<br>3. Students judge if the sentence matches the card. If it doesn't match, they say "错!"  and make an 'X' with their arms. If it matches, they say "对!"  and make a checkmark gesture. | 黏球，闪卡，白板 |
+| **Production**<br>(Aim: To encourage students to use the target language communicatively in a simulated situation.) | **Market Role-Play Game:**<br>1. Set up a "fruit stall" at the front of the classroom with the fruit models.<br>2. One student acts as the "seller". The teacher models the role first.<br>3. Other students are "customers". They approach the stall and say, "你好" .<br>4. The customer points to a fruit and says, "我喜欢..." (e.g., "我喜欢梨。").<br>5. The seller responds "给你"  and gives them the fruit.<br>6. Students take turns being the seller and customer. | 真实水果/模型，小桌子 |
+| **Wrap up 总结**<br>(Aim: To review the lesson content and end the class on a positive note.) | 1. **Quick Review:** Teacher quickly shows the flashcards, and the whole class shouts out the fruit names together.<br>2. **Themed Goodbye Song:** Sing a goodbye song using the target vocabulary to the tune of "Frère Jacques".<br>   "再见苹果，再见苹果" <br>   "再见香蕉，再见梨" <br>   "我们下课了，我们下课了" <br>   "下次再见，下次再见"  | 闪卡 |

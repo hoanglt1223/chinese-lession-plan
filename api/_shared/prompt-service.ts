@@ -18,20 +18,120 @@ export class PromptService {
    * Get the default prompt template for a specific type
    */
   static async getDefaultTemplate(type: string) {
-    const template = await db.query.promptTemplates.findFirst({
-      with: {
-        components: {
-          orderBy: [promptComponents.order]
-        }
-      },
-      where: and(
-        eq(promptTemplates.type, type),
-        eq(promptTemplates.isDefault, true),
-        eq(promptTemplates.isActive, true)
-      )
-    });
+    try {
+      const template = await db.query.promptTemplates.findFirst({
+        with: {
+          components: {
+            orderBy: [promptComponents.order]
+          }
+        },
+        where: and(
+          eq(promptTemplates.type, type),
+          eq(promptTemplates.isDefault, true),
+          eq(promptTemplates.isActive, true)
+        )
+      });
 
-    return template;
+      if (template) return template;
+    } catch (error) {
+      console.warn(`Database access failed for prompt template '${type}'. Using fallback.`, error);
+    }
+
+    return this.getFallbackTemplate(type);
+  }
+
+  static getFallbackTemplate(type: string) {
+    if (type === 'single_lesson_plan') {
+      return {
+        id: 'fallback-single-lesson-plan',
+        name: 'Fallback Single Lesson Plan',
+        components: [
+          {
+            type: 'system',
+            content: 'You are an expert Chinese language teacher creating a detailed lesson plan for a specific lesson.'
+          },
+          {
+            type: 'user',
+            content: `Create a detailed lesson plan following the EXACT structure below. 
+            
+**Language Requirements (STRICT):**
+1. **Target Language:** Chinese (Simplified). This is the primary language for the lesson content.
+2. **Support Language:** English. Use sparingly for headers or explaining difficult concepts to the teacher.
+3. **FORBIDDEN LANGUAGE:** Vietnamese. DO NOT use Vietnamese anywhere in the output.
+4. **Audience:** The lesson plan is for a professional Chinese teacher.
+
+**Structure Requirements:**
+
+1.  **Header Table** (Must use this exact format):
+    | Level 1 | N1 | Unit {{unit}} | {{topic}} | Lesson {{lesson}} | 第{{lesson}}节课 |
+    | :--- | :--- | :--- | :--- | :--- | :--- |
+    | **References:** | 参考资料 | | | | |
+    | **Lesson aim:** | 教学目标 | **Cognitive domain:** | (Fill based on {{objectives}}) | **Skill domain:** | (Fill based on {{objectives}}) |
+    | **Sub aim:** | 次要教学目标 | | | | |
+    | **Type of lesson** | 课型 | {{type}} | **Materials required:** | 教具 | {{materials}} |
+    | **Lesson content** | 教学内容 | **Vocabulary:** | {{vocabulary}} | **Grammar/Other:** | (Extract from objectives) |
+    | **Duration:** | 课时 | {{duration}} | | | |
+
+2.  **Procedure Table** (Must use this exact format):
+    | Stage & aim 教学环节与目标 | Activities ideas & Procedures 活动设计与教学步骤 | Materials / 教具 |
+    | :--- | :--- | :--- |
+    | **Warm up 热身**<br>(Aim: ...) | ... | ... |
+    | **Rules 规则**<br>(Aim: Remind class rules) | ... | ... |
+    | **Review / Presentation**<br>(Adjust based on lesson type) | ... | ... |
+    | **Practice** | ... | ... |
+    | **Production** | ... | ... |
+    | **Wrap up 总结** | ... | ... |
+
+**Content Guidelines:**
+- **Bilingual Headers:** Use English and Chinese for table headers as shown above.
+- **Content Language:** The content within the tables (activities, procedures, instructions) should be primarily in **Chinese** to simulate a real Chinese lesson environment. You may use English for teacher instructions if necessary for clarity.
+- **Activities:**
+  - Make them highly interactive and suitable for {{ageGroup}}.
+  - **MANDATORY REQUIREMENT:** Check the **Existing Generic Activities** list provided below. If ANY of them are suitable (especially games or warm-ups), you **MUST** use them in the lesson plan instead of inventing new generic ones.
+  - **HOW TO REUSE:** When using an existing activity, use its exact name in the "Activities ideas & Procedures" column and adapt its instructions to the current lesson's vocabulary/topic.
+  - **Existing Generic Activities (PRIORITIZE THESE):**
+    {{existingActivities}}
+
+- **Lesson Type:**
+  - If {{type}} is "Review", focus on games and practice (Stages: Pinyin Review, Vocabulary Review, Grammar Review, etc.).
+  - If {{type}} is "New Content", focus on Presentation, Practice, Production.
+
+Output ONLY the Markdown content. Do not include conversational text.`
+          }
+        ]
+      };
+    }
+
+    if (type === 'flashcard') {
+      return {
+        id: 'fallback-flashcard',
+        name: 'Fallback Flashcard',
+        components: [
+          {
+            type: 'system',
+            content: 'You are an expert Chinese language teacher creating flashcard data.'
+          },
+          {
+            type: 'user',
+            content: `Generate a list of flashcards for the following vocabulary items: {{vocabulary}}.
+Theme: {{theme}}
+Level: {{level}}
+Age Group: {{ageGroup}}
+
+For each item, provide:
+1. Word (Chinese characters)
+2. Pinyin
+3. Vietnamese meaning
+4. Part of Speech
+5. An image query string (English) to find a relevant image.
+
+Return the result as a JSON array of objects.`
+          }
+        ]
+      };
+    }
+
+    return null;
   }
 
   /**
@@ -152,6 +252,10 @@ export async function buildAnalysisPrompt(variables: PromptVariables): Promise<B
 
 export async function buildLessonPlanPrompt(variables: PromptVariables): Promise<BuiltPrompt | null> {
   return PromptService.buildDefaultPrompt('lesson_plan', variables);
+}
+
+export async function buildSingleLessonPlanPrompt(variables: PromptVariables): Promise<BuiltPrompt | null> {
+  return PromptService.buildDefaultPrompt('single_lesson_plan', variables);
 }
 
 export async function buildFlashcardPrompt(variables: PromptVariables): Promise<BuiltPrompt | null> {

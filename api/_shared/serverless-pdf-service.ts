@@ -14,14 +14,41 @@ export interface FlashcardPDFOptions {
   flashcards: FlashcardData[];
 }
 
+interface ChineseTextOptions {
+  method?: "svg" | "text-to-image" | "ultimate-text-to-image" | "png";
+  fontSize?: number;
+  fontWeight?: "100" | "200" | "300" | "400" | "500" | "600" | "700" | "800" | "900" | "normal" | "bold";
+  fontFamily?: string;
+  width?: number;
+  height?: number;
+  backgroundColor?: string;
+  textColor?: string;
+  padding?: number;
+  lineHeight?: number;
+  textAlign?: string;
+  quality?: number;
+}
+
 // External API function for Chinese text conversion with smart defaults
 async function callChineseTextAPI(
   text: string,
-  method: "svg" | "text-to-image" | "ultimate-text-to-image" | "png" = "ultimate-text-to-image",
-  fontSize: number = 48,
-  fontWeight: "100" | "200" | "300" | "400" | "500" | "600" | "700" | "800" | "900" | "normal" | "bold" = "700",
-  fontFamily: string = "AaBiMoHengZiZhenBaoKaiShu"
+  options: ChineseTextOptions = {}
 ): Promise<string> {
+  const {
+    method = "ultimate-text-to-image",
+    fontSize = 48,
+    fontWeight = "700",
+    fontFamily = "AaBiMoHengZiZhenBaoKaiShu",
+    width = 720,
+    height = 240,
+    backgroundColor = "#ffffff",
+    textColor = "#000000",
+    padding = 0,
+    lineHeight = 1.5,
+    textAlign = "center",
+    quality = 100
+  } = options;
+
   try {
     const response = await fetch("https://booking.hoangha.shop/api/convert-chinese-text", {
       method: "POST",
@@ -36,14 +63,14 @@ async function callChineseTextAPI(
         fontSize,
         fontFamily,
         fontWeight,
-        width: 720,
-        height: 240,
-        backgroundColor: "#ffffff",
-        textColor: "#000000",
-        padding: 0,
-        lineHeight: 1.5,
-        textAlign: "center",
-        quality: 100,
+        width,
+        height,
+        backgroundColor,
+        textColor,
+        padding,
+        lineHeight,
+        textAlign,
+        quality,
       }),
     });
 
@@ -98,12 +125,7 @@ export class ServerlessPDFService {
    */
   public async generateChineseTextImage(
     text: string,
-    opts?: {
-      width?: number;
-      height?: number;
-      fontSize?: number;
-      fontWeight?: "100" | "200" | "300" | "400" | "500" | "600" | "700" | "800" | "900" | "normal" | "bold";
-    }
+    opts?: ChineseTextOptions
   ): Promise<{
     buffer: Buffer;
     dataUri: string;
@@ -116,7 +138,7 @@ export class ServerlessPDFService {
 
     try {
       // Use simplified external API for Chinese text rendering
-      const svgDataUri = await callChineseTextAPI(text, "png", opts?.fontSize || 48, opts?.fontWeight || "400", "AaBiMoHengZiZhenBaoKaiShu");
+      const svgDataUri = await callChineseTextAPI(text, opts);
 
       // The API already returns binary image data as data URI, no need to convert
       // Extract buffer from data URI for compatibility
@@ -500,8 +522,8 @@ export class ServerlessPDFService {
     try {
       // Generate Chinese and Pinyin images via external API
       const [chineseTextImage, pinyinTextImage] = await Promise.all([
-        callChineseTextAPI(card.word || "朋友", "ultimate-text-to-image", 200, "bold", "AaBiMoHengZiZhenBaoKaiShu"),
-        callChineseTextAPI(card.pinyin || "péngyǒu", "ultimate-text-to-image", 50, "300", "Montserrat"),
+        callChineseTextAPI(card.word || "朋友", { fontSize: 200, fontWeight: "bold", fontFamily: "AaBiMoHengZiZhenBaoKaiShu" }),
+        callChineseTextAPI(card.pinyin || "péngyǒu", { fontSize: 50, fontWeight: "300", fontFamily: "Montserrat" }),
       ]);
 
       // CALCULATE ALL IMAGE DIMENSIONS FIRST TO PREVENT OVERLAP

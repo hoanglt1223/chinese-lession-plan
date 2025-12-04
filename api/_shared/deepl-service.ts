@@ -16,7 +16,7 @@ export class DeepLTranslationService {
 
   constructor() {
     this.deepLApiKey = process.env.DEEPL_API_KEY;
-    this.openaiApiKey = process.env.OPENAI_API_KEY || process.env.OPENAI_KEY;
+    this.openaiApiKey = process.env.OPENAI_API_KEY;
     
     if (this.deepLApiKey) {
       this.translator = new deepl.Translator(this.deepLApiKey);

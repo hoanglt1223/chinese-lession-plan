@@ -243,10 +243,11 @@ export default function Tools() {
   const chineseTextToImageMutation = useMutation({
     mutationFn: async () => {
       if (!chineseText.trim()) throw new Error('No text provided');
-      const response = await fetch('/api/export', {
+      const response = await fetch('/api/content-ops', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          action: 'export',
           documentType: 'chinese-text-image',
           text: chineseText,
           width: cnOptions.width,

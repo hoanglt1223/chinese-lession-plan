@@ -76,7 +76,7 @@ export default function PromptsPage() {
 
   const fetchTemplates = async () => {
     try {
-      const response = await fetch('/api/prompts');
+      const response = await fetch('/api/ai-ops?action=list-prompts');
       const data = await response.json();
       setTemplates(data.templates || []);
     } catch (error) {
@@ -110,13 +110,15 @@ export default function PromptsPage() {
     if (!selectedTemplate) return;
 
     try {
-      const url = isCreating ? '/api/prompts' : `/api/prompts/${selectedTemplate.id}`;
-      const method = isCreating ? 'POST' : 'PUT';
+      const action = isCreating ? 'create-prompt' : 'update-prompt';
       
-      const response = await fetch(url, {
-        method,
+      const response = await fetch('/api/ai-ops', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(selectedTemplate)
+        body: JSON.stringify({
+          action,
+          ...selectedTemplate
+        })
       });
 
       if (response.ok) {
@@ -134,7 +136,7 @@ export default function PromptsPage() {
     if (!confirm('Are you sure you want to delete this template?')) return;
 
     try {
-      const response = await fetch(`/api/prompts/${templateId}`, {
+      const response = await fetch(`/api/ai-ops?action=delete-prompt&id=${templateId}`, {
         method: 'DELETE'
       });
 
