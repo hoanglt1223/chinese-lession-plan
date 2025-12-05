@@ -10,7 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
 import { 
   Loader2, RefreshCw, CheckCircle, XCircle, Clock, Play, Square, 
-  Upload, Eye, Save, AlertCircle 
+  Upload, Eye, Save, AlertCircle, Trash2, Settings
 } from "lucide-react";
 import { 
   Accordion, AccordionContent, AccordionItem, AccordionTrigger 
@@ -66,6 +66,32 @@ export default function CourseManager() {
   const [currentEditingLesson, setCurrentEditingLesson] = useState<{unit: number, lesson: number, title: string} | null>(null);
   const [editorContent, setEditorContent] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isManageModalOpen, setIsManageModalOpen] = useState(false);
+
+  // Delete Course Mutation
+  const deleteCourseMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/course-ops?action=delete-course", {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error("Failed to delete course");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Course Deleted", description: "The course has been removed successfully." });
+      setIsManageModalOpen(false);
+      refetch();
+    },
+    onError: (error) => {
+      toast({ title: "Delete Failed", description: error.message, variant: "destructive" });
+    }
+  });
+
+  const handleDeleteCourse = () => {
+    if (window.confirm("Are you sure you want to delete the current course? This will remove the outline file and all database entries.")) {
+      deleteCourseMutation.mutate();
+    }
+  };
 
   // Fetch Structure
   const { data: courseData, isLoading, error, refetch } = useQuery<CourseStructure>({
@@ -343,6 +369,10 @@ export default function CourseManager() {
             Upload Outline (.xlsx)
           </Button>
           
+          <Button variant="outline" onClick={() => setIsManageModalOpen(true)}>
+            <Settings className="mr-2 h-4 w-4" /> Manage Course
+          </Button>
+
           <Link href="/">
              <Button variant="ghost">Back to Home</Button>
           </Link>
@@ -516,6 +546,39 @@ export default function CourseManager() {
                 Save Changes
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Manage Course Dialog */}
+      <Dialog open={isManageModalOpen} onOpenChange={setIsManageModalOpen}>
+        <DialogContent>
+            <DialogHeader>
+            <DialogTitle>Manage Course</DialogTitle>
+            <DialogDescription>Current active course configuration</DialogDescription>
+            </DialogHeader>
+            <div className="py-4 space-y-4">
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div>
+                        <p className="font-medium">Current Course Outline</p>
+                        <p className="text-sm text-muted-foreground">
+                            {courseData?.filePath ? courseData.filePath.split(/[/\\]/).pop() : "No course loaded"}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                            {courseData?.totalLessons || 0} Lessons
+                        </p>
+                    </div>
+                    {courseData?.totalLessons ? (
+                        <Button variant="destructive" size="sm" onClick={handleDeleteCourse} disabled={deleteCourseMutation.isPending}>
+                            {deleteCourseMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                        </Button>
+                    ) : null}
+                </div>
+                {!courseData?.totalLessons && (
+                    <p className="text-sm text-muted-foreground text-center">No active course. Please upload an Excel file.</p>
+                )}
+            </div>
+            <DialogFooter>
+            <Button variant="outline" onClick={() => setIsManageModalOpen(false)}>Close</Button>
+            </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

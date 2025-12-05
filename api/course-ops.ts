@@ -360,6 +360,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
+    // --- Delete Course ---
+    if (req.method === 'POST' && action === 'delete-course') {
+      try {
+        // Delete all lessons with status 'outline' (and potentially others if we want to clear everything)
+        // For now, let's just clear the outline and associated plans to "reset" the course
+        await db.delete(lessons).where(eq(lessons.status, 'outline'));
+        
+        // Also delete the physical file if it exists
+        if (fs.existsSync(COURSE_OUTLINE_PATH)) {
+          fs.unlinkSync(COURSE_OUTLINE_PATH);
+        }
+
+        return res.json({ success: true, message: "Course deleted successfully" });
+      } catch (error: any) {
+        return res.status(500).json({ message: `Failed to delete course: ${error.message}` });
+      }
+    }
+
     // --- Activities ---
     if (req.method === 'GET' && action === 'activities') {
       const allActivities = await db.select().from(activities).orderBy(desc(activities.createdAt));
