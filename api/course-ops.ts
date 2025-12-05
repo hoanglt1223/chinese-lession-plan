@@ -279,6 +279,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               planContent = await generateSingleLessonPlan(targetLesson, MODEL_NAME);
               docxBuffer = await createLessonPlanDocx(targetLesson, planContent);
               results.plan = 'generated';
+              (results as any).docx = docxBuffer.toString('base64'); // Add this line to return DOCX
           }
 
           // B. Generate Flashcards
