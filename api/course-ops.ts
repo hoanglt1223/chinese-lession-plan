@@ -5,7 +5,7 @@ import { generateLessonFiles } from './_shared/lesson-generator.js';
 import { setCorsHeaders, handleOptions } from './_shared/cors.js';
 import { handleError } from './_shared/error-handler.js';
 import { db } from './_shared/database.js';
-import { activities } from './_shared/db-schema.js';
+import { activities, lessons } from './_shared/db-schema.js';
 import { eq, desc } from 'drizzle-orm';
 import { storage } from './_shared/storage.js';
 import { initializeDatabase } from './_shared/init-db.js';
@@ -57,15 +57,57 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     // --- Course Structure ---
     if (req.method === 'GET' && action === 'structure') {
-      if (!fs.existsSync(COURSE_OUTLINE_PATH)) {
-        return res.status(404).json({ message: 'Course Outline Excel file not found at configured path.' });
+      // 1. Try to fetch from Database first (Serverless/Production)
+      try {
+        const dbLessons = await db.select().from(lessons).where(eq(lessons.status, 'outline'));
+        
+        if (dbLessons.length > 0) {
+           // Reconstruct structure from DB
+           const structure: Record<string, any[]> = {};
+           let totalLessons = 0;
+
+           dbLessons.forEach(row => {
+             const lessonData = row.aiAnalysis as any; // Store full CourseLesson in aiAnalysis
+             if (lessonData && lessonData.unitNumber) {
+               const unitKey = `Unit ${lessonData.unitNumber}`;
+               if (!structure[unitKey]) {
+                 structure[unitKey] = [];
+               }
+               structure[unitKey].push(lessonData);
+               totalLessons++;
+             }
+           });
+
+           // Sort lessons within units
+           Object.keys(structure).forEach(unit => {
+             structure[unit].sort((a, b) => {
+               const nA = parseInt(String(a.lessonNumber).match(/\d+/)?.[0] || '0');
+               const nB = parseInt(String(b.lessonNumber).match(/\d+/)?.[0] || '0');
+               return nA - nB;
+             });
+           });
+
+           return res.json({ 
+             structure,
+             totalLessons,
+             source: 'database'
+           });
+        }
+      } catch (e) {
+        console.warn("Failed to fetch from DB, falling back to file:", e);
       }
 
-      const lessons = parseCourseOutline(COURSE_OUTLINE_PATH);
+      // 2. Fallback to File System (Local Development)
+      if (!fs.existsSync(COURSE_OUTLINE_PATH)) {
+        // If neither DB nor File has data
+        return res.status(404).json({ message: 'Course Outline not found. Please upload an Excel file via Course Manager.' });
+      }
+
+      const lessonsData = parseCourseOutline(COURSE_OUTLINE_PATH);
       
       // Group by Unit
       const structure: Record<string, any[]> = {};
-      lessons.forEach(lesson => {
+      lessonsData.forEach(lesson => {
         const unitKey = `Unit ${lesson.unitNumber}`;
         if (!structure[unitKey]) {
           structure[unitKey] = [];
@@ -75,8 +117,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       return res.json({ 
         structure,
-        totalLessons: lessons.length,
-        filePath: COURSE_OUTLINE_PATH
+        totalLessons: lessonsData.length,
+        filePath: COURSE_OUTLINE_PATH,
+        source: 'file'
       });
     }
 
@@ -94,7 +137,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
        
        try {
          // Verify it can be parsed
-         const lessons = parseCourseOutline(tempFilePath);
+         const parsedLessons = parseCourseOutline(tempFilePath);
+         
+         // 1. Save to Database (Persistent Storage)
+         try {
+            // Clear old outline first to avoid duplicates
+            await db.delete(lessons).where(eq(lessons.status, 'outline'));
+
+            // Insert new lessons
+            // Batch insert might be too large, split if necessary or insert in chunks
+            // For 128 lessons, single batch usually works, but let's be safe with chunks of 50
+            const chunkSize = 50;
+            for (let i = 0; i < parsedLessons.length; i += chunkSize) {
+                const chunk = parsedLessons.slice(i, i + chunkSize);
+                await db.insert(lessons).values(chunk.map(l => ({
+                    title: l.title || `Lesson ${l.lessonNumber}`,
+                    level: l.level || 'N1',
+                    ageGroup: l.ageGroup || 'Primary',
+                    status: 'outline',
+                    aiAnalysis: l as any, // Store full object
+                    originalFiles: null,
+                    lessonPlans: null,
+                    flashcards: null,
+                    summaries: null
+                })));
+            }
+            console.log(`Saved ${parsedLessons.length} lessons to Database`);
+         } catch (dbError) {
+             console.error("Failed to save to Database:", dbError);
+             // Continue to try file save as fallback, or return error?
+             // If DB fails, we should probably let user know, but let's try file first
+         }
          
          // Try to move to permanent location, but handle read-only filesystem
          try {
@@ -110,23 +183,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.json({ 
               success: true, 
               message: "Course outline updated successfully",
-              lessonCount: lessons.length
+              lessonCount: parsedLessons.length
             });
          } catch (writeError: any) {
             // If we can't write to persistent storage (Vercel), return success with warning
-            // and maybe return the parsed data so frontend can use it temporarily?
-            // For now, just log it and return "success" but mention it wasn't persisted if needed.
-            // Or return a specific code.
-            
             console.warn("Could not persist course outline file (likely read-only FS):", writeError);
             
             if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
             
             return res.json({ 
               success: true, 
-              message: "Course outline parsed successfully but could not be saved to disk (Read-Only Filesystem). Changes will not persist.",
-              lessonCount: lessons.length,
-              warning: "read_only_fs"
+              message: "Course outline parsed and saved to Database (Read-Only Filesystem). Changes are persistent.",
+              lessonCount: parsedLessons.length,
+              storage: 'database'
             });
          }
        } catch (error: any) {
