@@ -949,7 +949,7 @@ export async function generateSingleLessonPlan(
       const allActivities = await db.select().from(activities);
       if (allActivities.length > 0) {
         existingActivitiesStr = "\n**Existing Generic Activities (Reuse if appropriate):**\n" + 
-          allActivities.map(a => `- **${a.name}** (${a.type}): ${a.description}`).join("\n");
+          allActivities.map((a: any) => `- **${a.name}** (${a.type}): ${a.description}`).join("\n");
       }
     } catch (error) {
       console.warn("Failed to fetch activities from DB (ignoring):", error);

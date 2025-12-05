@@ -8,11 +8,19 @@ import * as schema from './db-schema.js';
 neonConfig.webSocketConstructor = ws;
 
 // Initialize the database connection
-export const db = drizzle({
-  connection: process.env.DATABASE_URL!,
-  ws: ws,
-  schema
-});
+const connectionString = process.env.DATABASE_URL;
+
+export const db = connectionString
+  ? drizzle({
+      connection: connectionString,
+      ws: ws,
+      schema
+    })
+  : (new Proxy({}, {
+      get: () => {
+        throw new Error("DATABASE_URL is not set");
+      }
+    }) as any);
 
 // Export schema for convenience
 export * from './db-schema.js';

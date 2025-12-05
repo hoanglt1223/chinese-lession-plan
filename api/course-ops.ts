@@ -94,20 +94,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
          // Verify it can be parsed
          const lessons = parseCourseOutline(tempFilePath);
          
-         // If successful, move to permanent location
-         const dir = path.dirname(COURSE_OUTLINE_PATH);
-         if (!fs.existsSync(dir)) {
-           fs.mkdirSync(dir, { recursive: true });
+         // Try to move to permanent location, but handle read-only filesystem
+         try {
+            const dir = path.dirname(COURSE_OUTLINE_PATH);
+            if (!fs.existsSync(dir)) {
+              // This might fail on Vercel
+              try { fs.mkdirSync(dir, { recursive: true }); } catch (e) {}
+            }
+            
+            fs.copyFileSync(tempFilePath, COURSE_OUTLINE_PATH);
+            fs.unlinkSync(tempFilePath); // Clean up
+            
+            return res.json({ 
+              success: true, 
+              message: "Course outline updated successfully",
+              lessonCount: lessons.length
+            });
+         } catch (writeError: any) {
+            // If we can't write to persistent storage (Vercel), return success with warning
+            // and maybe return the parsed data so frontend can use it temporarily?
+            // For now, just log it and return "success" but mention it wasn't persisted if needed.
+            // Or return a specific code.
+            
+            console.warn("Could not persist course outline file (likely read-only FS):", writeError);
+            
+            if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
+            
+            return res.json({ 
+              success: true, 
+              message: "Course outline parsed successfully but could not be saved to disk (Read-Only Filesystem). Changes will not persist.",
+              lessonCount: lessons.length,
+              warning: "read_only_fs"
+            });
          }
-         
-         fs.copyFileSync(tempFilePath, COURSE_OUTLINE_PATH);
-         fs.unlinkSync(tempFilePath); // Clean up
-         
-         return res.json({ 
-           success: true, 
-           message: "Course outline updated successfully",
-           lessonCount: lessons.length
-         });
        } catch (error: any) {
          if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
          throw new Error(`Failed to parse Excel file: ${error.message}`);
