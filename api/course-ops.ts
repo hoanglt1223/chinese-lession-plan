@@ -6,7 +6,7 @@ import { setCorsHeaders, handleOptions } from './_shared/cors.js';
 import { handleError } from './_shared/error-handler.js';
 import { db } from './_shared/database.js';
 import { activities, lessons } from './_shared/db-schema.js';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, sql } from 'drizzle-orm';
 import { storage } from './_shared/storage.js';
 import { initializeDatabase } from './_shared/init-db.js';
 import * as fs from 'fs';
@@ -141,6 +141,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
          
          // 1. Save to Database (Persistent Storage)
          try {
+            // Ensure table exists (Fix for Vercel cold start / missing migrations)
+            try {
+                await db.execute(sql`CREATE TABLE IF NOT EXISTS "lessons" (
+                  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                  "title" varchar(255) NOT NULL,
+                  "level" varchar(50) NOT NULL,
+                  "age_group" varchar(100) NOT NULL,
+                  "status" varchar(50) NOT NULL DEFAULT 'draft',
+                  "original_files" jsonb,
+                  "ai_analysis" jsonb,
+                  "lesson_plans" jsonb,
+                  "flashcards" jsonb,
+                  "summaries" jsonb,
+                  "created_at" timestamp DEFAULT now() NOT NULL,
+                  "updated_at" timestamp DEFAULT now() NOT NULL
+                )`);
+            } catch (tableError) {
+                console.warn("Could not verify/create table 'lessons':", tableError);
+            }
+
             // Clear old outline first to avoid duplicates
             await db.delete(lessons).where(eq(lessons.status, 'outline'));
 
@@ -165,8 +185,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             console.log(`Saved ${parsedLessons.length} lessons to Database`);
          } catch (dbError) {
              console.error("Failed to save to Database:", dbError);
-             // Continue to try file save as fallback, or return error?
-             // If DB fails, we should probably let user know, but let's try file first
+             // Continue to try file save as fallback
          }
          
          // Try to move to permanent location, but handle read-only filesystem
