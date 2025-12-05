@@ -171,3 +171,22 @@ Based on the todo.md file:
 3. **State Management**: TanStack Query for server state, React Context for app state
 4. **Error Handling**: Comprehensive error boundaries and API error handling
 5. **Progressive Enhancement**: Steps can be completed independently with data persistence
+
+## Project Development Rules & Best Practices
+
+### 1. TypeScript & ESM Configuration
+- **Import Extensions**: When using Node.js with ESM (`"type": "module"` in `package.json`), all relative imports in TypeScript files MUST include the `.js` extension.
+  - ❌ Wrong: `import { db } from './database';`
+  - ✅ Correct: `import { db } from './database.js';`
+  - This applies to local file imports. External packages (like `drizzle-orm`) do not need extensions.
+
+### 2. Vercel Serverless Functions
+- **Database Migrations**: NEVER run heavy database migrations (`runMigrations()`) or initialization logic inside the API handler or top-level code of a Serverless Function.
+  - Serverless functions have short timeouts (max 10-60s usually) and are stateless.
+  - Running migrations on every request causes timeouts (500 errors) and race conditions.
+  - **Solution**: Run migrations manually via CLI (`npm run db:migrate`) or a dedicated separate pipeline.
+- **Lazy Database Connection**: Use lazy initialization for Database connections to prevent crashes if the DB is unreachable or config is missing during the build phase or cold start.
+- **Read-Only Filesystem**: Vercel Runtime filesystem is read-only (except `/tmp`). Do not attempt to write persistent files to `./docs` or other directories at runtime. Use `/tmp` for temporary processing only.
+
+### 3. General
+- **Code Preservation**: Do not delete legacy code/UI without explicit instruction. Prefer creating new routes/components (e.g., `/batch-manager`) to preserve old functionality while building new features.

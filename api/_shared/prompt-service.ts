@@ -1,6 +1,6 @@
 import { eq, and } from 'drizzle-orm';
-import { db } from './database';
-import { promptTemplates, promptComponents } from './db-schema';
+import { db } from './database.js';
+import { promptTemplates, promptComponents } from './db-schema.js';
 
 export interface PromptVariables {
   [key: string]: any;

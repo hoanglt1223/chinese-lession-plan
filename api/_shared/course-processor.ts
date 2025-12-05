@@ -1,5 +1,5 @@
 import XLSX from 'xlsx';
-import { LessonAnalysis } from './openai-services';
+import { LessonAnalysis } from './openai-services.js';
 
 export interface CourseLesson {
   unitNumber: number | string;
