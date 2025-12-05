@@ -126,7 +126,7 @@ export default function CourseManager() {
 
   // Generate Mutation
   const generateMutation = useMutation({
-    mutationFn: async (params: { unit: number; lesson: number; force: boolean; skipFlashcards: boolean }) => {
+    mutationFn: async (params: { unit: number | string; lesson: number; force: boolean; skipFlashcards: boolean }) => {
       const res = await fetch("/api/course-ops", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -233,7 +233,14 @@ export default function CourseManager() {
         continue;
       }
 
-      const [unit, lesson] = key.split('-').map(Number);
+      // Handle potential string unit numbers and complex keys
+      const lastDashIndex = key.lastIndexOf('-');
+      const unitStr = key.substring(0, lastDashIndex);
+      const lessonStr = key.substring(lastDashIndex + 1);
+      
+      const unit = isNaN(Number(unitStr)) ? unitStr : Number(unitStr);
+      const lesson = Number(lessonStr);
+
       const startTime = Date.now();
       
       setGenerationStatus(prev => ({ ...prev, [key]: { status: 'processing' } }));

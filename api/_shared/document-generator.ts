@@ -171,11 +171,15 @@ export async function createFlashcardPdf(flashcards: FlashcardData[]): Promise<B
 
     // Word (Chinese)
     doc.setFontSize(60);
-    doc.text(card.word, pageWidth / 2, yPos + 40, { align: 'center' });
+    if (card.word) {
+      doc.text(card.word, pageWidth / 2, yPos + 40, { align: 'center' });
+    }
 
     // Pinyin
     doc.setFontSize(24);
-    doc.text(card.pinyin, pageWidth / 2, yPos + 60, { align: 'center' });
+    if (card.pinyin) {
+      doc.text(card.pinyin, pageWidth / 2, yPos + 60, { align: 'center' });
+    }
 
     // Image
     if (card.imageUrl) {
@@ -190,16 +194,21 @@ export async function createFlashcardPdf(flashcards: FlashcardData[]): Promise<B
         const imgMaxH = cardHeight - 100; // Leave space for text
         const imgMaxW = cardWidth - 40;
         
-        doc.addImage(imageBase64, format, margin + 20, yPos + 70, imgMaxW, imgMaxH);
+        // Simplified image adding without strict aspect ratio calculation for this basic function
+        // For production, better aspect ratio logic is needed
+        doc.addImage(imageBase64, format, margin + 20, yPos + 70, 100, 100); 
       } catch (e) {
         console.error(`Failed to load image for ${card.word}`, e);
+        doc.setFontSize(12);
         doc.text("[Image Error]", pageWidth / 2, yPos + 100, { align: 'center' });
       }
     }
 
     // Vietnamese
     doc.setFontSize(20);
-    doc.text(card.vietnamese, pageWidth / 2, yPos + cardHeight - 10, { align: 'center' });
+    if (card.vietnamese) {
+      doc.text(card.vietnamese, pageWidth / 2, yPos + cardHeight - 10, { align: 'center' });
+    }
   }
 
   return Buffer.from(doc.output('arraybuffer'));
