@@ -44,11 +44,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // Initialize DB if needed (for lessons/activities)
   // We can do this lazily or here. Doing it here for safety.
+  /*
   try {
     await initializeDatabase();
   } catch (e) {
     console.error("DB Init failed", e);
   }
+  */
 
   const action = (req.query.action as string) || (req.body && (req.body as any).action) || 'unknown';
 
