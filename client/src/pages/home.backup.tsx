@@ -37,7 +37,7 @@ function HomeContent() {
   });
   
   const { data: lessons } = useQuery({
-    queryKey: ["/api/course-ops?action=lessons"],
+    queryKey: ["/api/lessons"],
     enabled: true,
   });
 
@@ -110,7 +110,7 @@ function HomeContent() {
   // Helper function to export analysis data
   const exportAnalysisData = async (analysisData: any) => {
     // Export as DOCX
-    const docxResponse = await fetch('/api/content-ops?action=export', {
+    const docxResponse = await fetch('/api/export', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
@@ -131,7 +131,7 @@ function HomeContent() {
     downloadFile(mdBlob, 'analysis_results.md');
 
     // Export as PDF
-    const pdfResponse = await fetch('/api/content-ops?action=export', {
+    const pdfResponse = await fetch('/api/export', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
@@ -152,7 +152,7 @@ function HomeContent() {
     // Export each lesson plan as DOCX and MD
     const exportPromises = lessonPlans.map(async (lessonPlan) => {
       // DOCX export
-      const docxResponse = await fetch('/api/content-ops?action=export', {
+      const docxResponse = await fetch('/api/export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -181,7 +181,7 @@ function HomeContent() {
 
   // Helper function to export flashcards data
   const exportFlashcardsData = async (flashcards: any[]) => {
-    const pdfResponse = await fetch('/api/content-ops?action=export', {
+    const pdfResponse = await fetch('/api/export', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
@@ -201,7 +201,7 @@ function HomeContent() {
   const exportSummaries = async (summaries: any[]) => {
     const exportPromises = summaries.map(async (summary) => {
       // DOCX export
-      const docxResponse = await fetch('/api/content-ops?action=export', {
+      const docxResponse = await fetch('/api/export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -311,7 +311,7 @@ function HomeContent() {
 
           // Step 1: Generate analysis if missing
           if (!lesson.aiAnalysis && lesson.files && lesson.files.length > 0) {
-            const analysisResponse = await fetch('/api/ai-ops?action=analyze', {
+            const analysisResponse = await fetch('/api/analyze', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -330,7 +330,7 @@ function HomeContent() {
 
           // Step 2: Generate lesson plans if missing
           if (!lesson.lessonPlans && lesson.aiAnalysis) {
-            const plansResponse = await fetch('/api/ai-ops?action=generate-plan', {
+            const plansResponse = await fetch('/api/generate-lesson-plans', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -349,7 +349,7 @@ function HomeContent() {
 
           // Step 3: Generate flashcards if missing
           if (!lesson.flashcards && lesson.aiAnalysis) {
-            const flashcardsResponse = await fetch('/api/ai-ops?action=generate-flashcards', {
+            const flashcardsResponse = await fetch('/api/generate-flashcards', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -368,7 +368,7 @@ function HomeContent() {
 
           // Step 4: Generate summaries if missing
           if (!lesson.summaries && lesson.lessonPlans) {
-            const summariesResponse = await fetch('/api/ai-ops?action=generate-summary', {
+            const summariesResponse = await fetch('/api/generate-summaries', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -424,15 +424,14 @@ function HomeContent() {
       formData.append('files', file);
       
       // Upload the file
-      const uploadResponse = await fetch('/api/content-ops?action=upload', {
+      const uploadResponse = await fetch('/api/upload', {
         method: 'POST',
         body: formData,
       });
       const uploadResult = await uploadResponse.json();
       
       // Create a lesson with required fields
-      const lessonResponse = await apiRequest('POST', '/api/course-ops?action=update-lesson', {
-        lessonId: 'quick-test-' + Date.now(), // Temporary ID since create is not supported
+      const lessonResponse = await apiRequest('POST', '/api/lessons', {
         title: `Quick Test: ${uploadResult.files[0].name}`,
         level: 'N5',
         ageGroup: 'primary',
@@ -441,22 +440,22 @@ function HomeContent() {
       const lessonData = await lessonResponse.json();
       
       // Start analysis immediately
-      const analysisResponse = await apiRequest('POST', '/api/ai-ops?action=analyze', {
+      const analysisResponse = await apiRequest('POST', '/api/analyze', {
         content: uploadResult.files[0].content
       });
       const analysisData = await analysisResponse.json();
       
       // Update lesson with analysis
-      await apiRequest('POST', '/api/course-ops?action=update-lesson', {
-        lessonId: lessonData.lesson?.id || lessonData.id,
+      await apiRequest('PUT', '/api/lessons', {
+        id: lessonData.lesson.id,
         aiAnalysis: analysisData
       });
       
-      return { lessonId: lessonData.lesson?.id || lessonData.id, analysis: analysisData };
+      return { lessonId: lessonData.lesson.id, analysis: analysisData };
     },
     onSuccess: (data) => {
       setSelectedLesson(data.lessonId);
-      queryClient.invalidateQueries({ queryKey: ['/api/course-ops?action=lessons'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/lessons'] });
     }
   });
 
