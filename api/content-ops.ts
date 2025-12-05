@@ -79,7 +79,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const filePath = path.join(lessonDir, fileName);
 
             if (!fs.existsSync(filePath)) {
-                return res.status(404).json({ message: 'File not found', path: filePath });
+                // Instead of returning 404, return empty content or default template
+                // This prevents "File not found" errors on frontend when opening a new lesson
+                return res.json({ content: '' });
             }
             const fileContent = fs.readFileSync(filePath, 'utf-8');
             return res.json({ content: fileContent });

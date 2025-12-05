@@ -1,7 +1,8 @@
 import 'dotenv/config';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { parseCourseOutline } from './_shared/course-processor.js';
-import { generateLessonFiles } from './_shared/lesson-generator.js';
+import { generateSingleLessonPlan, generateFlashcards } from './_shared/openai-services.js';
+import { createLessonPlanDocx, createFlashcardPdf } from './_shared/document-generator.js';
 import { setCorsHeaders, handleOptions } from './_shared/cors.js';
 import { handleError } from './_shared/error-handler.js';
 import { db } from './_shared/database.js';
@@ -98,28 +99,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       // 2. Fallback to File System (Local Development)
-      if (!fs.existsSync(COURSE_OUTLINE_PATH)) {
-        // If neither DB nor File has data
-        return res.status(404).json({ message: 'Course Outline not found. Please upload an Excel file via Course Manager.' });
+      if (fs.existsSync(COURSE_OUTLINE_PATH)) {
+        try {
+          const lessonsData = parseCourseOutline(COURSE_OUTLINE_PATH);
+          
+          // Group by Unit
+          const structure: Record<string, any[]> = {};
+          lessonsData.forEach(lesson => {
+            const unitKey = `Unit ${lesson.unitNumber}`;
+            if (!structure[unitKey]) {
+              structure[unitKey] = [];
+            }
+            structure[unitKey].push(lesson);
+          });
+
+          return res.json({ 
+            structure,
+            totalLessons: lessonsData.length,
+            filePath: COURSE_OUTLINE_PATH,
+            source: 'file'
+          });
+        } catch (parseError) {
+           console.error("Failed to parse local file:", parseError);
+        }
       }
 
-      const lessonsData = parseCourseOutline(COURSE_OUTLINE_PATH);
-      
-      // Group by Unit
-      const structure: Record<string, any[]> = {};
-      lessonsData.forEach(lesson => {
-        const unitKey = `Unit ${lesson.unitNumber}`;
-        if (!structure[unitKey]) {
-          structure[unitKey] = [];
-        }
-        structure[unitKey].push(lesson);
-      });
-
-      return res.json({ 
-        structure,
-        totalLessons: lessonsData.length,
-        filePath: COURSE_OUTLINE_PATH,
-        source: 'file'
+      // 3. If neither DB nor File has data, return empty structure instead of 404
+      // This prevents frontend error state and allows user to see the Upload button
+      return res.json({
+        structure: {},
+        totalLessons: 0,
+        source: 'none',
+        message: 'No course outline found. Please upload an Excel file.'
       });
     }
 
@@ -139,14 +150,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
          // Verify it can be parsed
          const parsedLessons = parseCourseOutline(tempFilePath);
          
+         if (!parsedLessons || parsedLessons.length === 0) {
+            throw new Error("No lessons found in the uploaded Excel file");
+         }
+
+         let dbSuccess = false;
+
          // 1. Save to Database (Persistent Storage)
          try {
             // Clear old outline first to avoid duplicates
             await db.delete(lessons).where(eq(lessons.status, 'outline'));
 
             // Insert new lessons
-            // Batch insert might be too large, split if necessary or insert in chunks
-            // For 128 lessons, single batch usually works, but let's be safe with chunks of 50
             const chunkSize = 50;
             for (let i = 0; i < parsedLessons.length; i += chunkSize) {
                 const chunk = parsedLessons.slice(i, i + chunkSize);
@@ -163,43 +178,48 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 })));
             }
             console.log(`Saved ${parsedLessons.length} lessons to Database`);
+            dbSuccess = true;
          } catch (dbError) {
              console.error("Failed to save to Database:", dbError);
-             // Continue to try file save as fallback
+             // We continue to try file save, but mark DB as failed
          }
          
-         // Try to move to permanent location, but handle read-only filesystem
+         // 2. Try to move to permanent location (File System)
+         let fileSuccess = false;
          try {
             const dir = path.dirname(COURSE_OUTLINE_PATH);
             if (!fs.existsSync(dir)) {
-              // This might fail on Vercel
               try { fs.mkdirSync(dir, { recursive: true }); } catch (e) {}
             }
             
             fs.copyFileSync(tempFilePath, COURSE_OUTLINE_PATH);
-            fs.unlinkSync(tempFilePath); // Clean up
-            
-            return res.json({ 
-              success: true, 
-              message: "Course outline updated successfully",
-              lessonCount: parsedLessons.length
-            });
+            fileSuccess = true;
          } catch (writeError: any) {
-            // If we can't write to persistent storage (Vercel), return success with warning
             console.warn("Could not persist course outline file (likely read-only FS):", writeError);
-            
-            if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
-            
-            return res.json({ 
-              success: true, 
-              message: "Course outline parsed and saved to Database (Read-Only Filesystem). Changes are persistent.",
-              lessonCount: parsedLessons.length,
-              storage: 'database'
-            });
          }
+
+         // Clean up temp file
+         if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
+
+         if (!dbSuccess && !fileSuccess) {
+             return res.status(500).json({ 
+                 message: "Failed to save course outline to both Database and File System." 
+             });
+         }
+            
+         return res.json({ 
+            success: true, 
+            message: dbSuccess 
+                ? "Course outline saved to Database successfully." 
+                : "Course outline saved to File System (DB failed).",
+            lessonCount: parsedLessons.length,
+            storage: dbSuccess ? 'database' : 'file'
+         });
+
        } catch (error: any) {
          if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
-         throw new Error(`Failed to parse Excel file: ${error.message}`);
+         console.error("Import error:", error);
+         return res.status(500).json({ message: `Failed to process Excel file: ${error.message}` });
        }
     }
 
@@ -211,23 +231,133 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ message: 'unitNumber and lessonNumber are required' });
       }
 
-      if (!fs.existsSync(COURSE_OUTLINE_PATH)) {
-        return res.status(404).json({ message: 'Course Outline Excel file not found.' });
+      let targetLesson: any = null;
+      let lessonDbRecord: any = null;
+
+      // 1. Try to find in Database
+      try {
+        const dbLessons = await db.select().from(lessons).where(
+            sql`ai_analysis->>'unitNumber' = ${String(unitNumber)} AND ai_analysis->>'lessonNumber' = ${String(lessonNumber)}`
+        ).limit(1);
+        
+        if (dbLessons.length > 0) {
+            lessonDbRecord = dbLessons[0];
+            targetLesson = lessonDbRecord.aiAnalysis;
+        }
+      } catch (dbError) {
+          console.warn("DB lookup for lesson failed:", dbError);
       }
 
-      const lessons = parseCourseOutline(COURSE_OUTLINE_PATH);
-      const targetLesson = lessons.find(l => 
-        String(l.unitNumber) === String(unitNumber) && 
-        String(l.lessonNumber) === String(lessonNumber)
-      );
+      // 2. Fallback to File
+      if (!targetLesson && fs.existsSync(COURSE_OUTLINE_PATH)) {
+        const allLessons = parseCourseOutline(COURSE_OUTLINE_PATH);
+        targetLesson = allLessons.find(l => 
+          String(l.unitNumber) === String(unitNumber) && 
+          String(l.lessonNumber) === String(lessonNumber)
+        );
+      }
 
       if (!targetLesson) {
         return res.status(404).json({ message: `Lesson not found: Unit ${unitNumber} Lesson ${lessonNumber}` });
       }
 
-      console.log(`Generating files for Unit ${unitNumber} Lesson ${lessonNumber}...`);
-      const result = await generateLessonFiles(targetLesson, OUTPUT_BASE_DIR, { force, skipFlashcards });
-      return res.json(result);
+      console.log(`Generating content for Unit ${unitNumber} Lesson ${lessonNumber}...`);
+      const MODEL_NAME = 'GLM-4.6';
+      const results: { plan?: string; flashcards?: string; error?: string; storage?: string } = { storage: 'database' };
+
+      try {
+          // A. Generate Lesson Plan
+          let planContent = "";
+          let docxBuffer: Buffer | null = null;
+          
+          // Check if already exists in DB and not forced
+          if (lessonDbRecord && lessonDbRecord.lessonPlans && lessonDbRecord.lessonPlans.length > 0 && !force) {
+              results.plan = 'skipped (exists in DB)';
+              planContent = lessonDbRecord.lessonPlans[0].content;
+          } else {
+              // Generate new
+              planContent = await generateSingleLessonPlan(targetLesson, MODEL_NAME);
+              docxBuffer = await createLessonPlanDocx(targetLesson, planContent);
+              results.plan = 'generated';
+          }
+
+          // B. Generate Flashcards
+          let flashcardsData: any[] = [];
+          let pdfBuffer: Buffer | null = null;
+
+          if (!skipFlashcards && targetLesson.vocabulary && targetLesson.vocabulary.length > 0) {
+              if (lessonDbRecord && lessonDbRecord.flashcards && lessonDbRecord.flashcards.length > 0 && !force) {
+                  results.flashcards = 'skipped (exists in DB)';
+                  flashcardsData = lessonDbRecord.flashcards;
+              } else {
+                  // Generate new
+                  flashcardsData = await generateFlashcards(
+                      targetLesson.vocabulary,
+                      targetLesson.title || `Lesson ${targetLesson.lessonNumber}`,
+                      targetLesson.level || 'Beginner',
+                      targetLesson.ageGroup || 'Preschool',
+                      MODEL_NAME,
+                      'api'
+                  );
+                  if (flashcardsData.length > 0) {
+                      pdfBuffer = await createFlashcardPdf(flashcardsData);
+                      results.flashcards = 'generated';
+                  } else {
+                      results.flashcards = 'no data';
+                  }
+              }
+          }
+
+          // C. Save to Database
+          if (results.plan === 'generated' || results.flashcards === 'generated') {
+              const updateData: any = { updatedAt: new Date() };
+              
+              if (results.plan === 'generated') {
+                  updateData.lessonPlans = [{
+                      content: planContent,
+                      docx: docxBuffer ? docxBuffer.toString('base64') : null, // Store as base64 if needed, or just content
+                      createdAt: new Date().toISOString()
+                  }];
+              }
+              
+              if (results.flashcards === 'generated') {
+                  updateData.flashcards = flashcardsData;
+                  // We might want to store PDF binary too if schema allows, but currently schema defines jsonb
+                  // We can store PDF as base64 string inside the JSON or just regenerate on demand
+              }
+
+              if (lessonDbRecord) {
+                  await db.update(lessons)
+                      .set(updateData)
+                      .where(eq(lessons.id, lessonDbRecord.id));
+              } else {
+                  // Create new record if it came from file but wasn't in DB
+                  await db.insert(lessons).values({
+                      title: targetLesson.title || `Lesson ${targetLesson.lessonNumber}`,
+                      level: targetLesson.level || 'N1',
+                      ageGroup: targetLesson.ageGroup || 'Primary',
+                      status: 'plan',
+                      aiAnalysis: targetLesson,
+                      lessonPlans: updateData.lessonPlans || null,
+                      flashcards: updateData.flashcards || null
+                  });
+              }
+          }
+
+          return res.json({ 
+              success: true, 
+              results,
+              lesson: {
+                  ...targetLesson,
+                  hasPlan: !!planContent,
+                  hasFlashcards: flashcardsData.length > 0
+              }
+          });
+
+      } catch (genError: any) {
+          console.error("Generation failed:", genError);
+          return res.status(500).json({ message: `Generation failed: ${genError.message}` });
+      }
     }
 
     // --- Activities ---
