@@ -513,6 +513,15 @@ function HomeContent() {
               
               {/* Desktop settings */}
               <div className="hidden lg:flex items-center space-x-1">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => window.location.href = '/course-manager'}
+                  className="hidden sm:flex px-2 mr-1"
+                >
+                  <FolderInput className="h-3.5 w-3.5 mr-1" />
+                  <span className="hidden md:inline text-xs">Course Manager</span>
+                </Button>
                 <select 
                   className="px-1.5 py-0.5 border rounded text-xs bg-background hover:bg-accent transition-colors min-w-0"
                   value={aiSettings.selectedModel}
@@ -521,6 +530,7 @@ function HomeContent() {
                   <option value="gpt-5-nano">GPT-5-nano</option>
                   <option value="gpt-5-mini">GPT-5-mini</option>
                   <option value="gpt-4o">GPT-4o</option>
+                  <option value="glm-4.6">GLM-4.6</option>
                 </select>
                 <select 
                   className="px-1.5 py-0.5 border rounded text-xs bg-background hover:bg-accent transition-colors min-w-0"
