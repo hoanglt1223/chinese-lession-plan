@@ -66,7 +66,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
            const structure: Record<string, any[]> = {};
            let totalLessons = 0;
 
-           dbLessons.forEach(row => {
+           dbLessons.forEach((row: { aiAnalysis: any; }) => {
              const lessonData = row.aiAnalysis as any; // Store full CourseLesson in aiAnalysis
              if (lessonData && lessonData.unitNumber) {
                const unitKey = `Unit ${lessonData.unitNumber}`;
@@ -141,26 +141,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
          
          // 1. Save to Database (Persistent Storage)
          try {
-            // Ensure table exists (Fix for Vercel cold start / missing migrations)
-            try {
-                await db.execute(sql`CREATE TABLE IF NOT EXISTS "lessons" (
-                  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-                  "title" varchar(255) NOT NULL,
-                  "level" varchar(50) NOT NULL,
-                  "age_group" varchar(100) NOT NULL,
-                  "status" varchar(50) NOT NULL DEFAULT 'draft',
-                  "original_files" jsonb,
-                  "ai_analysis" jsonb,
-                  "lesson_plans" jsonb,
-                  "flashcards" jsonb,
-                  "summaries" jsonb,
-                  "created_at" timestamp DEFAULT now() NOT NULL,
-                  "updated_at" timestamp DEFAULT now() NOT NULL
-                )`);
-            } catch (tableError) {
-                console.warn("Could not verify/create table 'lessons':", tableError);
-            }
-
             // Clear old outline first to avoid duplicates
             await db.delete(lessons).where(eq(lessons.status, 'outline'));
 
