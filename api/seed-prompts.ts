@@ -1,4 +1,4 @@
-import { seedPrompts } from './_shared/seed-prompts';
+import { seedPrompts } from './_shared/seed-prompts.js';
 
 async function main() {
   try {

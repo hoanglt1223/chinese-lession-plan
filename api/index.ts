@@ -4,10 +4,10 @@ import session from 'express-session';
 import 'dotenv/config';
 
 // Import handlers
-import courseOpsHandler from './course-ops';
-import aiOpsHandler from './ai-ops';
-import contentOpsHandler from './content-ops';
-import authHandler from './auth';
+import courseOpsHandler from './course-ops.js';
+import aiOpsHandler from './ai-ops.js';
+import contentOpsHandler from './content-ops.js';
+import authHandler from './auth.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;

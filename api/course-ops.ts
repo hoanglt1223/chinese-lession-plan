@@ -10,14 +10,9 @@ import { activities, lessons } from './_shared/db-schema.js';
 import { eq, desc, sql } from 'drizzle-orm';
 import { storage } from './_shared/storage.js';
 import { initializeDatabase } from './_shared/init-db.js';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
 import multer from 'multer';
 
-// Configuration
-const COURSE_OUTLINE_PATH = path.join(process.cwd(), 'docs/final-real-work/Super Learners Course Outline.xlsx');
-const OUTPUT_BASE_DIR = path.join(process.cwd(), 'docs/final-real-work/generated');
+// Configuration - Removed file paths for serverless compatibility
 
 // Multer Setup
 const upload = multer({ 
@@ -98,33 +93,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.warn("Failed to fetch from DB, falling back to file:", e);
       }
 
-      // 2. Fallback to File System (Local Development)
-      if (fs.existsSync(COURSE_OUTLINE_PATH)) {
-        try {
-          const lessonsData = parseCourseOutline(COURSE_OUTLINE_PATH);
-          
-          // Group by Unit
-          const structure: Record<string, any[]> = {};
-          lessonsData.forEach(lesson => {
-            const unitKey = `Unit ${lesson.unitNumber}`;
-            if (!structure[unitKey]) {
-              structure[unitKey] = [];
-            }
-            structure[unitKey].push(lesson);
-          });
-
-          return res.json({ 
-            structure,
-            totalLessons: lessonsData.length,
-            filePath: COURSE_OUTLINE_PATH,
-            source: 'file'
-          });
-        } catch (parseError) {
-           console.error("Failed to parse local file:", parseError);
-        }
-      }
-
-      // 3. If neither DB nor File has data, return empty structure instead of 404
+      // 2. If no data in database, return empty structure instead of 404
       // This prevents frontend error state and allows user to see the Upload button
       return res.json({
         structure: {},
@@ -143,12 +112,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
          return res.status(400).json({ message: "No file uploaded" });
        }
    
-       const tempFilePath = path.join(os.tmpdir(), `upload_${Date.now()}.xlsx`);
-       fs.writeFileSync(tempFilePath, file.buffer);
-       
        try {
-         // Verify it can be parsed
-         const parsedLessons = parseCourseOutline(tempFilePath);
+         // Verify it can be parsed directly from buffer
+         const parsedLessons = parseCourseOutline(file.buffer);
          
          if (!parsedLessons || parsedLessons.length === 0) {
             throw new Error("No lessons found in the uploaded Excel file");
@@ -184,40 +150,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
              // We continue to try file save, but mark DB as failed
          }
          
-         // 2. Try to move to permanent location (File System)
-         let fileSuccess = false;
-         try {
-            const dir = path.dirname(COURSE_OUTLINE_PATH);
-            if (!fs.existsSync(dir)) {
-              try { fs.mkdirSync(dir, { recursive: true }); } catch (e) {}
-            }
-            
-            fs.copyFileSync(tempFilePath, COURSE_OUTLINE_PATH);
-            fileSuccess = true;
-         } catch (writeError: any) {
-            console.warn("Could not persist course outline file (likely read-only FS):", writeError);
-         }
-
-         // Clean up temp file
-         if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
-
-         if (!dbSuccess && !fileSuccess) {
-             return res.status(500).json({ 
-                 message: "Failed to save course outline to both Database and File System." 
+         if (!dbSuccess) {
+             return res.status(500).json({
+                 message: "Failed to save course outline to Database. Please check database configuration."
              });
          }
-            
-         return res.json({ 
-            success: true, 
-            message: dbSuccess 
-                ? "Course outline saved to Database successfully." 
-                : "Course outline saved to File System (DB failed).",
+
+         return res.json({
+            success: true,
+            message: "Course outline saved to Database successfully.",
             lessonCount: parsedLessons.length,
-            storage: dbSuccess ? 'database' : 'file'
+            storage: 'database'
          });
 
        } catch (error: any) {
-         if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
          console.error("Import error:", error);
          return res.status(500).json({ message: `Failed to process Excel file: ${error.message}` });
        }

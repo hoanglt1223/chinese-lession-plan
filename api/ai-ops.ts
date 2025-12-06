@@ -8,11 +8,6 @@ import { db } from './_shared/database.js';
 import { promptTemplates, promptComponents, InsertPromptComponent } from './_shared/db-schema.js';
 import { eq, desc, and } from 'drizzle-orm';
 import { callChineseTextAPI } from './_shared/chinese-utils.js';
-import { parseCourseOutline } from './_shared/course-processor.js';
-import * as path from 'path';
-import * as fs from 'fs';
-
-const COURSE_OUTLINE_PATH = path.join(process.cwd(), 'docs/final-real-work/Super Learners Course Outline.xlsx');
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(res);
@@ -27,16 +22,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
        
        let lessonData = lesson;
        
-       // If lesson data is not provided, try to fetch it from the outline
-       if (!lessonData && unitNumber && lessonNumber) {
-          if (fs.existsSync(COURSE_OUTLINE_PATH)) {
-              const lessons = parseCourseOutline(COURSE_OUTLINE_PATH);
-              lessonData = lessons.find(l => 
-                String(l.unitNumber) === String(unitNumber) && 
-                String(l.lessonNumber) === String(lessonNumber)
-              );
-          }
-       }
+       // File system access removed for serverless compatibility
+       // Lesson data must be provided in request body
 
        if (!lessonData) {
           return res.status(400).json({ message: "Lesson data or valid Unit/Lesson numbers required" });

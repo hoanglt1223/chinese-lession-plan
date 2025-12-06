@@ -199,23 +199,9 @@ export async function analyzePDFContent(
     return result;
   } catch (error) {
     console.error("Failed to analyze PDF content:", error);
-    // Return meaningful fallback instead of throwing
-    return {
-      vocabulary: ["小鸟", "朋友", "飞", "点点头"],
-      activities: [
-        "Listen & Repeat (听说练习) Hardcoded",
-        "Listen & Pick Image (听选图片)",
-        "See Image & Speak (看图说话)",
-      ],
-      learningObjectives: [
-        "Students can recognize and pronounce key vocabulary",
-        "Students can understand the story sequence",
-      ],
-      detectedLevel: "N1",
-      ageAppropriate: "preschool",
-      mainTheme: "Making Friends",
-      duration: "75分钟",
-    };
+    // Return empty structure instead of hardcoded fallback
+    // This prevents contamination of results with fake data
+    throw new Error(`AI content analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 

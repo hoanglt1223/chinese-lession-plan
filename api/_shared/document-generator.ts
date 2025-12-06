@@ -1,6 +1,6 @@
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, BorderStyle } from "docx";
 import { jsPDF } from "jspdf";
-import { CourseLesson } from "./course-processor";
+import { CourseLesson } from "./course-processor.js";
 import { FlashcardData } from "../../shared/schema";
 import fetch from "node-fetch";
 

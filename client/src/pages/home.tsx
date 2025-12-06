@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ExportBar } from "@/components/export/export-bar";
 import { KanbanBoard } from "@/components/workflow/kanban-board";
 import { useWorkflow } from "@/hooks/use-workflow";
@@ -14,7 +15,7 @@ import { apiRequest } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useAI } from "@/contexts/AIContext";
-import { GraduationCap, Clock, FolderInput, Layers, Settings, Zap, Loader2, LogOut, DollarSign } from "lucide-react";
+import { GraduationCap, Clock, FolderInput, Layers, Settings, Zap, Loader2, LogOut, DollarSign, Menu, Home, BookOpen, PenTool } from "lucide-react";
 
 function HomeContent() {
   const [selectedLesson, setSelectedLesson] = useState<string | null>(null);
@@ -486,9 +487,9 @@ function HomeContent() {
             
             {/* User info and actions */}
             <nav className="flex items-center space-x-1 sm:space-x-2">
-              {/* User credit balance */}
+              {/* User credit balance - hidden on mobile */}
               {user && (
-                <Badge variant="secondary" className="flex items-center gap-1 text-xs px-1.5 py-0.5">
+                <Badge variant="secondary" className="hidden sm:flex items-center gap-1 text-xs px-1.5 py-0.5">
                   <DollarSign className="h-3 w-3 flex-shrink-0" />
                   <span className="font-medium">
                     {user.creditBalance}
@@ -496,19 +497,122 @@ function HomeContent() {
                   <span className="hidden lg:inline text-xs">Credits</span>
                 </Badge>
               )}
-              
-              {/* Settings dropdown for mobile */}
-              <div className="flex lg:hidden">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="p-1.5"
-                  onClick={() => {
-                    // Could toggle a mobile menu here
-                  }}
-                >
-                  <Settings className="h-3.5 w-3.5" />
-                </Button>
+
+              {/* Mobile navigation menu */}
+              <div className="lg:hidden">
+                <Sheet>
+                  <SheetTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="p-2 h-9 w-9"
+                      aria-label="Open navigation menu"
+                    >
+                      <Menu className="h-4 w-4" />
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="right" className="w-80 p-0">
+                    <SheetHeader className="p-4 border-b">
+                      <SheetTitle className="flex items-center gap-2">
+                        <div className="w-6 h-6 bg-primary rounded-md flex items-center justify-center">
+                          <GraduationCap className="text-primary-foreground w-3 h-3" />
+                        </div>
+                        <span>EduFlow Menu</span>
+                      </SheetTitle>
+                    </SheetHeader>
+
+                    <div className="p-4 space-y-4">
+                      {/* User info */}
+                      {user && (
+                        <div className="bg-muted/50 rounded-lg p-3 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium">{user.username}</span>
+                            <Badge variant="secondary" className="flex items-center gap-1 text-xs">
+                              <DollarSign className="h-3 w-3" />
+                              {user.creditBalance}
+                            </Badge>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Navigation items */}
+                      <div className="space-y-2">
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start"
+                          onClick={() => window.location.href = '/'}
+                        >
+                          <Home className="mr-2 h-4 w-4" />
+                          Home
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start"
+                          onClick={() => window.location.href = '/tools'}
+                        >
+                          <BookOpen className="mr-2 h-4 w-4" />
+                          AI Tools
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start"
+                          onClick={() => window.location.href = '/course-manager'}
+                        >
+                          <PenTool className="mr-2 h-4 w-4" />
+                          Course Manager
+                        </Button>
+                      </div>
+
+                      {/* AI Settings */}
+                      <div className="space-y-3 border-t pt-4">
+                        <h3 className="text-sm font-medium">AI Settings</h3>
+                        <div className="space-y-2">
+                          <div>
+                            <Label htmlFor="mobile-model" className="text-xs text-muted-foreground">Model</Label>
+                            <Select value={aiSettings.selectedModel} onValueChange={updateModel}>
+                              <SelectTrigger id="mobile-model" className="w-full">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="gpt-5-nano">GPT-5 Nano</SelectItem>
+                                <SelectItem value="gpt-5-mini">GPT-5 Mini</SelectItem>
+                                <SelectItem value="gpt-4o">GPT-4o</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label htmlFor="mobile-language" className="text-xs text-muted-foreground">Language</Label>
+                            <Select value={aiSettings.outputLanguage} onValueChange={updateLanguage}>
+                              <SelectTrigger id="mobile-language" className="w-full">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="auto">Auto</SelectItem>
+                                <SelectItem value="chinese">中文</SelectItem>
+                                <SelectItem value="vietnamese">Việt</SelectItem>
+                                <SelectItem value="english">English</SelectItem>
+                                <SelectItem value="bilingual">中+Việt</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Logout */}
+                      <div className="border-t pt-4">
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start text-destructive hover:text-destructive"
+                          onClick={() => logoutMutation.mutate()}
+                          disabled={logoutMutation.isPending}
+                        >
+                          <LogOut className="mr-2 h-4 w-4" />
+                          {logoutMutation.isPending ? "Logging out..." : "Logout"}
+                        </Button>
+                      </div>
+                    </div>
+                  </SheetContent>
+                </Sheet>
               </div>
               
               {/* Desktop settings */}
@@ -655,13 +759,21 @@ function HomeContent() {
               Lesson Creation Workflow
             </h2>
             <div className="flex items-center space-x-2">
-              <span className="text-xs md:text-sm text-gray-500">
+              <span className="text-xs md:text-sm text-gray-500" id="progress-label">
                 Progress: {Math.round((currentStep / totalSteps) * 100)}%
               </span>
-              <div className="w-16 md:w-20 bg-gray-200 rounded-full h-1.5 md:h-2">
+              <div
+                className="w-16 md:w-20 bg-gray-200 rounded-full h-1.5 md:h-2"
+                role="progressbar"
+                aria-valuenow={currentStep}
+                aria-valuemin={0}
+                aria-valuemax={totalSteps}
+                aria-labelledby="progress-label"
+              >
                 <div
                   className="bg-blue-600 h-1.5 md:h-2 rounded-full transition-all duration-300"
                   style={{ width: `${(currentStep / totalSteps) * 100}%` }}
+                  aria-hidden="true"
                 ></div>
               </div>
             </div>

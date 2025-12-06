@@ -1,6 +1,4 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import * as fs from 'fs';
-import * as path from 'path';
 import multer from 'multer';
 import { setCorsHeaders, handleOptions } from './_shared/cors.js';
 import { handleError } from './_shared/error-handler.js';
@@ -13,8 +11,7 @@ import { db } from './_shared/database.js';
 import { lessons } from './_shared/db-schema.js';
 import { eq, and, sql } from 'drizzle-orm';
 
-// Configuration
-const PROJECT_ROOT = path.join(process.cwd(), 'docs/final-real-work/generated');
+// Configuration - File paths removed for serverless compatibility
 
 // Multer Setup
 const upload = multer({ 
@@ -71,20 +68,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 console.warn("Failed to read from DB:", dbError);
             }
 
-            // Fallback to File System (Local Dev or if DB is empty)
-            const sanitizeName = (name: string) => name.replace(/[<>:"/\\|?*]/g, '-').replace(/\s+/g, ' ').trim();
-            const lessonDirName = sanitizeName(`Unit ${unit} - Lesson ${lesson}`);
-            const lessonDir = path.join(PROJECT_ROOT, lessonDirName);
-            const fileName = `${lessonDirName}.md`;
-            const filePath = path.join(lessonDir, fileName);
-
-            if (!fs.existsSync(filePath)) {
-                // Instead of returning 404, return empty content or default template
-                // This prevents "File not found" errors on frontend when opening a new lesson
-                return res.json({ content: '' });
-            }
-            const fileContent = fs.readFileSync(filePath, 'utf-8');
-            return res.json({ content: fileContent });
+            // Return empty content if not found in database (serverless compatible)
+            return res.json({ content: '' });
         }
 
         if (action === 'write-file') {
@@ -128,16 +113,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 console.warn("Failed to save to DB, falling back to file:", dbError);
             }
 
-            // Fallback to File System (Local Dev)
-            const sanitizeName = (name: string) => name.replace(/[<>:"/\\|?*]/g, '-').replace(/\s+/g, ' ').trim();
-            const lessonDirName = sanitizeName(`Unit ${unit} - Lesson ${lesson}`);
-            const lessonDir = path.join(PROJECT_ROOT, lessonDirName);
-            const fileName = `${lessonDirName}.md`;
-            const filePath = path.join(lessonDir, fileName);
-
-            if (!fs.existsSync(lessonDir)) fs.mkdirSync(lessonDir, { recursive: true });
-            fs.writeFileSync(filePath, content, 'utf-8');
-            return res.json({ success: true, path: filePath, storage: 'file' });
+            // File system operations removed for serverless compatibility
+            return res.status(500).json({ message: "Database save failed - no file system fallback available" });
         }
     }
 

@@ -15,8 +15,16 @@ export interface CourseLesson {
   activities?: string[]; // If defined in Excel
 }
 
-export function parseCourseOutline(filePath: string): CourseLesson[] {
-  const workbook = XLSX.readFile(filePath);
+export function parseCourseOutline(filePathOrBuffer: string | Buffer): CourseLesson[] {
+  let workbook: XLSX.WorkBook;
+
+  if (Buffer.isBuffer(filePathOrBuffer)) {
+    // Parse from buffer (for serverless compatibility)
+    workbook = XLSX.read(filePathOrBuffer);
+  } else {
+    // Parse from file path (legacy support)
+    workbook = XLSX.readFile(filePathOrBuffer);
+  }
   const sheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
   
