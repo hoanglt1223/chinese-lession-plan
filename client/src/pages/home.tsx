@@ -15,7 +15,7 @@ import { apiRequest } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useAI } from "@/contexts/AIContext";
-import { GraduationCap, Clock, FolderInput, Layers, Settings, Zap, Loader2, LogOut, DollarSign, Menu, Home, BookOpen, PenTool } from "lucide-react";
+import { GraduationCap, Clock, FolderInput, Layers, Settings, Zap, Loader2, LogOut, DollarSign, Menu, Home, BookOpen, PenTool, FileText } from "lucide-react";
 
 function HomeContent() {
   const [selectedLesson, setSelectedLesson] = useState<string | null>(null);
@@ -561,6 +561,14 @@ function HomeContent() {
                           <PenTool className="mr-2 h-4 w-4" />
                           Course Manager
                         </Button>
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start"
+                          onClick={() => window.location.href = '/template-manager'}
+                        >
+                          <FileText className="mr-2 h-4 w-4" />
+                          Template Manager
+                        </Button>
                       </div>
 
                       {/* AI Settings */}
@@ -617,14 +625,23 @@ function HomeContent() {
               
               {/* Desktop settings */}
               <div className="hidden lg:flex items-center space-x-1">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => window.location.href = '/course-manager'}
                   className="hidden sm:flex px-2 mr-1"
                 >
                   <FolderInput className="h-3.5 w-3.5 mr-1" />
                   <span className="hidden md:inline text-xs">Course Manager</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => window.location.href = '/template-manager'}
+                  className="hidden sm:flex px-2"
+                >
+                  <FileText className="h-3.5 w-3.5 mr-1" />
+                  <span className="hidden md:inline text-xs">Templates</span>
                 </Button>
                 <select 
                   className="px-1.5 py-0.5 border rounded text-xs bg-background hover:bg-accent transition-colors min-w-0"
