@@ -55,7 +55,8 @@ app.all('/api/ai-ops', adaptHandler(aiOpsHandler));
 app.all('/api/content-ops', adaptHandler(contentOpsHandler));
 app.all('/api/auth', adaptHandler(authHandler));
 app.all('/api/file-manager', adaptHandler(fileManagerHandler));
-app.all('/api/projects*', adaptHandler(projectsHandler));
+app.all('/api/projects', adaptHandler(projectsHandler));
+app.all('/api/projects/:id', adaptHandler(projectsHandler));
 // Add other routes if needed, e.g. tools
 // app.all('/api/tools/text-to-image', adaptHandler(textToImageHandler));
 

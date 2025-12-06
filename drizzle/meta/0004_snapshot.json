@@ -1,5 +1,5 @@
 {
-  "id": "386370af-eb71-4f1d-adda-56c61ba8d877",
+  "id": "4f8c2b2f-c8d9-4829-8919-e8d209fe4d3b",
   "prevId": "fbb5302d-1be3-4ac3-ba06-0a5315ba0fa2",
   "version": "7",
   "dialect": "postgresql",
@@ -64,6 +64,26 @@
           "primaryKey": false,
           "notNull": false
         },
+        "project_id": {
+          "name": "project_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "language": {
+          "name": "language",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'zh'"
+        },
+        "is_generic": {
+          "name": "is_generic",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -80,7 +100,21 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {},
+      "foreignKeys": {
+        "activities_project_id_projects_id_fk": {
+          "name": "activities_project_id_projects_id_fk",
+          "tableFrom": "activities",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "activities_name_unique": {
@@ -91,6 +125,131 @@
           ]
         }
       },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.enhanced_lessons": {
+      "name": "enhanced_lessons",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "template_id": {
+          "name": "template_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "unit": {
+          "name": "unit",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "lesson": {
+          "name": "lesson",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "content": {
+          "name": "content",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "format_match_score": {
+          "name": "format_match_score",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'0.00'"
+        },
+        "used_templates": {
+          "name": "used_templates",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'[]'::jsonb"
+        },
+        "language": {
+          "name": "language",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'zh'"
+        },
+        "generation_metadata": {
+          "name": "generation_metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'{}'::jsonb"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "enhanced_lessons_project_id_projects_id_fk": {
+          "name": "enhanced_lessons_project_id_projects_id_fk",
+          "tableFrom": "enhanced_lessons",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "enhanced_lessons_template_id_templates_id_fk": {
+          "name": "enhanced_lessons_template_id_templates_id_fk",
+          "tableFrom": "enhanced_lessons",
+          "tableTo": "templates",
+          "columnsFrom": [
+            "template_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -118,36 +277,33 @@
           "primaryKey": false,
           "notNull": true
         },
+        "direction": {
+          "name": "direction",
+          "type": "varchar(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'ltr'"
+        },
         "ai_prompts": {
           "name": "ai_prompts",
           "type": "jsonb",
           "primaryKey": false,
-          "notNull": false
+          "notNull": false,
+          "default": "'{}'::jsonb"
         },
         "cultural_settings": {
           "name": "cultural_settings",
           "type": "jsonb",
           "primaryKey": false,
-          "notNull": false
+          "notNull": false,
+          "default": "'{}'::jsonb"
         },
-        "translation_settings": {
-          "name": "translation_settings",
+        "formatting": {
+          "name": "formatting",
           "type": "jsonb",
           "primaryKey": false,
-          "notNull": false
-        },
-        "educational_standards": {
-          "name": "educational_standards",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "is_active": {
-          "name": "is_active",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
+          "notNull": false,
+          "default": "'{}'::jsonb"
         },
         "created_at": {
           "name": "created_at",
@@ -162,6 +318,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
         }
       },
       "indexes": {},
@@ -299,8 +462,15 @@
           "notNull": true,
           "default": "'zh'"
         },
-        "created_by": {
-          "name": "created_by",
+        "input_format": {
+          "name": "input_format",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'excel'"
+        },
+        "user_id": {
+          "name": "user_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
@@ -314,6 +484,27 @@
         },
         "settings": {
           "name": "settings",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'{}'::jsonb"
+        },
+        "template_count": {
+          "name": "template_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "lesson_count": {
+          "name": "lesson_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "metadata": {
+          "name": "metadata",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false
@@ -331,16 +522,30 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "is_archived": {
+          "name": "is_archived",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         }
       },
       "indexes": {},
       "foreignKeys": {
-        "projects_created_by_users_id_fk": {
-          "name": "projects_created_by_users_id_fk",
+        "projects_user_id_users_id_fk": {
+          "name": "projects_user_id_users_id_fk",
           "tableFrom": "projects",
           "tableTo": "users",
           "columnsFrom": [
-            "created_by"
+            "user_id"
           ],
           "columnsTo": [
             "id"
@@ -513,6 +718,142 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.template_analyses": {
+      "name": "template_analyses",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "template_id": {
+          "name": "template_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "analysis_version": {
+          "name": "analysis_version",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'1.0'"
+        },
+        "analyzed_at": {
+          "name": "analyzed_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "sections": {
+          "name": "sections",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'[]'::jsonb"
+        },
+        "tables": {
+          "name": "tables",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'[]'::jsonb"
+        },
+        "headers": {
+          "name": "headers",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'[]'::jsonb"
+        },
+        "detected_variables": {
+          "name": "detected_variables",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'[]'::jsonb"
+        },
+        "variable_patterns": {
+          "name": "variable_patterns",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'[]'::jsonb"
+        },
+        "markdown_style": {
+          "name": "markdown_style",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "table_format": {
+          "name": "table_format",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "language_patterns": {
+          "name": "language_patterns",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'[]'::jsonb"
+        },
+        "completeness_score": {
+          "name": "completeness_score",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'0.00'"
+        },
+        "consistency_score": {
+          "name": "consistency_score",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'0.00'"
+        },
+        "complexity_score": {
+          "name": "complexity_score",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'0.00'"
+        },
+        "analyzer_config": {
+          "name": "analyzer_config",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'{}'::jsonb"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "template_analyses_template_id_templates_id_fk": {
+          "name": "template_analyses_template_id_templates_id_fk",
+          "tableFrom": "template_analyses",
+          "tableTo": "templates",
+          "columnsFrom": [
+            "template_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.templates": {
       "name": "templates",
       "schema": "",
@@ -528,7 +869,7 @@
           "name": "project_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "name": {
           "name": "name",
@@ -540,7 +881,8 @@
           "name": "type",
           "type": "varchar(50)",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "default": "'lesson_plan'"
         },
         "description": {
           "name": "description",
@@ -548,9 +890,27 @@
           "primaryKey": false,
           "notNull": false
         },
+        "file_name": {
+          "name": "file_name",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
         "file_path": {
           "name": "file_path",
           "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "file_size": {
+          "name": "file_size",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "file_type": {
+          "name": "file_type",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false
         },
@@ -560,24 +920,32 @@
           "primaryKey": false,
           "notNull": false
         },
+        "processed_content": {
+          "name": "processed_content",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
         "variables": {
           "name": "variables",
           "type": "jsonb",
           "primaryKey": false,
-          "notNull": false
+          "notNull": false,
+          "default": "'[]'::jsonb"
         },
-        "metadata": {
-          "name": "metadata",
+        "structure": {
+          "name": "structure",
           "type": "jsonb",
           "primaryKey": false,
-          "notNull": false
+          "notNull": false,
+          "default": "'{}'::jsonb"
         },
-        "is_active": {
-          "name": "is_active",
-          "type": "boolean",
+        "quality_score": {
+          "name": "quality_score",
+          "type": "numeric(5, 2)",
           "primaryKey": false,
-          "notNull": true,
-          "default": true
+          "notNull": false,
+          "default": "'0.00'"
         },
         "created_by": {
           "name": "created_by",
@@ -598,6 +966,27 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "is_processed": {
+          "name": "is_processed",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "processing_status": {
+          "name": "processing_status",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
         }
       },
       "indexes": {},

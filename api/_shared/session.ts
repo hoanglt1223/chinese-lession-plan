@@ -11,6 +11,11 @@ export function setSession(req: VercelRequest, res: VercelResponse, userId: stri
 }
 
 export function getSession(req: VercelRequest): { userId?: string } {
+  // Check for development bypass first
+  if (process.env.VITE_SKIP_LOGIN === 'true' || process.env.NODE_ENV === 'development' && process.env.VITE_SKIP_AUTH === 'true') {
+    return { userId: 'dev-user' };
+  }
+
   const sessionId = req.headers['x-session-id'] as string;
   const sessionData = sessions.get(sessionId);
   if (sessionData && sessionData.expires > Date.now()) {

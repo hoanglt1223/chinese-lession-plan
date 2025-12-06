@@ -202,23 +202,56 @@ export interface Project {
   name: string;
   description: string | null;
   language: string;
-  createdBy: string | null;
+  inputFormat: string;
   status: string;
+  userId: string;
+  templateCount: number;
+  lessonCount: number;
   settings: Record<string, any> | null;
+  metadata: Record<string, any> | null;
   createdAt: Date;
   updatedAt: Date;
 }
 
+// Project schemas for API validation
 export const insertProjectSchema = z.object({
-  name: z.string().min(1),
+  name: z.string().min(1, "Name is required").max(255, "Name must be less than 255 characters"),
   description: z.string().optional(),
-  language: z.string().min(1).default('zh'),
-  createdBy: z.string().optional(),
-  status: z.string().default('active'),
+  language: z.string().min(1, "Language is required").max(10, "Language must be less than 10 characters").default("zh"),
+  inputFormat: z.enum(["excel", "pdf", "text", "markdown", "docx"], {
+    errorMap: () => ({ message: "Input format must be one of: excel, pdf, text, markdown, docx" })
+  }).default("excel"),
   settings: z.record(z.any()).optional(),
+  metadata: z.record(z.any()).optional(),
+});
+
+export const updateProjectSchema = z.object({
+  name: z.string().min(1, "Name is required").max(255, "Name must be less than 255 characters").optional(),
+  description: z.string().optional(),
+  language: z.string().min(1, "Language is required").max(10, "Language must be less than 10 characters").optional(),
+  inputFormat: z.enum(["excel", "pdf", "text", "markdown", "docx"], {
+    errorMap: () => ({ message: "Input format must be one of: excel, pdf, text, markdown, docx" })
+  }).optional(),
+  status: z.enum(["active", "archived", "deleted"], {
+    errorMap: () => ({ message: "Status must be one of: active, archived, deleted" })
+  }).optional(),
+  settings: z.record(z.any()).optional(),
+  metadata: z.record(z.any()).optional(),
+});
+
+export const projectFilterSchema = z.object({
+  language: z.string().optional(),
+  inputFormat: z.enum(["excel", "pdf", "text", "markdown", "docx"]).optional(),
+  status: z.enum(["active", "archived", "deleted"]).optional(),
+  limit: z.number().int().min(1).max(100).default(20),
+  offset: z.number().int().min(0).default(0),
+  sortBy: z.enum(["name", "createdAt", "updatedAt", "templateCount", "lessonCount"]).default("createdAt"),
+  sortOrder: z.enum(["asc", "desc"]).default("desc"),
 });
 
 export type InsertProject = z.infer<typeof insertProjectSchema>;
+export type UpdateProject = z.infer<typeof updateProjectSchema>;
+export type ProjectFilter = z.infer<typeof projectFilterSchema>;
 
 // Template types
 export interface Template {
@@ -227,14 +260,18 @@ export interface Template {
   name: string;
   type: string;
   description: string | null;
+  fileName: string | null;
   filePath: string | null;
   fileContent: string | null;
   variables: TemplateVariable[] | null;
-  metadata: Record<string, any> | null;
-  isActive: boolean;
+  structure: Record<string, any> | null;
+  qualityScore: string | null;
   createdBy: string | null;
   createdAt: Date;
   updatedAt: Date;
+  isActive: boolean;
+  isProcessed: boolean;
+  processingStatus: string;
 }
 
 export interface TemplateVariable {
@@ -250,6 +287,7 @@ export const insertTemplateSchema = z.object({
   name: z.string().min(1),
   type: z.string().min(1),
   description: z.string().optional(),
+  fileName: z.string().optional(),
   filePath: z.string().optional(),
   fileContent: z.string().optional(),
   variables: z.array(z.object({
@@ -259,9 +297,12 @@ export const insertTemplateSchema = z.object({
     defaultValue: z.string().optional(),
     required: z.boolean().optional(),
   })).optional(),
-  metadata: z.record(z.any()).optional(),
-  isActive: z.boolean().default(true),
+  structure: z.record(z.any()).optional(),
+  qualityScore: z.string().optional(),
   createdBy: z.string().optional(),
+  isActive: z.boolean().default(true),
+  isProcessed: z.boolean().default(false),
+  processingStatus: z.string().default('pending'),
 });
 
 export type InsertTemplate = z.infer<typeof insertTemplateSchema>;
@@ -271,10 +312,10 @@ export interface LanguageConfig {
   id: string;
   languageCode: string;
   languageName: string;
+  direction: string;
   aiPrompts: LanguageAIPrompts | null;
   culturalSettings: CulturalSettings | null;
-  translationSettings: TranslationSettings | null;
-  educationalStandards: EducationalStandards | null;
+  formatting: FormattingSettings | null;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -295,28 +336,17 @@ export interface CulturalSettings {
   educationalApproach: string;
 }
 
-export interface TranslationSettings {
-  targetLanguage: string;
-  sourceLanguage: string;
-  translationStyle: string;
-  culturalAdaptation: boolean;
-  idiomHandling: string;
-}
-
-export interface EducationalStandards {
-  system: string;
-  levels: string[];
-  ageGroups: {
-    preschool: string;
-    primary: string;
-    secondary: string;
-  };
-  assessmentTypes: string[];
+export interface FormattingSettings {
+  dateFormat: string;
+  numberFormat: string;
+  currencyFormat: string;
+  textDirection: string;
 }
 
 export const insertLanguageConfigSchema = z.object({
   languageCode: z.string().min(1),
   languageName: z.string().min(1),
+  direction: z.string().default('ltr'),
   aiPrompts: z.object({
     analysis: z.string(),
     lessonPlan: z.string(),
@@ -330,24 +360,80 @@ export const insertLanguageConfigSchema = z.object({
     culturalThemes: z.array(z.string()),
     educationalApproach: z.string(),
   }).optional(),
-  translationSettings: z.object({
-    targetLanguage: z.string(),
-    sourceLanguage: z.string(),
-    translationStyle: z.string(),
-    culturalAdaptation: z.boolean(),
-    idiomHandling: z.string(),
-  }).optional(),
-  educationalStandards: z.object({
-    system: z.string(),
-    levels: z.array(z.string()),
-    ageGroups: z.object({
-      preschool: z.string(),
-      primary: z.string(),
-      secondary: z.string(),
-    }),
-    assessmentTypes: z.array(z.string()),
+  formatting: z.object({
+    dateFormat: z.string(),
+    numberFormat: z.string(),
+    currencyFormat: z.string(),
+    textDirection: z.string(),
   }).optional(),
   isActive: z.boolean().default(true),
 });
 
 export type InsertLanguageConfig = z.infer<typeof insertLanguageConfigSchema>;
+
+// Template Analysis types
+export interface TemplateAnalysis {
+  id: string;
+  templateId: string;
+  analysisVersion: string;
+  analyzedAt: Date;
+  sections: AnalysisSection[];
+  tables: TableStructure[];
+  headers: HeaderInfo[];
+  detectedVariables: VariablePattern[];
+  variablePatterns: PatternMatch[];
+  markdownStyle: string | null;
+  tableFormat: string | null;
+  languagePatterns: LanguagePattern[];
+  completenessScore: string;
+  consistencyScore: string;
+  complexityScore: string;
+  analyzerConfig: Record<string, any>;
+}
+
+export interface AnalysisSection {
+  id: string;
+  name: string;
+  content: string;
+  type: string;
+  startPosition: number;
+  endPosition: number;
+}
+
+export interface TableStructure {
+  id: string;
+  rows: number;
+  columns: number;
+  headers: string[];
+  dataTypes: string[];
+  hasHeaderRow: boolean;
+}
+
+export interface HeaderInfo {
+  text: string;
+  level: number;
+  position: number;
+  style: string;
+}
+
+export interface VariablePattern {
+  name: string;
+  pattern: string;
+  examples: string[];
+  description: string;
+  required: boolean;
+}
+
+export interface PatternMatch {
+  pattern: string;
+  matches: string[];
+  confidence: number;
+  context: string;
+}
+
+export interface LanguagePattern {
+  pattern: string;
+  language: string;
+  description: string;
+  examples: string[];
+}
