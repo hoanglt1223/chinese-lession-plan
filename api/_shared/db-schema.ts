@@ -111,6 +111,98 @@ export const activities = pgTable('activities', {
   ageGroup: varchar('age_group', { length: 100 }), // e.g., "Preschool", "Primary"
   materials: jsonb('materials'), // Array of required materials
   benefits: text('benefits'), // Learning outcomes/benefits
+  projectId: uuid('project_id').references(() => projects.id, { onDelete: 'set null' }), // Project this activity belongs to (null for generic activities)
+  language: varchar('language', { length: 10 }).notNull().default('zh'), // Language of the activity
+  isGeneric: boolean('is_generic').notNull().default(false), // Whether this activity can be used across different projects
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Projects table for multi-project support
+export const projects = pgTable('projects', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: varchar('name', { length: 255 }).notNull(),
+  description: text('description'),
+  language: varchar('language', { length: 10 }).notNull().default('zh'), // 'zh', 'vi', 'en'
+  inputFormat: varchar('input_format', { length: 50 }).notNull().default('excel'), // 'excel', 'pdf', 'text', 'markdown'
+  settings: jsonb('settings').default({}), // Project-specific settings
+  createdBy: varchar('created_by', { length: 255 }),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  isActive: boolean('is_active').notNull().default(true),
+  isArchived: boolean('is_archived').notNull().default(false),
+});
+
+// Templates table for sample file storage and analysis
+export const templates = pgTable('templates', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  projectId: uuid('project_id').references(() => projects.id, { onDelete: 'cascade' }).notNull(),
+  name: varchar('name', { length: 255 }).notNull(),
+  type: varchar('type', { length: 50 }).notNull().default('lesson_plan'), // 'lesson_plan', 'summary', 'flashcard', 'vocabulary'
+  description: text('description'),
+  fileName: varchar('file_name', { length: 255 }).notNull(),
+  filePath: varchar('file_path', { length: 500 }),
+  fileSize: integer('file_size'), // File size in bytes
+  fileType: varchar('file_type', { length: 50 }),
+  fileContent: text('file_content'), // Raw file content
+  processedContent: jsonb('processed_content'), // Processed template structure
+  variables: jsonb('variables').default([]), // Detected variables from template
+  structure: jsonb('structure').default({}), // Template structure analysis
+  qualityScore: decimal('quality_score', { precision: 5, scale: 2 }).default('0.00'), // 0-100 quality score
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  isActive: boolean('is_active').notNull().default(true),
+  isProcessed: boolean('is_processed').notNull().default(false),
+  processingStatus: varchar('processing_status', { length: 50 }).notNull().default('pending'), // 'pending', 'processing', 'completed', 'failed'
+});
+
+// Language configurations table for multi-language support
+export const languageConfigs = pgTable('language_configs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  languageCode: varchar('language_code', { length: 10 }).notNull().unique(),
+  languageName: varchar('language_name', { length: 100 }).notNull(),
+  direction: varchar('direction', { length: 3 }).notNull().default('ltr'), // 'ltr' or 'rtl'
+  aiPrompts: jsonb('ai_prompts').default({}), // Language-specific AI prompts
+  culturalSettings: jsonb('cultural_settings').default({}), // Cultural and educational adaptations
+  formatting: jsonb('formatting').default({}), // Language-specific formatting rules
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  isActive: boolean('is_active').notNull().default(true),
+});
+
+// Template analyses table for detailed analysis results
+export const templateAnalyses = pgTable('template_analyses', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  templateId: uuid('template_id').references(() => templates.id, { onDelete: 'cascade' }).notNull(),
+  analysisVersion: varchar('analysis_version', { length: 20 }).notNull().default('1.0'),
+  analyzedAt: timestamp('analyzed_at').notNull().defaultNow(),
+  sections: jsonb('sections').default([]), // Extracted sections from template
+  tables: jsonb('tables').default([]), // Table structures
+  headers: jsonb('headers').default([]), // Headers found
+  detectedVariables: jsonb('detected_variables').default([]), // Variables detected in template
+  variablePatterns: jsonb('variable_patterns').default([]), // Pattern matches
+  markdownStyle: varchar('markdown_style', { length: 50 }), // Markdown format style
+  tableFormat: varchar('table_format', { length: 50 }), // Table format type
+  languagePatterns: jsonb('language_patterns').default([]), // Language-specific patterns
+  completenessScore: decimal('completeness_score', { precision: 5, scale: 2 }).default('0.00'), // 0-100
+  consistencyScore: decimal('consistency_score', { precision: 5, scale: 2 }).default('0.00'), // 0-100
+  complexityScore: decimal('complexity_score', { precision: 5, scale: 2 }).default('0.00'), // 0-100
+  analyzerConfig: jsonb('analyzer_config').default({}), // Analysis configuration
+});
+
+// Updated lessons table with project and template references
+export const enhancedLessons = pgTable('enhanced_lessons', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  projectId: uuid('project_id').references(() => projects.id, { onDelete: 'cascade' }),
+  templateId: uuid('template_id').references(() => templates.id, { onDelete: 'set null' }),
+  unit: integer('unit').notNull(),
+  lesson: integer('lesson').notNull(),
+  title: varchar('title', { length: 255 }).notNull(),
+  content: text('content'),
+  formatMatchScore: decimal('format_match_score', { precision: 5, scale: 2 }).default('0.00'), // 0-100 format matching score
+  usedTemplates: jsonb('used_templates').default([]), // Array of template IDs used
+  language: varchar('language', { length: 10 }).notNull().default('zh'),
+  generationMetadata: jsonb('generation_metadata').default({}), // AI generation metadata
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
