@@ -207,6 +207,82 @@ export const enhancedLessons = pgTable('enhanced_lessons', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
+// Projects table for organizing related content and resources
+export const projects = pgTable('projects', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: varchar('name', { length: 255 }).notNull(),
+  description: text('description'),
+  language: varchar('language', { length: 10 }).notNull().default('zh'), // Language code: zh, en, vi, etc.
+  createdBy: uuid('created_by').references(() => users.id),
+  status: varchar('status', { length: 50 }).notNull().default('active'), // active, archived, deleted
+  settings: jsonb('settings'), // Project-specific settings as JSON
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Templates table for storing reusable content templates with file storage
+export const templates = pgTable('templates', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  projectId: uuid('project_id').references(() => projects.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 255 }).notNull(),
+  type: varchar('type', { length: 50 }).notNull(), // 'lesson_plan', 'flashcard', 'worksheet', 'activity'
+  description: text('description'),
+  filePath: varchar('file_path', { length: 500 }), // Path to stored file (Vercel Blob, S3, etc.)
+  fileContent: text('file_content'), // Direct content storage for small templates
+  variables: jsonb('variables'), // Template variables: [{name, type, description, defaultValue, required}]
+  metadata: jsonb('metadata'), // Additional template metadata: tags, category, difficulty, etc.
+  isActive: boolean('is_active').notNull().default(true),
+  createdBy: uuid('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Language configurations table for localized settings and AI prompts
+export const languageConfigs = pgTable('language_configs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  languageCode: varchar('language_code', { length: 10 }).notNull().unique(), // zh, en, vi, ja, etc.
+  languageName: varchar('language_name', { length: 100 }).notNull(), // "Chinese", "English", "Vietnamese"
+  aiPrompts: jsonb('ai_prompts'), // Language-specific AI prompts: {analysis, lessonPlan, flashcard, summary}
+  culturalSettings: jsonb('cultural_settings'), // Cultural preferences and adaptations
+  translationSettings: jsonb('translation_settings'), // Translation preferences and mappings
+  educationalStandards: jsonb('educational_standards'), // Local educational system standards
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Relations for projects
+export const projectsRelations = relations(projects, ({ one, many }) => ({
+  createdBy: one(users, {
+    fields: [projects.createdBy],
+    references: [users.id],
+  }),
+  templates: many(templates),
+}));
+
+// Relations for templates
+export const templatesRelations = relations(templates, ({ one }) => ({
+  project: one(projects, {
+    fields: [templates.projectId],
+    references: [projects.id],
+  }),
+  createdBy: one(users, {
+    fields: [templates.createdBy],
+    references: [users.id],
+  }),
+}));
+
+// Relations for language configs
+export const languageConfigsRelations = relations(languageConfigs, ({ many }) => ({
+  // No direct relations needed for now
+}));
+
+// Users relations including all created entities
+export const usersRelations = relations(users, ({ many }) => ({
+  createdProjects: many(projects),
+  createdTemplates: many(templates),
+}));
+
 // Types for export
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
@@ -222,3 +298,7 @@ export type PromptComponent = typeof promptComponents.$inferSelect;
 export type InsertPromptComponent = typeof promptComponents.$inferInsert;
 export type Project = typeof projects.$inferSelect;
 export type InsertProject = typeof projects.$inferInsert;
+export type Template = typeof templates.$inferSelect;
+export type InsertTemplate = typeof templates.$inferInsert;
+export type LanguageConfig = typeof languageConfigs.$inferSelect;
+export type InsertLanguageConfig = typeof languageConfigs.$inferInsert;
