@@ -241,6 +241,54 @@ export const generatedContent = pgTable('generated_content', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
+// Quality metrics table for tracking generation performance (Enhanced AI Generation)
+export const generationMetrics = pgTable('generation_metrics', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  templateId: uuid('template_id').references(() => promptTemplates.id),
+  generationType: varchar('generation_type', { length: 50 }).notNull(), // 'lesson_plan', 'flashcard', 'analysis', 'summary'
+  modelUsed: varchar('model_used', { length: 50 }).notNull(), // AI model used
+  overallScore: decimal('overall_score', { precision: 3, scale: 2 }).notNull(), // 0.00-1.00
+  formatAccuracy: decimal('format_accuracy', { precision: 3, scale: 2 }).notNull(), // 0.00-1.00
+  contentQuality: decimal('content_quality', { precision: 3, scale: 2 }).notNull(), // 0.00-1.00
+  completeness: decimal('completeness', { precision: 3, scale: 2 }).notNull(), // 0.00-1.00
+  consistency: decimal('consistency', { precision: 3, scale: 2 }).notNull(), // 0.00-1.00
+  generationTime: integer('generation_time').notNull(), // milliseconds
+  retries: integer('retries').notNull().default(0),
+  variables: jsonb('variables'), // Input variables used
+  validationIssues: jsonb('validation_issues'), // Array of validation issues
+  templateMatchScore: decimal('template_match_score', { precision: 3, scale: 2 }), // How well template matched input
+  userFeedback: integer('user_feedback'), // 1-5 rating from users
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+// Template performance aggregation table (Enhanced AI Generation)
+export const templatePerformance = pgTable('template_performance', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  templateId: uuid('template_id').references(() => promptTemplates.id),
+  generationType: varchar('generation_type', { length: 50 }).notNull(),
+  totalGenerations: integer('total_generations').notNull().default(0),
+  averageScore: decimal('average_score', { precision: 3, scale: 2 }).notNull().default('0.00'),
+  averageFormatAccuracy: decimal('average_format_accuracy', { precision: 3, scale: 2 }).notNull().default('0.00'),
+  averageGenerationTime: integer('average_generation_time').notNull().default(0),
+  successRate: decimal('success_rate', { precision: 3, scale: 2 }).notNull().default('0.00'),
+  lastUsed: timestamp('last_used'),
+  lastUpdated: timestamp('last_updated').notNull().defaultNow(),
+});
+
+// Enhanced templates with quality tracking (Enhanced AI Generation)
+export const enhancedTemplates = pgTable('enhanced_templates', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  baseTemplateId: uuid('base_template_id').references(() => promptTemplates.id),
+  sampleOutput: text('sample_output').notNull(), // Golden sample output
+  formatStructure: jsonb('format_structure').notNull(), // Structure requirements
+  qualityScore: decimal('quality_score', { precision: 3, scale: 2 }).notNull(), // 0.00-1.00
+  isActive: boolean('is_active').notNull().default(true),
+  usageCount: integer('usage_count').notNull().default(0),
+  averageMatchScore: decimal('average_match_score', { precision: 3, scale: 2 }).notNull().default('0.00'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
 // Template Analysis Results table (additional for comprehensive analysis)
 export const templateAnalysisResults = pgTable('template_analysis_results', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -568,6 +616,8 @@ export type PromptTemplate = typeof promptTemplates.$inferSelect;
 export type InsertPromptTemplate = typeof promptTemplates.$inferInsert;
 export type PromptComponent = typeof promptComponents.$inferSelect;
 export type InsertPromptComponent = typeof promptComponents.$inferInsert;
+
+// Project-related types
 export type Project = typeof projects.$inferSelect;
 export type InsertProject = typeof projects.$inferInsert;
 export type Activity = typeof activities.$inferSelect;
@@ -582,6 +632,8 @@ export type EnhancedLesson = typeof enhancedLessons.$inferSelect;
 export type InsertEnhancedLesson = typeof enhancedLessons.$inferInsert;
 export type TemplateAnalysis = typeof templateAnalyses.$inferSelect;
 export type InsertTemplateAnalysis = typeof templateAnalyses.$inferInsert;
+
+// Enhanced AI Generation types
 export type Activity = typeof activities.$inferSelect;
 export type InsertActivity = typeof activities.$inferInsert;
 export type Project = typeof projects.$inferSelect;
@@ -595,6 +647,14 @@ export type TemplateAnalysis = typeof templateAnalyses.$inferSelect;
 export type InsertTemplateAnalysis = typeof templateAnalyses.$inferInsert;
 export type Activity = typeof activities.$inferSelect;
 export type InsertActivity = typeof activities.$inferInsert;
+export type GenerationMetrics = typeof generationMetrics.$inferSelect;
+export type InsertGenerationMetrics = typeof generationMetrics.$inferInsert;
+export type TemplatePerformance = typeof templatePerformance.$inferSelect;
+export type InsertTemplatePerformance = typeof templatePerformance.$inferInsert;
+export type EnhancedTemplate = typeof enhancedTemplates.$inferSelect;
+export type InsertEnhancedTemplate = typeof enhancedTemplates.$inferInsert;
+
+// Additional analysis and tracking types
 export type GeneratedContent = typeof generatedContent.$inferSelect;
 export type InsertGeneratedContent = typeof generatedContent.$inferInsert;
 export type TemplateAnalysisResult = typeof templateAnalysisResults.$inferSelect;

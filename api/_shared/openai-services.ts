@@ -6,6 +6,7 @@ import type { FlashcardData, FlashcardImage } from '../../shared/schema.js';
 import { PromptService, buildAnalysisPrompt, buildLessonPlanPrompt, buildSingleLessonPlanPrompt, buildFlashcardPrompt, buildSummaryPrompt } from './prompt-service.js';
 import { db } from './database.js';
 import { activities } from './db-schema.js';
+import { EnhancedGenerationService } from './enhanced-generation.js';
 
 // Using GLM-4.6 as requested
 let openaiInstance: OpenAI | null = null;
