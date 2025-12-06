@@ -5,6 +5,7 @@ import { generateSingleLessonPlan, generateFlashcards } from './_shared/openai-s
 import { createLessonPlanDocx, createFlashcardPdf } from './_shared/document-generator.js';
 import { setCorsHeaders, handleOptions } from './_shared/cors.js';
 import { handleError } from './_shared/error-handler.js';
+import { blobStorage } from './_shared/blob-storage.js';
 import { db } from './_shared/database.js';
 import { activities, lessons } from './_shared/db-schema.js';
 import { eq, desc, sql } from 'drizzle-orm';

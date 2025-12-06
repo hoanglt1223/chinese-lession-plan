@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { setCorsHeaders, handleOptions } from '../cors.js';
 import { handleError } from '../error-handler.js';
+import { blobStorage } from '../blob-storage.js';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from 'docx';
 
 // Helper function to parse markdown-like content to DOCX paragraphs
@@ -123,11 +124,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { content, lessonPlans, summaries, step, singleLesson, singleSummary } = req.body;
-    
+    const { content, lessonPlans, summaries, step, singleLesson, singleSummary, lessonId } = req.body;
+
     let docContent = '';
     let filename = `export_${Date.now()}.docx`;
-    
+
     if (singleLesson || singleSummary) {
       // Export single lesson or summary file
       docContent = content || 'No content available for export.';
@@ -135,25 +136,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } else if (step === 2 && lessonPlans && lessonPlans.length > 0) {
       // Export 4 lesson plans for Step 2 (combined - shouldn't be used anymore)
       docContent = `# 4-Lesson Unit Plan\n\n`;
-      
+
       lessonPlans.forEach((lesson: any, index: number) => {
         docContent += `## Lesson ${lesson.lessonNumber || index + 1}: ${lesson.title || `Lesson ${index + 1}`}\n`;
         docContent += `**Type:** ${lesson.type || 'N/A'}\n\n`;
         docContent += `${lesson.content || 'No content available'}\n\n`;
         docContent += '---\n\n';
       });
-      
+
       filename = `4_lesson_plans_${Date.now()}.docx`;
     } else if (step === 4 && summaries && summaries.length > 0) {
       // Export 4 lesson summaries for Step 4 (combined - shouldn't be used anymore)
       docContent = `# 4-Lesson Summaries\n\n`;
-      
+
       summaries.forEach((summary: any, index: number) => {
         docContent += `## Lesson ${summary.lessonNumber || index + 1}: ${summary.title || `Summary ${index + 1}`}\n\n`;
         docContent += `${summary.content || 'No content available'}\n\n`;
         docContent += '---\n\n';
       });
-      
+
       filename = `4_lesson_summaries_${Date.now()}.docx`;
     } else if (content) {
       // Fallback for general content export
@@ -193,11 +194,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Generate DOCX buffer
     const buffer = await Packer.toBuffer(doc);
-    
+
+    // Try to upload to blob storage if configured and lessonId is provided
+    if (blobStorage.isConfigured() && lessonId) {
+      try {
+        const blobUpload = await blobStorage.uploadExport(buffer, filename, lessonId, 'docx');
+
+        return res.json({
+          success: true,
+          url: blobUpload.url,
+          downloadUrl: blobUpload.downloadUrl,
+          size: blobUpload.size,
+          filename,
+          storage: 'blob'
+        });
+      } catch (blobError) {
+        console.error('Failed to upload DOCX to blob storage:', blobError);
+        // Fall through to direct response
+      }
+    }
+
+    // Direct response if blob storage fails or not configured
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Length', buffer.length);
-    
+
     return res.send(buffer);
   } catch (error: any) {
     return handleError(res, error, 'DOCX Export API');

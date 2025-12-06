@@ -45,11 +45,15 @@ const adaptHandler = (handler: any) => async (req: Request, res: Response) => {
   }
 };
 
+// Import file manager handler
+import fileManagerHandler from './file-manager.js';
+
 // Routes
 app.all('/api/course-ops', adaptHandler(courseOpsHandler));
 app.all('/api/ai-ops', adaptHandler(aiOpsHandler));
 app.all('/api/content-ops', adaptHandler(contentOpsHandler));
 app.all('/api/auth', adaptHandler(authHandler));
+app.all('/api/file-manager', adaptHandler(fileManagerHandler));
 // Add other routes if needed, e.g. tools
 // app.all('/api/tools/text-to-image', adaptHandler(textToImageHandler));
 

@@ -3,6 +3,7 @@ import multer from 'multer';
 import { setCorsHeaders, handleOptions } from './_shared/cors.js';
 import { handleError } from './_shared/error-handler.js';
 import { fileProcessor } from './_shared/file-processor.js';
+import { uploadFile, blobStorage } from './_shared/blob-storage.js';
 import flashcardPdfHandler from './_shared/export/flashcard-pdf.js';
 import docxHandler from './_shared/export/docx.js';
 import pdfHandler from './_shared/export/pdf.js';
@@ -127,15 +128,51 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         const processedFiles: any[] = [];
+        const { lessonId, userId } = req.body;
+
         for (const file of files) {
+            let processed: any;
+
+            // Process file content
             if (file.mimetype === 'application/pdf') {
-                const processed = await fileProcessor.processPDF(file.buffer, file.originalname);
-                processedFiles.push(processed);
+                processed = await fileProcessor.processPDF(file.buffer, file.originalname);
             } else if (file.mimetype.startsWith('image/')) {
-                const processed = await fileProcessor.processImage(file.buffer, file.originalname);
-                processedFiles.push(processed);
+                processed = await fileProcessor.processImage(file.buffer, file.originalname);
+            } else {
+                // For other file types, store as-is
+                processed = {
+                    name: file.originalname,
+                    content: file.buffer.toString('base64'),
+                    type: file.mimetype,
+                    size: file.size
+                };
             }
+
+            // Upload to Vercel Blob if configured
+            if (blobStorage.isConfigured()) {
+                try {
+                    const blobUpload = await uploadFile(file.buffer, file.originalname, {
+                        lessonId,
+                        userId,
+                        type: 'content'
+                    });
+
+                    // Add blob URL to processed file
+                    processed.blobUrl = blobUpload.url;
+                    processed.blobPath = blobUpload.pathname;
+                    processed.storage = 'blob';
+                } catch (blobError) {
+                    console.error('Failed to upload to blob storage:', blobError);
+                    processed.storage = 'memory';
+                    processed.error = 'Failed to save to cloud storage';
+                }
+            } else {
+                processed.storage = 'memory';
+            }
+
+            processedFiles.push(processed);
         }
+
         return res.json(processedFiles);
     }
 
@@ -170,7 +207,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         // Custom Logic Handlers (ported from export.ts)
         if (documentType === 'chinese-text-image') {
-            const { text, method, width, height, fontSize, background, textColor, fontWeight, padding, lineHeight, textAlign, quality } = requestData;
+            const { text, method, width, height, fontSize, background, textColor, fontWeight, padding, lineHeight, textAlign, quality, lessonId } = requestData;
             if (!text) return res.status(400).json({ message: 'text is required for chinese-text-image' });
 
             const imageResult = await serverlessPDFService.generateChineseTextImage(text, {
@@ -185,24 +222,64 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 textAlign: textAlign || 'center',
                 quality: quality || 95
             });
-            
+
+            // Upload to blob storage if configured and lessonId is provided
+            if (blobStorage.isConfigured() && lessonId) {
+                try {
+                    const filename = `chinese-text-${Date.now()}.png`;
+                    const blobUpload = await blobStorage.uploadExport(imageResult.buffer, filename, lessonId, 'image');
+
+                    return res.json({
+                        success: true,
+                        url: blobUpload.url,
+                        downloadUrl: blobUpload.downloadUrl,
+                        size: blobUpload.size,
+                        storage: 'blob'
+                    });
+                } catch (blobError) {
+                    console.error('Failed to upload image to blob storage:', blobError);
+                    // Fall through to direct response
+                }
+            }
+
+            // Direct response if blob storage fails or not configured
             res.setHeader('Content-Type', 'image/png');
             res.setHeader('Content-Disposition', `attachment; filename="chinese-text.png"`);
             return res.send(imageResult.buffer);
         }
 
         if (documentType === 'chinese-text-pdf') {
-            const { text: pdfText, texts } = requestData;
+            const { text: pdfText, texts, lessonId } = requestData;
             const textList = texts || (pdfText ? [pdfText] : []);
             if (!textList.length) return res.status(400).json({ message: 'text or texts array is required for chinese-text-pdf' });
-            
+
             const pdfResult = await serverlessPDFService.generateChineseTextPDF(textList, {
                 orientation: requestData.orientation || 'portrait',
                 unit: requestData.unit || 'mm',
                 format: requestData.format || 'a4',
                 margin: requestData.margin || 20
             });
-            
+
+            // Upload to blob storage if configured and lessonId is provided
+            if (blobStorage.isConfigured() && lessonId) {
+                try {
+                    const filename = `chinese-text-${Date.now()}.pdf`;
+                    const blobUpload = await blobStorage.uploadExport(pdfResult, filename, lessonId, 'pdf');
+
+                    return res.json({
+                        success: true,
+                        url: blobUpload.url,
+                        downloadUrl: blobUpload.downloadUrl,
+                        size: blobUpload.size,
+                        storage: 'blob'
+                    });
+                } catch (blobError) {
+                    console.error('Failed to upload PDF to blob storage:', blobError);
+                    // Fall through to direct response
+                }
+            }
+
+            // Direct response if blob storage fails or not configured
             res.setHeader('Content-Type', 'application/pdf');
             res.setHeader('Content-Disposition', `attachment; filename="chinese-text.pdf"`);
             return res.send(pdfResult);
