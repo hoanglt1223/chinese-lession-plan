@@ -221,9 +221,95 @@ export const activities = pgTable('activities', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
+// Generated Content table for tracking AI-generated content
+export const generatedContent = pgTable('generated_content', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  projectId: uuid('project_id').references(() => projects.id, { onDelete: 'cascade' }),
+  templateId: uuid('template_id').references(() => templates.id, { onDelete: 'set null' }),
+  lessonId: uuid('lesson_id').references(() => lessons.id, { onDelete: 'set null' }),
+  type: varchar('type', { length: 50 }).notNull(), // 'lesson_plan', 'flashcard', 'summary', 'vocabulary'
+  content: text('content').notNull(),
+  metadata: jsonb('metadata'), // Generation metadata (AI model, prompt, tokens, etc.)
+  unit: integer('unit').notNull(),
+  lesson: integer('lesson').notNull(),
+  title: varchar('title', { length: 255 }).notNull(),
+  formatMatchScore: decimal('format_match_score', { precision: 5, scale: 2 }).default('0.00'), // 0-100 format matching score
+  usedTemplates: jsonb('used_templates').default([]), // Array of template IDs used
+  language: varchar('language', { length: 10 }).notNull().default('zh'),
+  generationMetadata: jsonb('generation_metadata').default({}), // AI generation metadata
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Template Analysis Results table (additional for comprehensive analysis)
+export const templateAnalysisResults = pgTable('template_analysis_results', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  lessonId: uuid('lesson_id').references(() => lessons.id),
+  templateId: uuid('template_id').references(() => promptTemplates.id),
+  analysisType: varchar('analysis_type', { length: 50 }).notNull(), // 'structure', 'variables', 'quality', 'comprehensive'
+  content: text('content').notNull(),
+  analysisData: jsonb('analysis_data').notNull(), // Full TemplateAnalysis object
+  qualityScore: decimal('quality_score', { precision: 5, scale: 2 }), // Overall quality score
+  recommendations: jsonb('recommendations'), // Array of improvement recommendations
+  metadata: jsonb('metadata'), // Analysis metadata (version, analyzer, etc.)
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Template Quality Metrics table for historical tracking
+export const templateQualityMetrics = pgTable('template_quality_metrics', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  analysisId: uuid('analysis_id').references(() => templateAnalysisResults.id),
+  templateId: uuid('template_id').references(() => promptTemplates.id),
+  completeness: decimal('completeness', { precision: 5, scale: 2 }).notNull(),
+  consistency: decimal('consistency', { precision: 5, scale: 2 }).notNull(),
+  readability: decimal('readability', { precision: 5, scale: 2 }).notNull(),
+  structure: decimal('structure', { precision: 5, scale: 2 }).notNull(),
+  overall: decimal('overall', { precision: 5, scale: 2 }).notNull(),
+  issuesCount: integer('issues_count').notNull().default(0),
+  variablesCount: integer('variables_count').notNull().default(0),
+  wordCount: integer('word_count').notNull().default(0),
+  measuredAt: timestamp('measured_at').notNull().defaultNow(),
+});
+
+// Template Comparison Results table
+export const templateComparisons = pgTable('template_comparisons', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  template1Id: uuid('template_1_id').references(() => promptTemplates.id),
+  template2Id: uuid('template_2_id').references(() => promptTemplates.id),
+  comparisonData: jsonb('comparison_data').notNull(), // Full comparison results
+  similarityScore: decimal('similarity_score', { precision: 5, scale: 2 }).notNull(),
+  winnerId: uuid('winner_id').references(() => promptTemplates.id), // ID of the better template
+  comparisonType: varchar('comparison_type', { length: 50 }).notNull(), // 'quality', 'structure', 'variables', 'comprehensive'
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+// Template Usage Analytics table
+export const templateUsageAnalytics = pgTable('template_usage_analytics', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  templateId: uuid('template_id').references(() => promptTemplates.id),
+  lessonId: uuid('lesson_id').references(() => lessons.id),
+  userId: uuid('user_id').references(() => users.id),
+  usageType: varchar('usage_type', { length: 50 }).notNull(), // 'analysis', 'generation', 'export', 'comparison'
+  actionData: jsonb('action_data'), // Details about the action performed
+  success: boolean('success').notNull().default(true),
+  errorMessage: text('error_message'),
+  duration: integer('duration'), // Time taken in milliseconds
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
 // Relations
+export const usersRelations = relations(users, ({ many }) => ({
+  projects: many(projects),
+  templates: many(templates),
+  templateUsageAnalytics: many(templateUsageAnalytics),
+}));
+
 export const lessonsRelations = relations(lessons, ({ many }) => ({
   workflows: many(workflows),
+  templateAnalysisResults: many(templateAnalysisResults),
+  templateUsageAnalytics: many(templateUsageAnalytics),
+  generatedContent: many(generatedContent),
 }));
 
 export const workflowsRelations = relations(workflows, ({ one }) => ({
@@ -235,6 +321,11 @@ export const workflowsRelations = relations(workflows, ({ one }) => ({
 
 export const promptTemplatesRelations = relations(promptTemplates, ({ many }) => ({
   components: many(promptComponents),
+  templateAnalysisResults: many(templateAnalysisResults),
+  templateComparisons: many(templateComparisons, { relationName: 'template1' }),
+  templateComparisons2: many(templateComparisons, { relationName: 'template2' }),
+  templateQualityMetrics: many(templateQualityMetrics),
+  templateUsageAnalytics: many(templateUsageAnalytics),
 }));
 
 export const promptComponentsRelations = relations(promptComponents, ({ one }) => ({
@@ -244,7 +335,6 @@ export const promptComponentsRelations = relations(promptComponents, ({ one }) =
   }),
 }));
 
-// Relations for projects
 export const projectsRelations = relations(projects, ({ one, many }) => ({
   user: one(users, {
     fields: [projects.userId],
@@ -364,10 +454,10 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
     references: [users.id],
   }),
   templates: many(templates),
+  generatedContent: many(generatedContent),
   activities: many(activities),
 }));
 
-// Relations for templates
 export const templatesRelations = relations(templates, ({ one, many }) => ({
   project: one(projects, {
     fields: [templates.projectId],
@@ -378,9 +468,9 @@ export const templatesRelations = relations(templates, ({ one, many }) => ({
     references: [users.id],
   }),
   analyses: many(templateAnalyses),
+  generatedContent: many(generatedContent),
 }));
 
-// Relations for template analyses
 export const templateAnalysesRelations = relations(templateAnalyses, ({ one }) => ({
   template: one(templates, {
     fields: [templateAnalyses.templateId],
@@ -388,11 +478,80 @@ export const templateAnalysesRelations = relations(templateAnalyses, ({ one }) =
   }),
 }));
 
-// Relations for activities
 export const activitiesRelations = relations(activities, ({ one }) => ({
   project: one(projects, {
     fields: [activities.projectId],
     references: [projects.id],
+  }),
+}));
+
+export const generatedContentRelations = relations(generatedContent, ({ one }) => ({
+  project: one(projects, {
+    fields: [generatedContent.projectId],
+    references: [projects.id],
+  }),
+  template: one(templates, {
+    fields: [generatedContent.templateId],
+    references: [templates.id],
+  }),
+  lesson: one(lessons, {
+    fields: [generatedContent.lessonId],
+    references: [lessons.id],
+  }),
+}));
+
+export const templateAnalysisResultsRelations = relations(templateAnalysisResults, ({ one, many }) => ({
+  lesson: one(lessons, {
+    fields: [templateAnalysisResults.lessonId],
+    references: [lessons.id],
+  }),
+  template: one(promptTemplates, {
+    fields: [templateAnalysisResults.templateId],
+    references: [promptTemplates.id],
+  }),
+  qualityMetrics: many(templateQualityMetrics),
+}));
+
+export const templateQualityMetricsRelations = relations(templateQualityMetrics, ({ one }) => ({
+  analysis: one(templateAnalysisResults, {
+    fields: [templateQualityMetrics.analysisId],
+    references: [templateAnalysisResults.id],
+  }),
+  template: one(promptTemplates, {
+    fields: [templateQualityMetrics.templateId],
+    references: [promptTemplates.id],
+  }),
+}));
+
+export const templateComparisonsRelations = relations(templateComparisons, ({ one }) => ({
+  template1: one(promptTemplates, {
+    fields: [templateComparisons.template1Id],
+    references: [promptTemplates.id],
+    relationName: 'template1',
+  }),
+  template2: one(promptTemplates, {
+    fields: [templateComparisons.template2Id],
+    references: [promptTemplates.id],
+    relationName: 'template2',
+  }),
+  winner: one(promptTemplates, {
+    fields: [templateComparisons.winnerId],
+    references: [promptTemplates.id],
+  }),
+}));
+
+export const templateUsageAnalyticsRelations = relations(templateUsageAnalytics, ({ one }) => ({
+  template: one(promptTemplates, {
+    fields: [templateUsageAnalytics.templateId],
+    references: [promptTemplates.id],
+  }),
+  lesson: one(lessons, {
+    fields: [templateUsageAnalytics.lessonId],
+    references: [lessons.id],
+  }),
+  user: one(users, {
+    fields: [templateUsageAnalytics.userId],
+    references: [users.id],
   }),
 }));
 
@@ -436,3 +595,13 @@ export type TemplateAnalysis = typeof templateAnalyses.$inferSelect;
 export type InsertTemplateAnalysis = typeof templateAnalyses.$inferInsert;
 export type Activity = typeof activities.$inferSelect;
 export type InsertActivity = typeof activities.$inferInsert;
+export type GeneratedContent = typeof generatedContent.$inferSelect;
+export type InsertGeneratedContent = typeof generatedContent.$inferInsert;
+export type TemplateAnalysisResult = typeof templateAnalysisResults.$inferSelect;
+export type InsertTemplateAnalysisResult = typeof templateAnalysisResults.$inferInsert;
+export type TemplateQualityMetrics = typeof templateQualityMetrics.$inferSelect;
+export type InsertTemplateQualityMetrics = typeof templateQualityMetrics.$inferInsert;
+export type TemplateComparison = typeof templateComparisons.$inferSelect;
+export type InsertTemplateComparison = typeof templateComparisons.$inferInsert;
+export type TemplateUsageAnalytics = typeof templateUsageAnalytics.$inferSelect;
+export type InsertTemplateUsageAnalytics = typeof templateUsageAnalytics.$inferInsert;

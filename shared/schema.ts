@@ -139,6 +139,133 @@ export interface ProjectListQuery {
 export type InsertProject = z.infer<typeof insertProjectSchema>;
 export type UpdateProject = z.infer<typeof updateProjectSchema>;
 
+// Template Analysis types
+export interface Variable {
+  name: string;
+  type: 'string' | 'number' | 'boolean' | 'array' | 'object';
+  pattern: string; // e.g., "{{variable}}", "%variable%", etc.
+  required: boolean;
+  defaultValue?: any;
+  description?: string;
+  examples?: string[];
+}
+
+export interface TableStructure {
+  rowCount: number;
+  columnCount: number;
+  headers: string[];
+  hasHeader: boolean;
+  alignment?: ('left' | 'center' | 'right')[];
+  markdown: string;
+}
+
+export interface MarkdownStructure {
+  headings: {
+    level: number;
+    text: string;
+    position: number;
+  }[];
+  tables: TableStructure[];
+  lists: {
+    type: 'ordered' | 'unordered';
+    items: string[];
+    position: number;
+  }[];
+  codeBlocks: {
+    language: string;
+    content: string;
+    position: number;
+  }[];
+  links: {
+    text: string;
+    url: string;
+    position: number;
+  }[];
+  images: {
+    alt: string;
+    src: string;
+    position: number;
+  }[];
+  wordCount: number;
+  lineCount: number;
+}
+
+export interface LanguagePattern {
+  language: 'chinese' | 'vietnamese' | 'english';
+  confidence: number;
+  characterCount: number;
+  wordCount: number;
+  patterns: string[];
+}
+
+export interface QualityMetrics {
+  completeness: number; // 0-100
+  consistency: number; // 0-100
+  readability: number; // 0-100
+  structure: number; // 0-100
+  overall: number; // 0-100
+  issues: {
+    type: 'error' | 'warning' | 'info';
+    message: string;
+    position?: number;
+    suggestion?: string;
+  }[];
+}
+
+export interface TemplateAnalysis {
+  id?: string;
+  content: string;
+  variables: Variable[];
+  structure: MarkdownStructure;
+  languages: LanguagePattern[];
+  quality: QualityMetrics;
+  metadata: {
+    analyzedAt: Date;
+    version: string;
+    analyzerVersion: string;
+  };
+}
+
+export interface ValidationResult {
+  isValid: boolean;
+  score: number; // 0-100
+  completeness: {
+    totalVariables: number;
+    requiredVariables: number;
+    providedVariables: number;
+    missingVariables: string[];
+  };
+  consistency: {
+    languageMixing: boolean;
+    variableNaming: boolean;
+    structureConsistency: boolean;
+  };
+  recommendations: string[];
+}
+
+export interface TemplateStructure {
+  type: 'markdown' | 'plain-text' | 'structured' | 'mixed';
+  complexity: 'simple' | 'medium' | 'complex';
+  hasTables: boolean;
+  hasVariables: boolean;
+  hasMultilingualContent: boolean;
+  estimatedWordCount: number;
+  sections: {
+    title: string;
+    level: number;
+    content: string;
+  }[];
+}
+
+export type AnalysisOptions = {
+  detectLanguage?: boolean;
+  extractVariables?: boolean;
+  analyzeStructure?: boolean;
+  scoreQuality?: boolean;
+  variablePatterns?: string[]; // Custom patterns to detect
+  targetLanguages?: ('chinese' | 'vietnamese' | 'english')[];
+};
+
 // Flashcard Image types
 export interface FlashcardImage {
   id: string;
