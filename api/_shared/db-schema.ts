@@ -199,10 +199,6 @@ export const templateAnalyses = pgTable('template_analyses', {
   analyzerConfig: jsonb('analyzer_config').default({}), // Analysis configuration
 });
 
-// Enhanced lessons table with project and template references
-export const enhancedLessons = pgTable('enhanced_lessons', {
-// Generic Activities table for reusable lesson activities
-export const activities = pgTable('activities', {
 // Generic Activities table for reusable lesson activities
 export const activities = pgTable('activities', {
   id: uuid('id').primaryKey().defaultRandom(),

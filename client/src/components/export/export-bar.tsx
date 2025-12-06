@@ -5,7 +5,7 @@ import { apiRequest } from "@/lib/api";
 import { FileText, Download, Loader2, MoreHorizontal, Image, FileType, File, Hash } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
-import type { Lesson } from "@shared/schema";
+import type { Lesson } from "@/shared/schema";
 import {
   DropdownMenu,
   DropdownMenuContent,
