@@ -96,6 +96,7 @@ export const activities = pgTable('activities', {
 });
 
 // Projects table for project management API and multi-project support
+// Enhanced Projects table for multi-project support with language and settings
 export const projects = pgTable('projects', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: varchar('name', { length: 255 }).notNull(),
@@ -104,38 +105,57 @@ export const projects = pgTable('projects', {
   inputFormat: varchar('input_format', { length: 50 }).notNull().default('excel'), // 'excel', 'pdf', 'text', 'markdown', 'docx'
   userId: uuid('user_id').references(() => users.id),
   status: varchar('status', { length: 50 }).notNull().default('active'), // active, archived, deleted
+  language: varchar('language', { length: 10 }).notNull().default('zh'), // 'zh', 'vi', 'en', etc.
+  inputFormat: varchar('input_format', { length: 50 }).notNull().default('excel'), // 'excel', 'pdf', 'text', 'markdown'
   settings: jsonb('settings').default({}), // Project-specific settings
   templateCount: integer('template_count').notNull().default(0),
   lessonCount: integer('lesson_count').notNull().default(0),
   metadata: jsonb('metadata'), // Additional project metadata
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  createdBy: uuid('created_by').references(() => users.id),
+  status: varchar('status', { length: 50 }).notNull().default('active'), // 'active', 'archived', 'deleted'
   isActive: boolean('is_active').notNull().default(true),
   isArchived: boolean('is_archived').notNull().default(false),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
-// Templates table for sample file storage and analysis
+// Enhanced Templates table for both file uploads and template management
 export const templates = pgTable('templates', {
   id: uuid('id').primaryKey().defaultRandom(),
   projectId: uuid('project_id').references(() => projects.id, { onDelete: 'cascade' }).notNull(),
   name: varchar('name', { length: 255 }).notNull(),
-  type: varchar('type', { length: 50 }).notNull().default('lesson_plan'), // 'lesson_plan', 'summary', 'flashcard', 'vocabulary'
+  type: varchar('type', { length: 50 }).notNull(), // 'lesson_plan', 'flashcard', 'worksheet', 'activity', 'uploaded_file'
   description: text('description'),
-  fileName: varchar('file_name', { length: 255 }).notNull(),
-  filePath: varchar('file_path', { length: 500 }),
+
+  // File upload specific fields
+  filename: varchar('filename', { length: 255 }), // Generated filename for storage
+  originalName: varchar('original_name', { length: 255 }), // Original uploaded filename
+  fileType: varchar('file_type', { length: 10 }), // 'md', 'docx', 'pdf', etc.
   fileSize: integer('file_size'), // File size in bytes
-  fileType: varchar('file_type', { length: 50 }),
-  fileContent: text('file_content'), // Raw file content
-  processedContent: jsonb('processed_content'), // Processed template structure
-  variables: jsonb('variables').default([]), // Detected variables from template
-  structure: jsonb('structure').default({}), // Template structure analysis
+  mimeType: varchar('mime_type', { length: 100 }),
+  content: text('content'), // Extracted text content
+  structure: jsonb('structure'), // Parsed structure (headings, sections, etc.)
+  storageUrl: varchar('storage_url', { length: 500 }), // Cloud storage URL
+  storageKey: varchar('storage_key', { length: 500 }), // Storage key for retrieval
+  contentHash: varchar('content_hash', { length: 64 }), // SHA-256 hash for duplicate detection
+
+  // Template management fields
+  variables: jsonb('variables').default([]), // Template variables
+  metadata: jsonb('metadata').default({}), // Additional metadata
   qualityScore: decimal('quality_score', { precision: 5, scale: 2 }).default('0.00'), // 0-100 quality score
   createdBy: uuid('created_by').references(() => users.id),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
+
+  uploadedBy: uuid('uploaded_by').references(() => users.id),
+  isDeleted: boolean('is_deleted').notNull().default(false),
   isActive: boolean('is_active').notNull().default(true),
   isProcessed: boolean('is_processed').notNull().default(false),
   processingStatus: varchar('processing_status', { length: 50 }).notNull().default('pending'), // 'pending', 'processing', 'completed', 'failed'
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
 // Language configurations table for multi-language support
@@ -174,17 +194,20 @@ export const templateAnalyses = pgTable('template_analyses', {
 
 // Enhanced lessons table with project and template references
 export const enhancedLessons = pgTable('enhanced_lessons', {
+// Generic Activities table for reusable lesson activities
+export const activities = pgTable('activities', {
   id: uuid('id').primaryKey().defaultRandom(),
-  projectId: uuid('project_id').references(() => projects.id, { onDelete: 'cascade' }),
-  templateId: uuid('template_id').references(() => templates.id, { onDelete: 'set null' }),
-  unit: integer('unit').notNull(),
-  lesson: integer('lesson').notNull(),
-  title: varchar('title', { length: 255 }).notNull(),
-  content: text('content'),
-  formatMatchScore: decimal('format_match_score', { precision: 5, scale: 2 }).default('0.00'), // 0-100 format matching score
-  usedTemplates: jsonb('used_templates').default([]), // Array of template IDs used
-  language: varchar('language', { length: 10 }).notNull().default('zh'),
-  generationMetadata: jsonb('generation_metadata').default({}), // AI generation metadata
+  name: varchar('name', { length: 255 }).notNull().unique(), // e.g., "Sticky Ball", "Fruit Squat"
+  type: varchar('type', { length: 50 }).notNull().default('game'), // 'game', 'song', 'worksheet', 'drill'
+  description: text('description'), // Short description
+  instructions: text('instructions'), // Detailed how-to-play
+  duration: varchar('duration', { length: 50 }), // e.g., "5-10 mins"
+  ageGroup: varchar('age_group', { length: 100 }), // e.g., "Preschool", "Primary"
+  materials: jsonb('materials'), // Array of required materials
+  benefits: text('benefits'), // Learning outcomes/benefits
+  projectId: uuid('project_id').references(() => projects.id, { onDelete: 'set null' }), // Project this activity belongs to
+  language: varchar('language', { length: 10 }).notNull().default('zh'), // Language of the activity
+  isGeneric: boolean('is_generic').notNull().default(false), // Whether this activity can be used across projects
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
@@ -221,6 +244,7 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
   templates: many(templates),
   activities: many(activities),
   enhancedLessons: many(enhancedLessons),
+  activities: many(activities),
 }));
 
 // Relations for templates
@@ -229,12 +253,13 @@ export const templatesRelations = relations(templates, ({ one, many }) => ({
     fields: [templates.projectId],
     references: [projects.id],
   }),
-  createdBy: one(users, {
-    fields: [templates.createdBy],
+  uploadedBy: one(users, {
+    fields: [templates.uploadedBy],
     references: [users.id],
   }),
   templateAnalyses: many(templateAnalyses),
   enhancedLessons: many(enhancedLessons),
+  analyses: many(templateAnalyses),
 }));
 
 // Relations for users
@@ -254,6 +279,12 @@ export const activitiesRelations = relations(activities, ({ one }) => ({
 // Relations for language configs
 export const languageConfigsRelations = relations(languageConfigs, ({ many }) => ({
   // No direct relations needed for now
+// Relations for template analyses
+export const templateAnalysesRelations = relations(templateAnalyses, ({ one }) => ({
+  template: one(templates, {
+    fields: [templateAnalyses.templateId],
+    references: [templates.id],
+  }),
 }));
 
 // Relations for template analyses
@@ -261,6 +292,12 @@ export const templateAnalysesRelations = relations(templateAnalyses, ({ one }) =
   template: one(templates, {
     fields: [templateAnalyses.templateId],
     references: [templates.id],
+  }),
+// Relations for activities
+export const activitiesRelations = relations(activities, ({ one }) => ({
+  project: one(projects, {
+    fields: [activities.projectId],
+    references: [projects.id],
   }),
 }));
 
@@ -301,3 +338,7 @@ export type TemplateAnalysis = typeof templateAnalyses.$inferSelect;
 export type InsertTemplateAnalysis = typeof templateAnalyses.$inferInsert;
 export type EnhancedLesson = typeof enhancedLessons.$inferSelect;
 export type InsertEnhancedLesson = typeof enhancedLessons.$inferInsert;
+export type TemplateAnalysis = typeof templateAnalyses.$inferSelect;
+export type InsertTemplateAnalysis = typeof templateAnalyses.$inferInsert;
+export type Activity = typeof activities.$inferSelect;
+export type InsertActivity = typeof activities.$inferInsert;
