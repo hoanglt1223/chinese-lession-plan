@@ -2,6 +2,14 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { setCorsHeaders, handleOptions } from './_shared/cors.js';
 import { handleError } from './_shared/error-handler.js';
 import { generateSingleLessonPlan, generateFlashcards, generateLessonSummary } from './_shared/openai-services.js';
+import {
+  generateSingleLessonPlanEnhanced,
+  generateFlashcardsEnhanced,
+  analyzePDFContentEnhanced,
+  generateSummaryEnhanced,
+  getGenerationRecommendations,
+  batchGenerateEnhanced
+} from './_shared/enhanced-openai-services.js';
 import { deeplService } from './_shared/deepl-service.js';
 import { analyzePDFContent } from './_shared/openai-services.js';
 import { db } from './_shared/database.js';
@@ -62,6 +70,133 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { unitNumber, lessonNumber, planContent } = req.body;
         const result = await generateLessonSummary(unitNumber, lessonNumber, planContent);
         return res.json(result);
+    }
+
+    // --- Enhanced AI Generation with Sample-Based Format Enforcement ---
+
+    if (req.method === 'POST' && action === 'generate-plan-enhanced') {
+        const { unitNumber, lessonNumber, additionalContext, lesson, options } = req.body;
+
+        let lessonData = lesson;
+
+        if (!lessonData) {
+            return res.status(400).json({ message: "Lesson data or valid Unit/Lesson numbers required" });
+        }
+
+        const result = await generateSingleLessonPlanEnhanced(lessonData, {
+            aiModel: options?.aiModel,
+            useEnhancedGeneration: options?.useEnhancedGeneration !== false,
+            qualityThreshold: options?.qualityThreshold || 0.75,
+            enforceFormat: options?.enforceFormat !== false
+        });
+
+        return res.json({
+            content: result.content,
+            quality: result.quality,
+            success: result.success,
+            templateUsed: result.templateUsed,
+            error: result.error
+        });
+    }
+
+    if (req.method === 'POST' && action === 'generate-flashcards-enhanced') {
+        const { vocabulary, theme, level, ageGroup, options } = req.body;
+
+        if (!vocabulary || !Array.isArray(vocabulary) || vocabulary.length === 0) {
+            return res.status(400).json({ message: "Vocabulary array is required" });
+        }
+
+        const result = await generateFlashcardsEnhanced(vocabulary, theme, level, ageGroup, {
+            aiModel: options?.aiModel,
+            useEnhancedGeneration: options?.useEnhancedGeneration !== false,
+            qualityThreshold: options?.qualityThreshold || 0.7,
+            includeImages: options?.includeImages !== false
+        });
+
+        return res.json({
+            flashcards: result.flashcards,
+            quality: result.quality,
+            success: result.success,
+            templateUsed: result.templateUsed,
+            error: result.error
+        });
+    }
+
+    if (req.method === 'POST' && action === 'analyze-enhanced') {
+        const { content, aiModel, outputLanguage, options } = req.body;
+
+        if (!content) {
+            return res.status(400).json({ message: "Content is required for analysis" });
+        }
+
+        const result = await analyzePDFContentEnhanced(
+            content,
+            aiModel || "gpt-5-nano",
+            outputLanguage || "auto",
+            {
+                useEnhancedGeneration: options?.useEnhancedGeneration !== false,
+                qualityThreshold: options?.qualityThreshold || 0.8
+            }
+        );
+
+        return res.json({
+            analysis: result.analysis,
+            quality: result.quality,
+            success: result.success,
+            templateUsed: result.templateUsed,
+            error: result.error
+        });
+    }
+
+    if (req.method === 'POST' && action === 'generate-summary-enhanced') {
+        const { lessonPlan, options } = req.body;
+
+        if (!lessonPlan) {
+            return res.status(400).json({ message: "Lesson plan content is required" });
+        }
+
+        const result = await generateSummaryEnhanced(lessonPlan, {
+            aiModel: options?.aiModel,
+            useEnhancedGeneration: options?.useEnhancedGeneration !== false,
+            qualityThreshold: options?.qualityThreshold || 0.7
+        });
+
+        return res.json({
+            summary: result.summary,
+            quality: result.quality,
+            success: result.success,
+            templateUsed: result.templateUsed,
+            error: result.error
+        });
+    }
+
+    if (req.method === 'POST' && action === 'get-generation-recommendations') {
+        const { type, variables } = req.body;
+
+        if (!type || !variables) {
+            return res.status(400).json({ message: "Type and variables are required" });
+        }
+
+        const recommendations = await getGenerationRecommendations(type, variables);
+
+        return res.json(recommendations);
+    }
+
+    if (req.method === 'POST' && action === 'batch-generate-enhanced') {
+        const { requests } = req.body;
+
+        if (!requests || !Array.isArray(requests)) {
+            return res.status(400).json({ message: "Requests array is required" });
+        }
+
+        const results = await batchGenerateEnhanced(requests);
+
+        return res.json({
+            results,
+            totalRequests: requests.length,
+            successCount: results.filter(r => r.success).length,
+            failureCount: results.filter(r => !r.success).length
+        });
     }
 
     if (req.method === 'POST' && action === 'translate') {
