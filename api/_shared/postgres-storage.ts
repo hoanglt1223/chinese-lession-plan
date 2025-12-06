@@ -1,16 +1,19 @@
-import { eq, and } from 'drizzle-orm';
-import { db, users, lessons, workflows, translationCache } from './database.js';
-import type { 
-  User, 
-  InsertUser, 
-  Lesson, 
-  InsertLesson, 
-  Workflow, 
+import { eq, and, desc, asc, ilike, count } from 'drizzle-orm';
+import { db, users, lessons, workflows, translationCache, projects, templates, enhancedLessons } from './database.js';
+import type {
+  User,
+  InsertUser,
+  Lesson,
+  InsertLesson,
+  Workflow,
   InsertWorkflow,
   TranslationCache,
-  InsertTranslationCache 
+  InsertTranslationCache,
+  Project,
+  InsertProject
 } from './database.js';
 import { IStorage } from './storage.js';
+import type { ProjectListQuery } from '../../shared/schema.js';
 
 export class PostgresStorage implements IStorage {
   
@@ -129,6 +132,184 @@ export class PostgresStorage implements IStorage {
       translatedText,
       provider,
     }).onConflictDoNothing();
+  }
+
+  // Project methods
+  async createProject(insertProject: InsertProject): Promise<Project> {
+    const result = await db.insert(projects).values(insertProject).returning();
+    return result[0];
+  }
+
+  async getProject(id: string): Promise<Project | undefined> {
+    const result = await db.select().from(projects).where(eq(projects.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getProjects(query?: ProjectListQuery): Promise<Project[]> {
+    let baseQuery = db.select().from(projects);
+
+    // Apply filters
+    const conditions = [];
+    if (query?.language) {
+      conditions.push(eq(projects.language, query.language));
+    }
+    if (query?.inputFormat) {
+      conditions.push(eq(projects.inputFormat, query.inputFormat));
+    }
+    if (query?.isActive !== undefined) {
+      conditions.push(eq(projects.isActive, query.isActive));
+    }
+    if (query?.isArchived !== undefined) {
+      conditions.push(eq(projects.isArchived, query.isArchived));
+    }
+
+    if (conditions.length > 0) {
+      baseQuery = baseQuery.where(and(...conditions));
+    }
+
+    // Apply sorting
+    const sortBy = query?.sortBy || 'createdAt';
+    const sortOrder = query?.sortOrder || 'desc';
+    const orderBy = sortOrder === 'desc' ? desc(projects[sortBy]) : asc(projects[sortBy]);
+    baseQuery = baseQuery.orderBy(orderBy);
+
+    // Apply pagination
+    if (query?.offset) {
+      baseQuery = baseQuery.offset(query.offset);
+    }
+    if (query?.limit) {
+      baseQuery = baseQuery.limit(query.limit);
+    }
+
+    return await baseQuery;
+  }
+
+  async getProjectsWithCounts(query?: ProjectListQuery): Promise<Project[]> {
+    // Get projects with counts using a subquery
+    const templateCounts = db
+      .select({
+        projectId: templates.projectId,
+        count: count(templates.id)
+      })
+      .from(templates)
+      .groupBy(templates.projectId);
+
+    const lessonCounts = db
+      .select({
+        projectId: enhancedLessons.projectId,
+        count: count(enhancedLessons.id)
+      })
+      .from(enhancedLessons)
+      .groupBy(enhancedLessons.projectId);
+
+    const projectsWithCounts = await db
+      .select({
+        id: projects.id,
+        name: projects.name,
+        description: projects.description,
+        language: projects.language,
+        inputFormat: projects.inputFormat,
+        settings: projects.settings,
+        createdBy: projects.createdBy,
+        createdAt: projects.createdAt,
+        updatedAt: projects.updatedAt,
+        isActive: projects.isActive,
+        isArchived: projects.isArchived,
+        templateCount: templateCounts.count,
+        lessonCount: lessonCounts.count,
+      })
+      .from(projects)
+      .leftJoin(templateCounts, eq(projects.id, templateCounts.projectId))
+      .leftJoin(lessonCounts, eq(projects.id, lessonCounts.projectId));
+
+    // Apply filters, sorting, and pagination in memory for now
+    let filteredProjects = projectsWithCounts.map(row => ({
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      language: row.language,
+      inputFormat: row.inputFormat,
+      settings: row.settings,
+      createdBy: row.createdBy,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      isActive: row.isActive,
+      isArchived: row.isArchived,
+      templateCount: Number(row.templateCount) || 0,
+      lessonCount: Number(row.lessonCount) || 0,
+    }));
+
+    // Apply filters
+    if (query) {
+      if (query.language) {
+        filteredProjects = filteredProjects.filter(p => p.language === query.language);
+      }
+      if (query.inputFormat) {
+        filteredProjects = filteredProjects.filter(p => p.inputFormat === query.inputFormat);
+      }
+      if (query.isActive !== undefined) {
+        filteredProjects = filteredProjects.filter(p => p.isActive === query.isActive);
+      }
+      if (query.isArchived !== undefined) {
+        filteredProjects = filteredProjects.filter(p => p.isArchived === query.isArchived);
+      }
+    }
+
+    // Apply sorting
+    const sortBy = query?.sortBy || 'createdAt';
+    const sortOrder = query?.sortOrder || 'desc';
+    filteredProjects.sort((a, b) => {
+      const aValue = a[sortBy];
+      const bValue = b[sortBy];
+      if (sortOrder === 'asc') {
+        return aValue > bValue ? 1 : -1;
+      } else {
+        return aValue < bValue ? 1 : -1;
+      }
+    });
+
+    // Apply pagination
+    if (query?.offset) {
+      filteredProjects = filteredProjects.slice(query.offset);
+    }
+    if (query?.limit) {
+      filteredProjects = filteredProjects.slice(0, query.limit);
+    }
+
+    return filteredProjects;
+  }
+
+  async updateProject(id: string, updates: Partial<Project>): Promise<Project | undefined> {
+    const result = await db.update(projects)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(projects.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteProject(id: string): Promise<boolean> {
+    const result = await db.delete(projects).where(eq(projects.id, id));
+    return result.rowCount > 0;
+  }
+
+  async getProjectStats(id: string): Promise<{ templateCount: number; lessonCount: number }> {
+    const [templateResult, lessonResult] = await Promise.all([
+      db
+        .select({ count: count(templates.id) })
+        .from(templates)
+        .where(eq(templates.projectId, id))
+        .limit(1),
+      db
+        .select({ count: count(enhancedLessons.id) })
+        .from(enhancedLessons)
+        .where(eq(enhancedLessons.projectId, id))
+        .limit(1)
+    ]);
+
+    return {
+      templateCount: Number(templateResult[0]?.count) || 0,
+      lessonCount: Number(lessonResult[0]?.count) || 0,
+    };
   }
 
   // Initialize with default users (for development)

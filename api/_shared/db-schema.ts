@@ -220,3 +220,5 @@ export type PromptTemplate = typeof promptTemplates.$inferSelect;
 export type InsertPromptTemplate = typeof promptTemplates.$inferInsert;
 export type PromptComponent = typeof promptComponents.$inferSelect;
 export type InsertPromptComponent = typeof promptComponents.$inferInsert;
+export type Project = typeof projects.$inferSelect;
+export type InsertProject = typeof projects.$inferInsert;

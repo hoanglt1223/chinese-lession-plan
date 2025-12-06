@@ -69,6 +69,76 @@ export const insertWorkflowSchema = z.object({
 
 export type InsertWorkflow = z.infer<typeof insertWorkflowSchema>;
 
+// Project types
+export interface Project {
+  id: string;
+  name: string;
+  description: string | null;
+  language: string;
+  inputFormat: string;
+  settings: Record<string, any> | null;
+  createdBy: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  isActive: boolean;
+  isArchived: boolean;
+  // Computed fields
+  templateCount?: number;
+  lessonCount?: number;
+}
+
+export const insertProjectSchema = z.object({
+  name: z.string().min(1).max(255),
+  description: z.string().optional(),
+  language: z.string().min(2).max(10).default('zh'),
+  inputFormat: z.enum(['excel', 'pdf', 'text', 'markdown']).default('excel'),
+  settings: z.record(z.any()).optional(),
+  createdBy: z.string().optional(),
+});
+
+export const updateProjectSchema = insertProjectSchema.partial().extend({
+  isActive: z.boolean().optional(),
+  isArchived: z.boolean().optional(),
+});
+
+// API Request/Response types
+export interface CreateProjectRequest {
+  name: string;
+  description?: string;
+  language: string;
+  inputFormat: 'excel' | 'pdf' | 'text' | 'markdown';
+}
+
+export interface ProjectResponse {
+  id: string;
+  name: string;
+  description: string | null;
+  language: string;
+  inputFormat: string;
+  templateCount: number;
+  lessonCount: number;
+  isActive: boolean;
+  isArchived: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  settings: Record<string, any> | null;
+  createdBy: string | null;
+}
+
+export interface ProjectListQuery {
+  language?: string;
+  inputFormat?: string;
+  isActive?: boolean;
+  isArchived?: boolean;
+  limit?: number;
+  offset?: number;
+  sortBy?: 'name' | 'createdAt' | 'updatedAt';
+  sortOrder?: 'asc' | 'desc';
+}
+
+export type InsertProject = z.infer<typeof insertProjectSchema>;
+export type UpdateProject = z.infer<typeof updateProjectSchema>;
+
 // Flashcard Image types
 export interface FlashcardImage {
   id: string;
