@@ -20,23 +20,7 @@ import {
   X
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-export interface TemplateVariable {
-  name: string;
-  type: 'string' | 'number' | 'date' | 'lesson' | 'vocabulary' | 'boolean';
-  position: number;
-  context?: string;
-  defaultValue?: string;
-  required?: boolean;
-  description?: string;
-  validation?: {
-    pattern?: string;
-    minLength?: number;
-    maxLength?: number;
-    min?: number;
-    max?: number;
-  };
-}
+import type { TemplateVariable } from '../../../../shared/types';
 
 interface VariableHighlighterProps {
   content: string;

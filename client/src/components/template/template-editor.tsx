@@ -22,14 +22,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-export interface TemplateVariable {
-  name: string;
-  type: 'string' | 'number' | 'date' | 'lesson' | 'vocabulary' | 'boolean';
-  defaultValue?: string;
-  required?: boolean;
-  description?: string;
-}
+import type { TemplateVariable } from '../../../../shared/types';
 
 interface HistoryEntry {
   content: string;

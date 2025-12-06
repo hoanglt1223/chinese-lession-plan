@@ -1,5 +1,5 @@
 import { eq, and, desc, asc, ilike, count } from 'drizzle-orm';
-import { db, users, lessons, workflows, translationCache, projects, templates, enhancedLessons } from './database.js';
+import { db, users, lessons, workflows, translationCache, projects, templates } from './database.js';
 import type {
   User,
   InsertUser,

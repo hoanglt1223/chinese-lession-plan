@@ -13,6 +13,9 @@ import {
   pgEnum
 } from 'drizzle-orm/pg-core';
 
+// Mock lessons table for reference - should be imported from main db-schema
+const lessons = {} as any; // This will be replaced by proper import when merged
+
 // Enums
 export const templateTypeEnum = pgEnum('template_type', [
   'lesson_plan',
@@ -156,7 +159,7 @@ export type NewTemplateAnalytics = typeof templateAnalytics.$inferInsert;
 export interface TemplateVariable {
   name: string;
   type: 'string' | 'number' | 'date' | 'lesson' | 'vocabulary' | 'boolean';
-  position?: number;
+  position: number;
   context?: string;
   defaultValue?: string;
   required?: boolean;
