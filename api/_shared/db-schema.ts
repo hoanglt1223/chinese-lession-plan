@@ -77,29 +77,6 @@ export const promptComponents = pgTable('prompt_components', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
-// Relations
-export const lessonsRelations = relations(lessons, ({ many }) => ({
-  workflows: many(workflows),
-}));
-
-export const workflowsRelations = relations(workflows, ({ one }) => ({
-  lesson: one(lessons, {
-    fields: [workflows.lessonId],
-    references: [lessons.id],
-  }),
-}));
-
-export const promptTemplatesRelations = relations(promptTemplates, ({ many }) => ({
-  components: many(promptComponents),
-}));
-
-export const promptComponentsRelations = relations(promptComponents, ({ one }) => ({
-  template: one(promptTemplates, {
-    fields: [promptComponents.templateId],
-    references: [promptTemplates.id],
-  }),
-}));
-
 // Generic Activities table for reusable lesson activities
 export const activities = pgTable('activities', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -118,15 +95,19 @@ export const activities = pgTable('activities', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
-// Projects table for multi-project support
+// Projects table for project management API and multi-project support
 export const projects = pgTable('projects', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: varchar('name', { length: 255 }).notNull(),
   description: text('description'),
-  language: varchar('language', { length: 10 }).notNull().default('zh'), // 'zh', 'vi', 'en'
-  inputFormat: varchar('input_format', { length: 50 }).notNull().default('excel'), // 'excel', 'pdf', 'text', 'markdown'
+  language: varchar('language', { length: 10 }).notNull().default('zh'), // 'zh', 'vi', 'en', etc.
+  inputFormat: varchar('input_format', { length: 50 }).notNull().default('excel'), // 'excel', 'pdf', 'text', 'markdown', 'docx'
+  userId: uuid('user_id').references(() => users.id),
+  status: varchar('status', { length: 50 }).notNull().default('active'), // active, archived, deleted
   settings: jsonb('settings').default({}), // Project-specific settings
-  createdBy: varchar('created_by', { length: 255 }),
+  templateCount: integer('template_count').notNull().default(0),
+  lessonCount: integer('lesson_count').notNull().default(0),
+  metadata: jsonb('metadata'), // Additional project metadata
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
   isActive: boolean('is_active').notNull().default(true),
@@ -149,6 +130,7 @@ export const templates = pgTable('templates', {
   variables: jsonb('variables').default([]), // Detected variables from template
   structure: jsonb('structure').default({}), // Template structure analysis
   qualityScore: decimal('quality_score', { precision: 5, scale: 2 }).default('0.00'), // 0-100 quality score
+  createdBy: uuid('created_by').references(() => users.id),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
   isActive: boolean('is_active').notNull().default(true),
@@ -190,7 +172,7 @@ export const templateAnalyses = pgTable('template_analyses', {
   analyzerConfig: jsonb('analyzer_config').default({}), // Analysis configuration
 });
 
-// Updated lessons table with project and template references
+// Enhanced lessons table with project and template references
 export const enhancedLessons = pgTable('enhanced_lessons', {
   id: uuid('id').primaryKey().defaultRandom(),
   projectId: uuid('project_id').references(() => projects.id, { onDelete: 'cascade' }),
@@ -207,61 +189,42 @@ export const enhancedLessons = pgTable('enhanced_lessons', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
-// Projects table for organizing related content and resources
-export const projects = pgTable('projects', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  name: varchar('name', { length: 255 }).notNull(),
-  description: text('description'),
-  language: varchar('language', { length: 10 }).notNull().default('zh'), // Language code: zh, en, vi, etc.
-  createdBy: uuid('created_by').references(() => users.id),
-  status: varchar('status', { length: 50 }).notNull().default('active'), // active, archived, deleted
-  settings: jsonb('settings'), // Project-specific settings as JSON
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
+// Relations
+export const lessonsRelations = relations(lessons, ({ many }) => ({
+  workflows: many(workflows),
+}));
 
-// Templates table for storing reusable content templates with file storage
-export const templates = pgTable('templates', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  projectId: uuid('project_id').references(() => projects.id, { onDelete: 'cascade' }),
-  name: varchar('name', { length: 255 }).notNull(),
-  type: varchar('type', { length: 50 }).notNull(), // 'lesson_plan', 'flashcard', 'worksheet', 'activity'
-  description: text('description'),
-  filePath: varchar('file_path', { length: 500 }), // Path to stored file (Vercel Blob, S3, etc.)
-  fileContent: text('file_content'), // Direct content storage for small templates
-  variables: jsonb('variables'), // Template variables: [{name, type, description, defaultValue, required}]
-  metadata: jsonb('metadata'), // Additional template metadata: tags, category, difficulty, etc.
-  isActive: boolean('is_active').notNull().default(true),
-  createdBy: uuid('created_by').references(() => users.id),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
+export const workflowsRelations = relations(workflows, ({ one }) => ({
+  lesson: one(lessons, {
+    fields: [workflows.lessonId],
+    references: [lessons.id],
+  }),
+}));
 
-// Language configurations table for localized settings and AI prompts
-export const languageConfigs = pgTable('language_configs', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  languageCode: varchar('language_code', { length: 10 }).notNull().unique(), // zh, en, vi, ja, etc.
-  languageName: varchar('language_name', { length: 100 }).notNull(), // "Chinese", "English", "Vietnamese"
-  aiPrompts: jsonb('ai_prompts'), // Language-specific AI prompts: {analysis, lessonPlan, flashcard, summary}
-  culturalSettings: jsonb('cultural_settings'), // Cultural preferences and adaptations
-  translationSettings: jsonb('translation_settings'), // Translation preferences and mappings
-  educationalStandards: jsonb('educational_standards'), // Local educational system standards
-  isActive: boolean('is_active').notNull().default(true),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
+export const promptTemplatesRelations = relations(promptTemplates, ({ many }) => ({
+  components: many(promptComponents),
+}));
+
+export const promptComponentsRelations = relations(promptComponents, ({ one }) => ({
+  template: one(promptTemplates, {
+    fields: [promptComponents.templateId],
+    references: [promptTemplates.id],
+  }),
+}));
 
 // Relations for projects
 export const projectsRelations = relations(projects, ({ one, many }) => ({
-  createdBy: one(users, {
-    fields: [projects.createdBy],
+  user: one(users, {
+    fields: [projects.userId],
     references: [users.id],
   }),
   templates: many(templates),
+  activities: many(activities),
+  enhancedLessons: many(enhancedLessons),
 }));
 
 // Relations for templates
-export const templatesRelations = relations(templates, ({ one }) => ({
+export const templatesRelations = relations(templates, ({ one, many }) => ({
   project: one(projects, {
     fields: [templates.projectId],
     references: [projects.id],
@@ -270,6 +233,22 @@ export const templatesRelations = relations(templates, ({ one }) => ({
     fields: [templates.createdBy],
     references: [users.id],
   }),
+  templateAnalyses: many(templateAnalyses),
+  enhancedLessons: many(enhancedLessons),
+}));
+
+// Relations for users
+export const usersRelations = relations(users, ({ many }) => ({
+  projects: many(projects),
+  createdTemplates: many(templates),
+}));
+
+// Relations for activities
+export const activitiesRelations = relations(activities, ({ one }) => ({
+  project: one(projects, {
+    fields: [activities.projectId],
+    references: [projects.id],
+  }),
 }));
 
 // Relations for language configs
@@ -277,10 +256,24 @@ export const languageConfigsRelations = relations(languageConfigs, ({ many }) =>
   // No direct relations needed for now
 }));
 
-// Users relations including all created entities
-export const usersRelations = relations(users, ({ many }) => ({
-  createdProjects: many(projects),
-  createdTemplates: many(templates),
+// Relations for template analyses
+export const templateAnalysesRelations = relations(templateAnalyses, ({ one }) => ({
+  template: one(templates, {
+    fields: [templateAnalyses.templateId],
+    references: [templates.id],
+  }),
+}));
+
+// Relations for enhanced lessons
+export const enhancedLessonsRelations = relations(enhancedLessons, ({ one }) => ({
+  project: one(projects, {
+    fields: [enhancedLessons.projectId],
+    references: [projects.id],
+  }),
+  template: one(templates, {
+    fields: [enhancedLessons.templateId],
+    references: [templates.id],
+  }),
 }));
 
 // Types for export
@@ -298,7 +291,13 @@ export type PromptComponent = typeof promptComponents.$inferSelect;
 export type InsertPromptComponent = typeof promptComponents.$inferInsert;
 export type Project = typeof projects.$inferSelect;
 export type InsertProject = typeof projects.$inferInsert;
+export type Activity = typeof activities.$inferSelect;
+export type InsertActivity = typeof activities.$inferInsert;
 export type Template = typeof templates.$inferSelect;
 export type InsertTemplate = typeof templates.$inferInsert;
 export type LanguageConfig = typeof languageConfigs.$inferSelect;
 export type InsertLanguageConfig = typeof languageConfigs.$inferInsert;
+export type TemplateAnalysis = typeof templateAnalyses.$inferSelect;
+export type InsertTemplateAnalysis = typeof templateAnalyses.$inferInsert;
+export type EnhancedLesson = typeof enhancedLessons.$inferSelect;
+export type InsertEnhancedLesson = typeof enhancedLessons.$inferInsert;
