@@ -39,7 +39,7 @@ export class BlobStorage {
       }
 
       const blob = await put(pathname, buffer, {
-        access: options.access,
+        access: options.access as 'public', // Vercel Blob only supports 'public'
         cacheControlMaxAge: options.cacheControlMaxAge,
         contentType: options.contentType,
         token: this.token
@@ -48,8 +48,8 @@ export class BlobStorage {
       return {
         url: blob.url,
         downloadUrl: blob.downloadUrl,
-        size: blob.size,
-        uploadedAt: new Date(blob.uploadedAt),
+        size: Buffer.byteLength(buffer), // Use Buffer.byteLength for both Buffer and ArrayBuffer
+        uploadedAt: new Date(), // Use current date since uploadedAt may not be available
         pathname: blob.pathname
       };
     } catch (error) {
@@ -94,10 +94,15 @@ export class BlobStorage {
         throw new Error('BLOB_READ_WRITE_TOKEN is required for blob operations');
       }
 
-      const blob = await head({
-        pathname,
+      const blobs = await list({
+        prefix: pathname,
         token: this.token
       });
+
+      const blob = blobs.blobs.find(b => b.pathname === pathname);
+      if (!blob) {
+        return null;
+      }
 
       return {
         url: blob.url,
@@ -121,10 +126,7 @@ export class BlobStorage {
         throw new Error('BLOB_READ_WRITE_TOKEN is required for blob operations');
       }
 
-      await del({
-        pathname,
-        token: this.token
-      });
+      await del(pathname);
     } catch (error) {
       console.error('Error deleting blob:', error);
       throw error;
@@ -199,6 +201,40 @@ export class BlobStorage {
   }
 
   /**
+   * Upload template files for projects
+   */
+  async uploadTemplate(
+    buffer: Buffer,
+    filename: string,
+    projectId: string
+  ): Promise<BlobFile> {
+    const pathname = `templates/project-${projectId}/${filename}`;
+
+    const contentType = this.getContentType(filename);
+
+    return this.upload(buffer, pathname, {
+      access: 'private', // Templates should be private by default
+      contentType,
+      cacheControlMaxAge: 86400 // 1 day cache
+    });
+  }
+
+  /**
+   * Upload template file from buffer (convenience method)
+   */
+  async uploadFromBuffer(
+    buffer: Buffer,
+    pathname: string,
+    contentType: string
+  ): Promise<string> {
+    const blob = await this.upload(buffer, pathname, {
+      access: 'private',
+      contentType
+    });
+    return blob.url;
+  }
+
+  /**
    * Get files for a specific lesson
    */
   async getLessonFiles(lessonId: string): Promise<BlobFile[]> {
@@ -243,6 +279,8 @@ export class BlobStorage {
       'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'doc': 'application/msword',
       'txt': 'text/plain',
+      'md': 'text/markdown',
+      'markdown': 'text/markdown',
       'png': 'image/png',
       'jpg': 'image/jpeg',
       'jpeg': 'image/jpeg',
@@ -289,4 +327,12 @@ export async function deleteFile(pathname: string): Promise<void> {
 
 export async function listFiles(prefix?: string): Promise<BlobFile[]> {
   return blobStorage.list(prefix);
+}
+
+export async function uploadTemplateFile(
+  buffer: Buffer,
+  filename: string,
+  projectId: string
+): Promise<BlobFile> {
+  return blobStorage.uploadTemplate(buffer, filename, projectId);
 }

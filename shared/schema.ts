@@ -196,7 +196,7 @@ export interface FlashcardData {
   selectedImageId?: string; // Track which image user selected
 }
 
-// Project types
+// Enhanced Project types for multi-language support
 export interface Project {
   id: string;
   name: string;
@@ -209,6 +209,13 @@ export interface Project {
   lessonCount: number;
   settings: Record<string, any> | null;
   metadata: Record<string, any> | null;
+  language: string; // 'zh', 'vi', 'en', etc.
+  inputFormat: string; // 'excel', 'pdf', 'text', 'markdown'
+  settings: Record<string, any> | null;
+  createdBy: string | null;
+  status: string; // 'active', 'archived', 'deleted'
+  isActive: boolean;
+  isArchived: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -223,6 +230,13 @@ export const insertProjectSchema = z.object({
   }).default("excel"),
   settings: z.record(z.any()).optional(),
   metadata: z.record(z.any()).optional(),
+  language: z.string().min(1).default('zh'),
+  inputFormat: z.string().default('excel'),
+  settings: z.record(z.any()).optional(),
+  createdBy: z.string().optional(),
+  status: z.string().default('active'),
+  isActive: z.boolean().default(true),
+  isArchived: z.boolean().default(false),
 });
 
 export const updateProjectSchema = z.object({
@@ -253,12 +267,12 @@ export type InsertProject = z.infer<typeof insertProjectSchema>;
 export type UpdateProject = z.infer<typeof updateProjectSchema>;
 export type ProjectFilter = z.infer<typeof projectFilterSchema>;
 
-// Template types
+// Enhanced Template types for both file uploads and template management
 export interface Template {
   id: string;
-  projectId: string | null;
+  projectId: string;
   name: string;
-  type: string;
+  type: string; // 'lesson_plan', 'flashcard', 'worksheet', 'activity', 'uploaded_file'
   description: string | null;
   fileName: string | null;
   filePath: string | null;
@@ -267,6 +281,31 @@ export interface Template {
   structure: Record<string, any> | null;
   qualityScore: string | null;
   createdBy: string | null;
+
+  // File upload specific fields
+  filename?: string | null; // Generated filename for storage
+  originalName?: string | null; // Original uploaded filename
+  fileType?: string | null; // 'md', 'docx', 'pdf', etc.
+  fileSize?: number | null; // File size in bytes
+  mimeType?: string | null;
+  content?: string | null; // Extracted text content
+  structure?: TemplateStructure | null; // Parsed structure
+
+  // Storage fields
+  storageUrl?: string | null; // Cloud storage URL
+  storageKey?: string | null; // Storage key for retrieval
+  contentHash?: string | null; // SHA-256 hash for duplicate detection
+
+  // Template management fields
+  variables?: TemplateVariable[] | null;
+  metadata?: Record<string, any> | null;
+  qualityScore?: string | null; // Decimal as string
+
+  uploadedBy: string | null;
+  isDeleted: boolean;
+  isActive: boolean;
+  isProcessed: boolean;
+  processingStatus: string; // 'pending', 'processing', 'completed', 'failed'
   createdAt: Date;
   updatedAt: Date;
   isActive: boolean;
@@ -282,14 +321,44 @@ export interface TemplateVariable {
   required?: boolean;
 }
 
+export interface TemplateStructure {
+  headings?: Array<{
+    level: number;
+    text: string;
+    position: number;
+  }>;
+  sections?: Array<{
+    title: string;
+    content: string;
+    position: number;
+  }>;
+  metadata?: Record<string, any>;
+}
+
 export const insertTemplateSchema = z.object({
-  projectId: z.string().optional(),
+  projectId: z.string().min(1),
   name: z.string().min(1),
   type: z.string().min(1),
   description: z.string().optional(),
   fileName: z.string().optional(),
   filePath: z.string().optional(),
   fileContent: z.string().optional(),
+
+  // File upload fields (optional for template management)
+  filename: z.string().optional(),
+  originalName: z.string().optional(),
+  fileType: z.string().optional(),
+  fileSize: z.number().optional(),
+  mimeType: z.string().optional(),
+  content: z.string().optional(),
+  structure: z.any().optional(),
+
+  // Storage fields (optional)
+  storageUrl: z.string().optional(),
+  storageKey: z.string().optional(),
+  contentHash: z.string().optional(),
+
+  // Template management fields
   variables: z.array(z.object({
     name: z.string(),
     type: z.string(),
@@ -300,6 +369,10 @@ export const insertTemplateSchema = z.object({
   structure: z.record(z.any()).optional(),
   qualityScore: z.string().optional(),
   createdBy: z.string().optional(),
+  metadata: z.record(z.any()).optional(),
+  qualityScore: z.string().optional(),
+
+  uploadedBy: z.string().optional(),
   isActive: z.boolean().default(true),
   isProcessed: z.boolean().default(false),
   processingStatus: z.string().default('pending'),
@@ -313,6 +386,7 @@ export interface LanguageConfig {
   languageCode: string;
   languageName: string;
   direction: string;
+  direction: string; // 'ltr' or 'rtl'
   aiPrompts: LanguageAIPrompts | null;
   culturalSettings: CulturalSettings | null;
   formatting: FormattingSettings | null;
@@ -341,6 +415,12 @@ export interface FormattingSettings {
   numberFormat: string;
   currencyFormat: string;
   textDirection: string;
+export interface FormattingSettings {
+  dateFormat: string;
+  numberFormat: string;
+  currency: string;
+  textDirection: string;
+  customStyles?: Record<string, any>;
 }
 
 export const insertLanguageConfigSchema = z.object({
@@ -365,6 +445,12 @@ export const insertLanguageConfigSchema = z.object({
     numberFormat: z.string(),
     currencyFormat: z.string(),
     textDirection: z.string(),
+  formatting: z.object({
+    dateFormat: z.string(),
+    numberFormat: z.string(),
+    currency: z.string(),
+    textDirection: z.string(),
+    customStyles: z.record(z.any()).optional(),
   }).optional(),
   isActive: z.boolean().default(true),
 });
@@ -436,4 +522,105 @@ export interface LanguagePattern {
   language: string;
   description: string;
   examples: string[];
+}
+
+// Template Analysis types
+export interface TemplateAnalysis {
+  id: string;
+  templateId: string;
+  analysisVersion: string;
+  analyzedAt: Date;
+  sections: Array<any>;
+  tables: Array<any>;
+  headers: Array<any>;
+  detectedVariables: Array<any>;
+  variablePatterns: Array<any>;
+  markdownStyle?: string | null;
+  tableFormat?: string | null;
+  languagePatterns: Array<any>;
+  completenessScore: string; // Decimal as string
+  consistencyScore: string; // Decimal as string
+  complexityScore: string; // Decimal as string
+  analyzerConfig: Record<string, any>;
+}
+
+export const insertTemplateAnalysisSchema = z.object({
+  templateId: z.string().min(1),
+  analysisVersion: z.string().default('1.0'),
+  sections: z.array(z.any()).default([]),
+  tables: z.array(z.any()).default([]),
+  headers: z.array(z.any()).default([]),
+  detectedVariables: z.array(z.any()).default([]),
+  variablePatterns: z.array(z.any()).default([]),
+  markdownStyle: z.string().optional(),
+  tableFormat: z.string().optional(),
+  languagePatterns: z.array(z.any()).default([]),
+  completenessScore: z.string().default('0.00'),
+  consistencyScore: z.string().default('0.00'),
+  complexityScore: z.string().default('0.00'),
+  analyzerConfig: z.record(z.any()).default({}),
+});
+
+export type InsertTemplateAnalysis = z.infer<typeof insertTemplateAnalysisSchema>;
+
+// Activity types
+export interface Activity {
+  id: string;
+  name: string;
+  type: string; // 'game', 'song', 'worksheet', 'drill'
+  description: string | null;
+  instructions: string | null;
+  duration: string | null; // e.g., "5-10 mins"
+  ageGroup: string | null; // e.g., "Preschool", "Primary"
+  materials: Array<any> | null;
+  benefits: string | null;
+  projectId: string | null;
+  language: string;
+  isGeneric: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export const insertActivitySchema = z.object({
+  name: z.string().min(1),
+  type: z.string().default('game'),
+  description: z.string().optional(),
+  instructions: z.string().optional(),
+  duration: z.string().optional(),
+  ageGroup: z.string().optional(),
+  materials: z.array(z.any()).optional(),
+  benefits: z.string().optional(),
+  projectId: z.string().optional(),
+  language: z.string().default('zh'),
+  isGeneric: z.boolean().default(false),
+});
+
+export type InsertActivity = z.infer<typeof insertActivitySchema>;
+
+// Template upload request types
+export interface TemplateUploadRequest {
+  files: Array<{
+    name: string;
+    type: string;
+    size: number;
+  }>;
+  projectId: string;
+}
+
+export interface TemplateUploadResponse {
+  success: boolean;
+  templates?: Array<{
+    id: string;
+    filename: string;
+    originalName: string;
+    fileType: string;
+    status: 'uploaded' | 'error';
+    error?: string;
+  }>;
+  duplicates?: Array<{
+    filename: string;
+    originalName: string;
+    existingId: string;
+  }>;
+  errors?: string[];
 }
