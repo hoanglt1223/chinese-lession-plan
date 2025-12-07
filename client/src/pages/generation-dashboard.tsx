@@ -14,7 +14,8 @@ import { FormatValidation } from "@/components/generation/format-validation";
 import { ExportOptions } from "@/components/generation/export-options";
 import { BatchGeneration } from "@/components/generation/batch-generation";
 import { ErrorRecovery } from "@/components/generation/error-recovery";
-import {
+import * as LucideIcons from "lucide-react";
+const {
   Zap,
   FileText,
   Globe,
@@ -32,7 +33,7 @@ import {
   Plus,
   Layers,
   AlertTriangle
-} from "lucide-react";
+} = LucideIcons;
 import { cn } from "@/lib/utils";
 
 interface GenerationData {

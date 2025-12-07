@@ -124,25 +124,61 @@ export default function CronjobManager() {
   };
 
   useEffect(() => {
+    let mounted = true;
+
     const loadData = async () => {
+      if (!mounted) return;
       setIsLoading(true);
-      await Promise.all([fetchJobs(), fetchJobStatuses()]);
-      setIsLoading(false);
+      try {
+        await Promise.all([fetchJobs(), fetchJobStatuses()]);
+      } catch (error) {
+        console.error('Initial load error:', error);
+      } finally {
+        if (mounted) {
+          setIsLoading(false);
+        }
+      }
     };
     loadData();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   // Auto-refresh for running jobs
   useEffect(() => {
-    const interval = setInterval(() => {
-      const hasRunningJobs = jobs.some(job => job.status === 'running');
-      if (hasRunningJobs) {
-        Promise.all([fetchJobs(), fetchJobStatuses()]);
-      }
-    }, 5000); // Refresh every 5 seconds
+    let mounted = true;
+    let refreshTimeout: NodeJS.Timeout;
 
-    return () => clearInterval(interval);
-  }, [jobs]);
+    const refreshData = async () => {
+      if (!mounted) return;
+
+      try {
+        const hasRunningJobs = jobs.some(job => job.status === 'running');
+        if (hasRunningJobs) {
+          await Promise.all([fetchJobs(), fetchJobStatuses()]);
+        }
+      } catch (error) {
+        console.error('Auto-refresh error:', error);
+      }
+
+      // Schedule next refresh only if component is still mounted
+      if (mounted) {
+        refreshTimeout = setTimeout(refreshData, 5000);
+      }
+    };
+
+    // Start the refresh cycle
+    refreshTimeout = setTimeout(refreshData, 5000);
+
+    return () => {
+      mounted = false;
+      if (refreshTimeout) {
+        clearTimeout(refreshTimeout);
+      }
+    };
+  }, [jobs.length]); // Only depend on jobs length to avoid excessive re-renders
 
   const runJob = async (jobId: string) => {
     try {
@@ -196,7 +232,7 @@ export default function CronjobManager() {
 
   const deleteJob = async (jobId: string) => {
     try {
-      const response = await fetch(`/api/cronjob?action=delete&jobId=${jobId}`, {
+      const response = await fetch(`/api/cronjob?jobId=${jobId}`, {
         method: 'DELETE'
       });
 

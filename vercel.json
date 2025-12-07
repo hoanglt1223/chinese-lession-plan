@@ -16,6 +16,9 @@
     "api/course-ops.ts": {
       "maxDuration": 300
     },
+    "api/cronjob.ts": {
+      "maxDuration": 300
+    },
     "api/export.ts": {
       "maxDuration": 300
     },
