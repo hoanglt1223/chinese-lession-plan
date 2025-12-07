@@ -189,7 +189,7 @@ export class PostgresStorage implements IStorage {
     }
 
     const results = await baseQuery;
-    return results.map(project => this.transformProject(project));
+    return results.map((project: any) => this.transformProject(project));
   }
 
   async getProjectsWithCounts(query?: ProjectListQuery): Promise<SchemaProject[]> {
@@ -233,7 +233,7 @@ export class PostgresStorage implements IStorage {
       .leftJoin(templateCounts, eq(projects.id, templateCounts.projectId));
 
     // Apply filters, sorting, and pagination in memory for now
-    let filteredProjects = projectsWithCounts.map(row => this.transformProject({
+    let filteredProjects = projectsWithCounts.map((row: any) => this.transformProject({
       id: row.id,
       name: row.name,
       description: row.description,
@@ -254,23 +254,23 @@ export class PostgresStorage implements IStorage {
     // Apply filters
     if (query) {
       if (query.language) {
-        filteredProjects = filteredProjects.filter(p => p.language === query.language);
+        filteredProjects = filteredProjects.filter((p: any) => p.language === query.language);
       }
       if (query.inputFormat) {
-        filteredProjects = filteredProjects.filter(p => p.inputFormat === query.inputFormat);
+        filteredProjects = filteredProjects.filter((p: any) => p.inputFormat === query.inputFormat);
       }
       if (query.isActive !== undefined) {
-        filteredProjects = filteredProjects.filter(p => p.isActive === query.isActive);
+        filteredProjects = filteredProjects.filter((p: any) => p.isActive === query.isActive);
       }
       if (query.isArchived !== undefined) {
-        filteredProjects = filteredProjects.filter(p => p.isArchived === query.isArchived);
+        filteredProjects = filteredProjects.filter((p: any) => p.isArchived === query.isArchived);
       }
     }
 
     // Apply sorting
     const sortBy = query?.sortBy || 'createdAt';
     const sortOrder = query?.sortOrder || 'desc';
-    filteredProjects.sort((a, b) => {
+    filteredProjects.sort((a: any, b: any) => {
       const aValue = a[sortBy];
       const bValue = b[sortBy];
       if (sortOrder === 'asc') {

@@ -4,9 +4,7 @@ import { setCorsHeaders, handleOptions } from './_shared/cors.js';
 import { handleError } from './_shared/error-handler.js';
 import { fileProcessor } from './_shared/file-processor.js';
 import { uploadFile, blobStorage } from './_shared/blob-storage.js';
-import flashcardPdfHandler from './_shared/export/flashcard-pdf.js';
-import docxHandler from './_shared/export/docx.js';
-import pdfHandler from './_shared/export/pdf.js';
+import consolidatedExportHandler from './export.js';
 import { serverlessPDFService } from './_shared/serverless-pdf-service.js';
 import { db } from './_shared/database.js';
 import { lessons } from './_shared/db-schema.js';
@@ -181,27 +179,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { documentType, ...requestData } = req.body;
         if (!documentType) return res.status(400).json({ message: 'documentType is required' });
 
-        // Standard Handlers
-        const handlers: Record<string, any> = {
-            'flashcard-pdf': flashcardPdfHandler,
-            'docx': docxHandler,
-            'pdf': pdfHandler,
+        // Map old document types to new format parameter
+        const formatMap: Record<string, string> = {
+            'flashcard-pdf': 'pdf',
+            'docx': 'docx',
+            'pdf': 'pdf',
         };
 
-        const exportHandler = handlers[documentType];
-        
-        if (exportHandler) {
+        const format = formatMap[documentType];
+
+        if (format) {
              // Strip documentType and action if needed, but handlers likely check specific fields.
              // Also handlers typically expect specific body structure. 
              // Since we are proxying, we might need to temporarily set req.body to requestData 
              // or ensure handlers are okay with extra fields.
              // The original export.ts did: req.body = requestData;
              const originalBody = req.body;
+             const originalQuery = req.query;
              req.body = requestData;
+             req.query = { ...req.query, format };
              try {
-                return await exportHandler(req, res);
+                return await consolidatedExportHandler(req, res);
              } finally {
                 req.body = originalBody;
+                req.query = originalQuery;
              }
         }
 

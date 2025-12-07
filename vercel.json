@@ -2,38 +2,22 @@
   "version": 2,
   "functions": {
     "api/ai-ops.ts": {
-      "maxDuration": 3600,
-      "compute": "fluid",
-      "includeFiles": "docs/**"
+      "maxDuration": 300
     },
     "api/cronjob.ts": {
-      "maxDuration": 3600,
-      "compute": "fluid",
-      "includeFiles": "docs/**"
+      "maxDuration": 300
     },
     "api/upload.ts": {
-      "maxDuration": 1800,
-      "compute": "fluid",
-      "includeFiles": "docs/**"
+      "maxDuration": 300
     },
     "api/export.ts": {
-      "maxDuration": 1800,
-      "compute": "fluid",
-      "includeFiles": "docs/**"
+      "maxDuration": 300
     },
     "api/content-ops.ts": {
-      "maxDuration": 1800,
-      "compute": "fluid",
-      "includeFiles": "docs/**"
+      "maxDuration": 300
     },
     "api/course-ops.ts": {
-      "maxDuration": 1800,
-      "compute": "fluid",
-      "includeFiles": "docs/**"
-    },
-    "api/**/*.ts": {
-      "maxDuration": 300,
-      "includeFiles": "docs/**"
+      "maxDuration": 300
     }
   },
   "routes": [

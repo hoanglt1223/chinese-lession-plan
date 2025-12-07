@@ -67,7 +67,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           continue;
         }
 
-        const lessonsData: CourseLesson[] = courseLessons.map(row => row.aiAnalysis as CourseLesson);
+        const lessonsData: CourseLesson[] = courseLessons.map((row: any) => row.aiAnalysis as CourseLesson);
         const lessonsByUnit = groupLessonsByUnit(lessonsData);
 
         // Process lessons in parallel (import from main cronjob file)

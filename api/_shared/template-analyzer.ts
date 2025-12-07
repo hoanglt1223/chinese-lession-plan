@@ -261,30 +261,30 @@ export class TemplateAnalyzer {
     }
 
     // Sort by confidence
-    return patterns.sort((a, b) => b.confidence - a.confidence);
+    return patterns.sort((a, b) => (b.confidence || 0) - (a.confidence || 0));
   }
 
   /**
    * Generate template structure summary
    */
   static generateTemplateStructure(analysis: TemplateAnalysis): TemplateStructure {
-    const hasTables = analysis.structure.tables.length > 0;
-    const hasVariables = analysis.variables.length > 0;
-    const hasMultilingualContent = analysis.languages.length > 1;
+    const hasTables = (analysis.structure?.tables?.length || 0) > 0;
+    const hasVariables = (analysis.variables?.length || 0) > 0;
+    const hasMultilingualContent = (analysis.languages?.length || 0) > 1;
 
     let type: TemplateStructure['type'] = 'plain-text';
-    if (analysis.structure.headings.length > 0 || hasTables) {
+    if ((analysis.structure?.headings?.length || 0) > 0 || hasTables) {
       type = 'markdown';
-    } else if (analysis.structure.codeBlocks.length > 0 || analysis.structure.lists.length > 0) {
+    } else if ((analysis.structure?.codeBlocks?.length || 0) > 0 || (analysis.structure?.lists?.length || 0) > 0) {
       type = 'structured';
     }
 
     let complexity: TemplateStructure['complexity'] = 'simple';
     const complexityScore =
-      analysis.variables.length * 2 +
-      analysis.structure.tables.length * 3 +
-      analysis.structure.headings.length +
-      analysis.structure.codeBlocks.length;
+      (analysis.variables?.length || 0) * 2 +
+      (analysis.structure?.tables?.length || 0) * 3 +
+      (analysis.structure?.headings?.length || 0) +
+      (analysis.structure?.codeBlocks?.length || 0);
 
     if (complexityScore > 10) {
       complexity = 'complex';
@@ -294,12 +294,13 @@ export class TemplateAnalyzer {
 
     // Extract sections from headings
     const sections: TemplateStructure['sections'] = [];
-    for (let i = 0; i < analysis.structure.headings.length; i++) {
-      const heading = analysis.structure.headings[i];
-      const nextHeading = analysis.structure.headings[i + 1];
+    const headings = analysis.structure?.headings || [];
+    for (let i = 0; i < headings.length; i++) {
+      const heading = headings[i];
+      const nextHeading = headings[i + 1];
       const startPos = heading.position;
-      const endPos = nextHeading ? nextHeading.position : analysis.content.length;
-      const content = analysis.content.substring(startPos, endPos).trim();
+      const endPos = nextHeading ? nextHeading.position : (analysis.content?.length || 0);
+      const content = (analysis.content || '').substring(startPos, endPos).trim();
 
       sections.push({
         title: heading.text,
@@ -314,7 +315,7 @@ export class TemplateAnalyzer {
       hasTables,
       hasVariables,
       hasMultilingualContent,
-      estimatedWordCount: analysis.structure.wordCount,
+      estimatedWordCount: analysis.structure?.wordCount,
       sections,
     };
   }
@@ -323,20 +324,25 @@ export class TemplateAnalyzer {
    * Validate template completeness and consistency
    */
   static validateCompleteness(analysis: TemplateAnalysis, providedVariables: Record<string, any> = {}): ValidationResult {
-    const totalVariables = analysis.variables.length;
-    const requiredVariables = analysis.variables.filter(v => v.required).length;
+    const variables = analysis.variables || [];
+    const languages = analysis.languages || [];
+    const structure = analysis.structure;
+
+    const totalVariables = variables.length;
+    const requiredVariables = variables.filter(v => v.required).length;
     const providedVarNames = Object.keys(providedVariables);
-    const missingVariables = analysis.variables
+    const missingVariables = variables
       .filter(v => v.required && !providedVarNames.includes(v.name))
       .map(v => v.name);
 
     const isValid = missingVariables.length === 0;
-    const completenessScore = Math.round(((requiredVariables - missingVariables.length) / requiredVariables) * 100);
+    const completenessScore = requiredVariables > 0 ?
+      Math.round(((requiredVariables - missingVariables.length) / requiredVariables) * 100) : 100;
 
     // Check consistency
-    const languageMixing = analysis.languages.length > 1;
-    const variableNaming = this.checkVariableNamingConsistency(analysis.variables);
-    const structureConsistency = this.checkStructureConsistency(analysis.structure);
+    const languageMixing = languages.length > 1;
+    const variableNaming = this.checkVariableNamingConsistency(variables);
+    const structureConsistency = structure ? this.checkStructureConsistency(structure) : true;
 
     const recommendations = this.generateRecommendations(analysis, missingVariables);
 
@@ -366,7 +372,7 @@ export class TemplateAnalyzer {
 
     // Completeness score
     let completeness = 100;
-    if (analysis.variables.length === 0) {
+    if ((analysis.variables?.length || 0) === 0) {
       completeness = 30;
       issues.push({
         type: 'warning',
@@ -377,7 +383,7 @@ export class TemplateAnalyzer {
 
     // Consistency score
     let consistency = 100;
-    if (analysis.languages.length > 1) {
+    if ((analysis.languages?.length || 0) > 1) {
       consistency -= 20;
       issues.push({
         type: 'info',
@@ -400,7 +406,7 @@ export class TemplateAnalyzer {
 
     // Structure score
     let structure = 100;
-    if (analysis.structure.headings.length === 0 && analysis.structure.tables.length === 0) {
+    if ((analysis.structure?.headings?.length || 0) === 0 && (analysis.structure?.tables?.length || 0) === 0) {
       structure -= 40;
       issues.push({
         type: 'info',
@@ -539,24 +545,29 @@ export class TemplateAnalyzer {
 
   private static generateRecommendations(analysis: TemplateAnalysis, missingVariables: string[]): string[] {
     const recommendations: string[] = [];
+    const variables = analysis.variables || [];
+    const structure = analysis.structure;
+    const content = analysis.content || '';
+    const languages = analysis.languages || [];
+    const quality = analysis.quality;
 
     if (missingVariables.length > 0) {
       recommendations.push(`Provide values for required variables: ${missingVariables.join(', ')}`);
     }
 
-    if (analysis.variables.length > 10) {
+    if (variables.length > 10) {
       recommendations.push('Consider simplifying template by reducing number of variables');
     }
 
-    if (analysis.structure.tables.length === 0 && analysis.content.includes('|')) {
+    if (structure?.tables?.length === 0 && content.includes('|')) {
       recommendations.push('Consider using markdown tables for better data organization');
     }
 
-    if (analysis.languages.length > 1 && analysis.quality.consistency < 80) {
+    if (languages.length > 1 && (quality?.consistency || 0) < 80) {
       recommendations.push('Consider separating multilingual content or using language markers');
     }
 
-    if (analysis.quality.readability < 70) {
+    if ((quality?.readability || 0) < 70) {
       recommendations.push('Improve readability by adding proper formatting and structure');
     }
 
