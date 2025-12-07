@@ -308,11 +308,46 @@ export const templateUsageAnalytics = pgTable('template_usage_analytics', {
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 
+// Cronjobs table for automated lesson generation
+export const cronjobs = pgTable('cronjobs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: varchar('name', { length: 255 }).notNull().unique(),
+  status: varchar('status', { length: 20 }).notNull().default('pending'), // 'pending', 'running', 'completed', 'failed', 'paused'
+  schedule: varchar('schedule', { length: 100 }).notNull(), // Cron expression
+  lastRun: timestamp('last_run'),
+  nextRun: timestamp('next_run'),
+  totalLessons: integer('total_lessons').notNull().default(0),
+  processedLessons: integer('processed_lessons').notNull().default(0),
+  failedLessons: integer('failed_lessons').notNull().default(0),
+  options: jsonb('options').default({}), // Job options: skipExisting, skipFlashcards, maxConcurrent, retryFailures
+  createdBy: uuid('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Cronjob lesson statuses for tracking individual lesson progress
+export const cronjobLessonStatuses = pgTable('cronjob_lesson_statuses', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  jobId: uuid('job_id').references(() => cronjobs.id, { onDelete: 'cascade' }).notNull(),
+  status: varchar('status', { length: 20 }).notNull().default('pending'), // 'pending', 'processing', 'completed', 'failed'
+  unitNumber: varchar('unit_number', { length: 50 }).notNull(),
+  lessonNumber: varchar('lesson_number', { length: 50 }).notNull(),
+  lessonTitle: varchar('lesson_title', { length: 255 }).notNull(),
+  progress: integer('progress').notNull().default(0), // 0-100
+  error: text('error'), // Error message if failed
+  startTime: timestamp('start_time').notNull().defaultNow(),
+  endTime: timestamp('end_time'),
+  retryCount: integer('retry_count').notNull().default(0),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   projects: many(projects),
   templates: many(templates),
   templateUsageAnalytics: many(templateUsageAnalytics),
+  cronjobs: many(cronjobs),
 }));
 
 export const lessonsRelations = relations(lessons, ({ many }) => ({
@@ -455,6 +490,22 @@ export const templateUsageAnalyticsRelations = relations(templateUsageAnalytics,
   }),
 }));
 
+// Cronjob relations
+export const cronjobsRelations = relations(cronjobs, ({ one, many }) => ({
+  creator: one(users, {
+    fields: [cronjobs.createdBy],
+    references: [users.id],
+  }),
+  lessonStatuses: many(cronjobLessonStatuses),
+}));
+
+export const cronjobLessonStatusesRelations = relations(cronjobLessonStatuses, ({ one }) => ({
+  job: one(cronjobs, {
+    fields: [cronjobLessonStatuses.jobId],
+    references: [cronjobs.id],
+  }),
+}));
+
 // Types for export
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
@@ -500,3 +551,9 @@ export type TemplateComparison = typeof templateComparisons.$inferSelect;
 export type InsertTemplateComparison = typeof templateComparisons.$inferInsert;
 export type TemplateUsageAnalytics = typeof templateUsageAnalytics.$inferSelect;
 export type InsertTemplateUsageAnalytics = typeof templateUsageAnalytics.$inferInsert;
+
+// Cronjob types
+export type Cronjob = typeof cronjobs.$inferSelect;
+export type InsertCronjob = typeof cronjobs.$inferInsert;
+export type CronjobLessonStatus = typeof cronjobLessonStatuses.$inferSelect;
+export type InsertCronjobLessonStatus = typeof cronjobLessonStatuses.$inferInsert;

@@ -15,7 +15,7 @@ import { apiRequest } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useAI } from "@/contexts/AIContext";
-import { GraduationCap, Clock, FolderInput, Layers, Settings, Zap, Loader2, LogOut, DollarSign, Menu, Home, BookOpen, PenTool, FileText, Sparkles } from "lucide-react";
+import { GraduationCap, Clock, FolderInput, Layers, Settings, Zap, Loader2, LogOut, DollarSign, Menu, Home, BookOpen, PenTool, FileText, Sparkles, Timer } from "lucide-react";
 
 function HomeContent() {
   const [selectedLesson, setSelectedLesson] = useState<string | null>(null);
@@ -577,6 +577,14 @@ function HomeContent() {
                           <Sparkles className="mr-2 h-4 w-4" />
                           Generation Dashboard
                         </Button>
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start"
+                          onClick={() => window.location.href = '/cronjob-manager'}
+                        >
+                          <Timer className="mr-2 h-4 w-4" />
+                          Cronjob Manager
+                        </Button>
                       </div>
 
                       {/* AI Settings */}
@@ -659,6 +667,15 @@ function HomeContent() {
                 >
                   <Sparkles className="h-3.5 w-3.5 mr-1" />
                   <span className="hidden md:inline text-xs">Generate</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => window.location.href = '/cronjob-manager'}
+                  className="hidden sm:flex px-2"
+                >
+                  <Timer className="h-3.5 w-3.5 mr-1" />
+                  <span className="hidden md:inline text-xs">Cronjobs</span>
                 </Button>
                 <select 
                   className="px-1.5 py-0.5 border rounded text-xs bg-background hover:bg-accent transition-colors min-w-0"

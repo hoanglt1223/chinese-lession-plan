@@ -16,6 +16,7 @@ import NotFound from "@/pages/not-found";
 import CourseManager from "@/pages/course-manager";
 import TemplateManager from "@/pages/template-manager";
 import GenerationDashboard from "@/pages/generation-dashboard";
+import CronjobManager from "@/pages/cronjob-manager";
 
 function Router() {
   const { isAuthenticated, isLoading, user } = useAuth();
@@ -44,6 +45,7 @@ function Router() {
       <Route path="/course-manager" component={CourseManager} />
       <Route path="/template-manager" component={TemplateManager} />
       <Route path="/generation-dashboard" component={GenerationDashboard} />
+      <Route path="/cronjob-manager" component={CronjobManager} />
       <Route component={NotFound} />
     </Switch>
   );
