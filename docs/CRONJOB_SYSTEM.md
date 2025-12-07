@@ -131,6 +131,70 @@ To deploy the cronjob system:
    SELECT * FROM cronjob_lesson_statuses;
    ```
 
+3. Set up Vercel Cron Jobs:
+   - Add `CRON_SECRET` environment variable in Vercel dashboard
+   - Configure cron schedules in `vercel.json`
+   - Deploy to Vercel to enable cron functionality
+
+## Vercel Cron Job Setup
+
+### Environment Variables
+Set the following environment variables in your Vercel project:
+
+```bash
+CRON_SECRET=your_random_secret_key_here
+```
+
+### Cron Schedule Configuration
+The `vercel.json` file defines cron job schedules:
+
+```json
+{
+  "crons": [
+    {
+      "path": "/api/cron-schedule",
+      "schedule": "0 * * * *"
+    }
+  ]
+}
+```
+
+### How Vercel Cron Jobs Work
+
+1. **Scheduling**: Vercel automatically calls the specified endpoint on the defined schedule
+2. **Authentication**: The endpoint is protected with the `CRON_SECRET` for security
+3. **Execution**: The system checks for jobs that are due to run and executes them
+4. **Status Tracking**: Job progress and results are stored in the database
+
+### Custom Schedules
+
+To modify the cron schedule, update the `schedule` field in `vercel.json`:
+
+```json
+{
+  "crons": [
+    {
+      "path": "/api/cron-schedule",
+      "schedule": "0 */6 * * *"  // Every 6 hours
+    }
+  ]
+}
+```
+
+Common schedules:
+- `0 * * * *` - Every hour
+- `0 */6 * * *` - Every 6 hours
+- `0 0 * * *` - Every day at midnight
+- `0 0 * * 1` - Every Monday at midnight
+- `0 9,17 * * 1-5` - Weekdays at 9 AM and 5 PM
+
+### Limitations and Considerations
+
+- **Execution Time**: Vercel functions have a 300-second timeout
+- **Concurrency**: Multiple jobs may run simultaneously
+- **Rate Limits**: Consider API rate limits when scheduling frequent runs
+- **Monitoring**: Use Vercel's function logs to monitor execution
+
 ## Performance Considerations
 
 ### API Rate Limits

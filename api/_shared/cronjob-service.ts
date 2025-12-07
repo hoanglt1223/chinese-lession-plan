@@ -60,10 +60,14 @@ export class CronjobService {
     // Extract CourseLesson data from aiAnalysis
     const lessons: CourseLesson[] = courseLessons.map(row => row.aiAnalysis as CourseLesson);
 
+    // Calculate next run time based on cron schedule
+    const nextRun = this.calculateNextRun(schedule);
+
     const [newJob] = await db.insert(cronjobs).values({
       name,
       status: 'pending',
       schedule,
+      nextRun,
       totalLessons: lessons.length,
       processedLessons: 0,
       failedLessons: 0,
@@ -88,12 +92,22 @@ export class CronjobService {
 
   // Update job status
   async updateJobStatus(jobId: string, status: CronJobData['status']): Promise<void> {
+    const job = await this.getJob(jobId);
+    if (!job) return;
+
+    const updateData: any = {
+      status,
+      updatedAt: new Date(),
+      ...(status === 'completed' || status === 'failed' ? { lastRun: new Date() } : {})
+    };
+
+    // Calculate next run time for completed jobs
+    if (status === 'completed' && job.schedule) {
+      updateData.nextRun = this.calculateNextRun(job.schedule);
+    }
+
     await db.update(cronjobs)
-      .set({
-        status,
-        updatedAt: new Date(),
-        ...(status === 'completed' || status === 'failed' ? { lastRun: new Date() } : {})
-      })
+      .set(updateData)
       .where(eq(cronjobs.id, jobId));
   }
 
@@ -250,6 +264,64 @@ export class CronjobService {
       createdAt: dbStatus.createdAt,
       updatedAt: dbStatus.updatedAt,
     };
+  }
+
+  // Calculate next run time based on cron expression
+  private calculateNextRun(cronExpression: string): Date {
+    // Simple cron parser implementation
+    // In production, consider using a proper cron library like 'node-cron'
+    const now = new Date();
+    const [minute, hour, dayOfMonth, month, dayOfWeek] = cronExpression.split(' ').map(part => {
+      if (part === '*') return '*';
+      return parseInt(part, 10);
+    });
+
+    const nextRun = new Date(now);
+
+    // Handle minute
+    if (minute !== '*') {
+      nextRun.setMinutes(minute);
+      if (nextRun <= now) {
+        nextRun.setHours(nextRun.getHours() + 1);
+      }
+    }
+
+    // Handle hour
+    if (hour !== '*') {
+      nextRun.setHours(hour);
+      if (nextRun <= now) {
+        nextRun.setDate(nextRun.getDate() + 1);
+      }
+    }
+
+    // Handle day of month
+    if (dayOfMonth !== '*') {
+      nextRun.setDate(dayOfMonth);
+      if (nextRun <= now) {
+        nextRun.setMonth(nextRun.getMonth() + 1);
+      }
+    }
+
+    // Handle month
+    if (month !== '*') {
+      nextRun.setMonth(month - 1); // Months are 0-indexed
+      if (nextRun <= now) {
+        nextRun.setFullYear(nextRun.getFullYear() + 1);
+      }
+    }
+
+    // Handle day of week (0 = Sunday, 6 = Saturday)
+    if (dayOfWeek !== '*') {
+      const currentDay = nextRun.getDay();
+      const targetDay = dayOfWeek;
+      let daysToAdd = (targetDay - currentDay + 7) % 7;
+      if (daysToAdd === 0 && nextRun <= now) {
+        daysToAdd = 7;
+      }
+      nextRun.setDate(nextRun.getDate() + daysToAdd);
+    }
+
+    return nextRun;
   }
 }
 

@@ -20,6 +20,12 @@
       "dest": "/index.html"
     }
   ],
+  "crons": [
+    {
+      "path": "/api/cron-schedule",
+      "schedule": "0 * * * *"
+    }
+  ],
   "env": {
     "NODE_ENV": "production"
   },

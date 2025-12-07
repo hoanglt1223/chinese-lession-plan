@@ -17,7 +17,8 @@
     "format:check": "prettier --check .",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "cron:generate-secret": "node scripts/generate-cron-secret.js"
   },
   "packageManager": "pnpm@10.14.0",
   "dependencies": {
