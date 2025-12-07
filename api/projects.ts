@@ -10,7 +10,7 @@ import {
   type CreateProjectRequest,
   type ProjectResponse,
   type ProjectListQuery
-} from '../../shared/schema.js';
+} from '../_shared/db-schema.js';
 import { z } from 'zod';
 
 const querySchema = z.object({

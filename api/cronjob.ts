@@ -305,11 +305,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       // Get course outline
-      const courseLessons = await db.select().from(lessons).where(eq(lessons.status, 'outline'));
-      const lessons: CourseLesson[] = courseLessons.map(row => row.aiAnalysis as CourseLesson);
+      const courseLessonsRows = await db.select().from(lessons).where(eq(lessons.status, 'outline'));
+      const courseLessons: CourseLesson[] = courseLessonsRows.map((row: any) => row.aiAnalysis as CourseLesson);
 
       // Group lessons by unit
-      const lessonsByUnit = groupLessonsByUnit(lessons);
+      const lessonsByUnit = groupLessonsByUnit(courseLessons);
 
       // Start processing in background (don't await for response)
       processLessonsInParallel(lessonsByUnit, job.options, jobId)
@@ -322,7 +322,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         message: 'Job started',
         jobId,
         totalUnits: Object.keys(lessonsByUnit).length,
-        totalLessons: lessons.length
+        totalLessons: courseLessons.length
       });
     }
 

@@ -51,14 +51,14 @@ export class CronjobService {
     createdBy?: string
   ): Promise<CronJobData> {
     // Get course outline from database
-    const courseLessons = await db.select().from(lessons).where(eq(lessons.status, 'outline'));
+    const courseLessonsRows = await db.select().from(lessons).where(eq(lessons.status, 'outline'));
 
-    if (courseLessons.length === 0) {
+    if (courseLessonsRows.length === 0) {
       throw new Error('No course outline found. Please upload a course outline first.');
     }
 
     // Extract CourseLesson data from aiAnalysis
-    const lessons: CourseLesson[] = courseLessons.map(row => row.aiAnalysis as CourseLesson);
+    const courseLessons: CourseLesson[] = courseLessonsRows.map((row: any) => row.aiAnalysis as CourseLesson);
 
     // Calculate next run time based on cron schedule
     const nextRun = this.calculateNextRun(schedule);
@@ -68,7 +68,7 @@ export class CronjobService {
       status: 'pending',
       schedule,
       nextRun,
-      totalLessons: lessons.length,
+      totalLessons: courseLessons.length,
       processedLessons: 0,
       failedLessons: 0,
       options,
@@ -81,7 +81,7 @@ export class CronjobService {
   // Get all cronjobs
   async getAllJobs(): Promise<CronJobData[]> {
     const dbJobs = await db.select().from(cronjobs).orderBy(desc(cronjobs.createdAt));
-    return dbJobs.map(job => this.mapDbJobToData(job));
+    return dbJobs.map((job: any) => this.mapDbJobToData(job));
   }
 
   // Get a specific cronjob
@@ -147,7 +147,7 @@ export class CronjobService {
         .orderBy(cronjobLessonStatuses.createdAt);
     }
 
-    return dbStatuses.map(status => this.mapDbStatusToData(status));
+    return dbStatuses.map((status: any) => this.mapDbStatusToData(status));
   }
 
   // Create or update lesson status
@@ -217,13 +217,13 @@ export class CronjobService {
 
     const stats = {
       totalJobs: allJobs.length,
-      runningJobs: allJobs.filter(job => job.status === 'running').length,
-      completedJobs: allJobs.filter(job => job.status === 'completed').length,
-      failedJobs: allJobs.filter(job => job.status === 'failed').length,
-      pendingJobs: allJobs.filter(job => job.status === 'pending').length,
-      totalLessons: allJobs.reduce((sum, job) => sum + job.totalLessons, 0),
-      processedLessons: allJobs.reduce((sum, job) => sum + job.processedLessons, 0),
-      failedLessons: allJobs.reduce((sum, job) => sum + job.failedLessons, 0),
+      runningJobs: allJobs.filter((job: any) => job.status === 'running').length,
+      completedJobs: allJobs.filter((job: any) => job.status === 'completed').length,
+      failedJobs: allJobs.filter((job: any) => job.status === 'failed').length,
+      pendingJobs: allJobs.filter((job: any) => job.status === 'pending').length,
+      totalLessons: allJobs.reduce((sum: any, job: any) => sum + job.totalLessons, 0),
+      processedLessons: allJobs.reduce((sum: any, job: any) => sum + job.processedLessons, 0),
+      failedLessons: allJobs.reduce((sum: any, job: any) => sum + job.failedLessons, 0),
     };
 
     return stats;

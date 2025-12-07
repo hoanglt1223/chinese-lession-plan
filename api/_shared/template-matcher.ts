@@ -62,8 +62,8 @@ export class TemplateMatcher {
     // Compare vocabulary overlap
     if (input.vocabulary && template.sampleInput.vocabulary) {
       maxScore += 30;
-      const inputWords = input.vocabulary.split(/[,，\s]+/).filter(w => w.trim());
-      const templateWords = template.sampleInput.vocabulary.split(/[,，\s]+/).filter(w => w.trim());
+      const inputWords = input.vocabulary.split(/[,，\s]+/).filter((w: string) => w.trim());
+      const templateWords = template.sampleInput.vocabulary.split(/[,，\s]+/).filter((w: string) => w.trim());
       const overlap = this.calculateOverlap(inputWords, templateWords);
       const vocabScore = (overlap.length / Math.max(inputWords.length, templateWords.length)) * 30;
       totalScore += vocabScore;

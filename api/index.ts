@@ -35,13 +35,13 @@ app.use(session({
 // Wrapper to adapt Express req/res to Vercel handler signature if needed
 // Since Express req/res are compatible with VercelRequest/VercelResponse for the most part, 
 // we can pass them directly.
-const adaptHandler = (handler: any) => async (req: Request, res: Response) => {
+const adaptHandler = (handler: (req: any, res: any) => Promise<void>) => async (req: any, res: any) => {
   try {
     await handler(req, res);
   } catch (error) {
     console.error('API Error:', error);
-    if (!res.headersSent) {
-      res.status(500).json({ error: 'Internal Server Error' });
+    if (!(res as any).headersSent) {
+      (res as any).status(500).json({ error: 'Internal Server Error' });
     }
   }
 };
