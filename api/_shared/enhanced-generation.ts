@@ -136,8 +136,8 @@ export class EnhancedGenerationService {
 
       // Step 2: Fallback to standard prompt if no template match
       if (!enhancedPrompt) {
-        const { buildDefaultPrompt } = await import('./prompt-service.js');
-        enhancedPrompt = await buildDefaultPrompt(type, variables);
+        const { PromptService } = await import('./prompt-service.js');
+        enhancedPrompt = await PromptService.buildPrompt(type, variables);
       }
 
       if (!enhancedPrompt) {
@@ -145,14 +145,10 @@ export class EnhancedGenerationService {
       }
 
       // Step 3: Generate content
+      const combinedPrompt = `${enhancedPrompt.systemPrompt}\n\n${enhancedPrompt.userPrompt}`;
       const generatedContent = await generateWithOpenAI(
-        enhancedPrompt.systemPrompt,
-        enhancedPrompt.userPrompt,
-        options.model || 'GLM-4.6',
-        {
-          temperature: type === 'analysis' ? 0.1 : 0.7,
-          maxTokens: type === 'flashcard' ? 2000 : 4000
-        }
+        combinedPrompt,
+        options.model || 'GLM-4.6'
       );
 
       // Step 4: Parse and validate content

@@ -301,8 +301,8 @@ export async function generateSummaryEnhanced(
   try {
     if (!options.useEnhancedGeneration) {
       // Fallback to original function
-      const summary = await generateSummary(lessonPlan, options.aiModel);
-      return { summary, success: true };
+      const summaryResult = await generateSummary(lessonPlan, [], options.aiModel);
+      return { summary: summaryResult.fullSummary, success: true };
     }
 
     console.log("Generating enhanced lesson summary");
@@ -333,9 +333,9 @@ export async function generateSummaryEnhanced(
     } else {
       // Fallback to original generation
       console.warn("Enhanced summary generation failed, falling back to original method");
-      const fallbackSummary = await generateSummary(lessonPlan, options.aiModel);
+      const fallbackSummaryResult = await generateSummary(lessonPlan, [], options.aiModel);
       return {
-        summary: fallbackSummary,
+        summary: fallbackSummaryResult.fullSummary,
         success: true,
         error: result.error
       };
@@ -344,8 +344,8 @@ export async function generateSummaryEnhanced(
     console.error("Failed to generate enhanced summary:", error);
     // Final fallback
     try {
-      const summary = await generateSummary(lessonPlan, options.aiModel);
-      return { summary, success: true, error: error instanceof Error ? error.message : "Unknown error" };
+      const summaryResult = await generateSummary(lessonPlan, [], options.aiModel);
+      return { summary: summaryResult.fullSummary, success: true, error: error instanceof Error ? error.message : "Unknown error" };
     } catch (fallbackError) {
       throw new Error(`Both enhanced and fallback summary generation failed: ${error instanceof Error ? error.message : "Unknown error"}`);
     }

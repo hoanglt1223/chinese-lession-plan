@@ -77,7 +77,7 @@ export interface Project {
   language: string;
   inputFormat: string;
   status: string;
-  userId: string;
+  userId: string | null;
   settings: Record<string, any> | null;
   metadata: Record<string, any> | null;
   createdBy: string | null;

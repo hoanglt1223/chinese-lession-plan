@@ -1,5 +1,7 @@
 import 'dotenv/config';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import * as fs from 'fs';
+import path from 'path';
 import { parseCourseOutline } from './_shared/course-processor.js';
 import { generateSingleLessonPlan, generateFlashcards } from './_shared/openai-services.js';
 import { createLessonPlanDocx, createFlashcardPdf } from './_shared/document-generator.js';
@@ -8,6 +10,9 @@ import { handleError } from './_shared/error-handler.js';
 import { blobStorage } from './_shared/blob-storage.js';
 import { db } from './_shared/database.js';
 import { activities, lessons } from './_shared/db-schema.js';
+
+// Define course outline path
+const COURSE_OUTLINE_PATH = process.env.COURSE_OUTLINE_PATH || path.join(process.cwd(), 'course-outline.json');
 import { eq, desc, sql } from 'drizzle-orm';
 import { storage } from './_shared/storage.js';
 import { initializeDatabase } from './_shared/init-db.js';

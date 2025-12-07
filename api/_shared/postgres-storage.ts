@@ -8,15 +8,22 @@ import type {
   Workflow,
   InsertWorkflow,
   TranslationCache,
-  InsertTranslationCache,
-  Project,
-  InsertProject
+  InsertTranslationCache
 } from './database.js';
+import type { InsertProject, Project as SchemaProject } from '../../shared/schema.js';
 import { IStorage } from './storage.js';
 import type { ProjectListQuery } from '../../shared/schema.js';
 
 export class PostgresStorage implements IStorage {
-  
+
+  private transformProject(dbProject: any): SchemaProject {
+    return {
+      ...dbProject,
+      settings: dbProject.settings as Record<string, any> | null,
+      metadata: dbProject.metadata as Record<string, any> | null,
+    };
+  }
+
   // User methods
   async getUser(id: string): Promise<User | undefined> {
     const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
@@ -135,17 +142,17 @@ export class PostgresStorage implements IStorage {
   }
 
   // Project methods
-  async createProject(insertProject: InsertProject): Promise<Project> {
+  async createProject(insertProject: InsertProject): Promise<SchemaProject> {
     const result = await db.insert(projects).values(insertProject).returning();
-    return result[0];
+    return this.transformProject(result[0]);
   }
 
-  async getProject(id: string): Promise<Project | undefined> {
+  async getProject(id: string): Promise<SchemaProject | undefined> {
     const result = await db.select().from(projects).where(eq(projects.id, id)).limit(1);
-    return result[0];
+    return result[0] ? this.transformProject(result[0]) : undefined;
   }
 
-  async getProjects(query?: ProjectListQuery): Promise<Project[]> {
+  async getProjects(query?: ProjectListQuery): Promise<SchemaProject[]> {
     let baseQuery = db.select().from(projects);
 
     // Apply filters
@@ -181,10 +188,11 @@ export class PostgresStorage implements IStorage {
       baseQuery = baseQuery.limit(query.limit);
     }
 
-    return await baseQuery;
+    const results = await baseQuery;
+    return results.map(project => this.transformProject(project));
   }
 
-  async getProjectsWithCounts(query?: ProjectListQuery): Promise<Project[]> {
+  async getProjectsWithCounts(query?: ProjectListQuery): Promise<SchemaProject[]> {
     // Get projects with counts using a subquery
     const templateCounts = db
       .select({
@@ -194,13 +202,14 @@ export class PostgresStorage implements IStorage {
       .from(templates)
       .groupBy(templates.projectId);
 
-    const lessonCounts = db
-      .select({
-        projectId: enhancedLessons.projectId,
-        count: count(enhancedLessons.id)
-      })
-      .from(enhancedLessons)
-      .groupBy(enhancedLessons.projectId);
+    // TODO: Add project support to lessons table
+    // const lessonCounts = db
+    //   .select({
+    //     projectId: lessons.projectId,
+    //     count: count(lessons.id)
+    //   })
+    //   .from(lessons)
+    //   .groupBy(lessons.projectId);
 
     const projectsWithCounts = await db
       .select({
@@ -210,33 +219,36 @@ export class PostgresStorage implements IStorage {
         language: projects.language,
         inputFormat: projects.inputFormat,
         settings: projects.settings,
+        metadata: projects.metadata,
+        userId: projects.userId,
         createdBy: projects.createdBy,
         createdAt: projects.createdAt,
         updatedAt: projects.updatedAt,
+        status: projects.status,
         isActive: projects.isActive,
         isArchived: projects.isArchived,
         templateCount: templateCounts.count,
-        lessonCount: lessonCounts.count,
       })
       .from(projects)
-      .leftJoin(templateCounts, eq(projects.id, templateCounts.projectId))
-      .leftJoin(lessonCounts, eq(projects.id, lessonCounts.projectId));
+      .leftJoin(templateCounts, eq(projects.id, templateCounts.projectId));
 
     // Apply filters, sorting, and pagination in memory for now
-    let filteredProjects = projectsWithCounts.map(row => ({
+    let filteredProjects = projectsWithCounts.map(row => this.transformProject({
       id: row.id,
       name: row.name,
       description: row.description,
       language: row.language,
       inputFormat: row.inputFormat,
       settings: row.settings,
+      metadata: row.metadata,
+      userId: row.userId,
       createdBy: row.createdBy,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
+      status: row.status,
       isActive: row.isActive,
       isArchived: row.isArchived,
       templateCount: Number(row.templateCount) || 0,
-      lessonCount: Number(row.lessonCount) || 0,
     }));
 
     // Apply filters
@@ -279,12 +291,12 @@ export class PostgresStorage implements IStorage {
     return filteredProjects;
   }
 
-  async updateProject(id: string, updates: Partial<Project>): Promise<Project | undefined> {
+  async updateProject(id: string, updates: Partial<SchemaProject>): Promise<SchemaProject | undefined> {
     const result = await db.update(projects)
       .set({ ...updates, updatedAt: new Date() })
       .where(eq(projects.id, id))
       .returning();
-    return result[0];
+    return result[0] ? this.transformProject(result[0]) : undefined;
   }
 
   async deleteProject(id: string): Promise<boolean> {
@@ -293,22 +305,15 @@ export class PostgresStorage implements IStorage {
   }
 
   async getProjectStats(id: string): Promise<{ templateCount: number; lessonCount: number }> {
-    const [templateResult, lessonResult] = await Promise.all([
-      db
-        .select({ count: count(templates.id) })
-        .from(templates)
-        .where(eq(templates.projectId, id))
-        .limit(1),
-      db
-        .select({ count: count(enhancedLessons.id) })
-        .from(enhancedLessons)
-        .where(eq(enhancedLessons.projectId, id))
-        .limit(1)
-    ]);
+    const templateResult = await db
+      .select({ count: count(templates.id) })
+      .from(templates)
+      .where(eq(templates.projectId, id))
+      .limit(1);
 
     return {
       templateCount: Number(templateResult[0]?.count) || 0,
-      lessonCount: Number(lessonResult[0]?.count) || 0,
+      lessonCount: 0, // TODO: Add project support to lessons table
     };
   }
 

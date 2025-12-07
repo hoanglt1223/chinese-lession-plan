@@ -359,7 +359,7 @@ async function handleDeleteProject(req: VercelRequest, res: VercelResponse, id: 
       });
     }
 
-    return res.status(204).send(); // No content
+    return res.status(204).send({}); // No content
   } catch (error: any) {
     if (error.code === '23503') { // PostgreSQL foreign key violation
       return res.status(409).json({

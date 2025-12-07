@@ -987,7 +987,7 @@ export async function generateSingleLessonPlan(
   }
 }
 
-async function extractAndSaveNewActivities(lessonContent: string) {
+export async function extractAndSaveNewActivities(lessonContent: string) {
   try {
     const response = await getOpenAI().chat.completions.create({
       model: "GLM-4.6",
