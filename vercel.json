@@ -7,9 +7,6 @@
     "api/cronjob.ts": {
       "maxDuration": 300
     },
-    "api/upload.ts": {
-      "maxDuration": 300
-    },
     "api/export.ts": {
       "maxDuration": 300
     },
