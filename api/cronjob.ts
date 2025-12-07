@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { setCorsHeaders, handleOptions } from './_shared/cors.js';
 import { handleError } from './_shared/error-handler.js';
 import { cronjobService } from './_shared/cronjob-service.js';
+import { runMigrations } from './_shared/migrate.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(res);
@@ -49,6 +50,23 @@ async function handleGet(req: VercelRequest, res: VercelResponse, action: string
     case 'stats':
       const stats = await cronjobService.getJobStats();
       return res.status(200).json(stats);
+
+    case 'migrate':
+      try {
+        console.log('🔄 Running database migrations via API...');
+        await runMigrations();
+        return res.status(200).json({
+          message: 'Database migrations completed successfully',
+          timestamp: new Date().toISOString()
+        });
+      } catch (error: any) {
+        console.error('❌ Migration failed:', error);
+        return res.status(500).json({
+          error: 'Migration Failed',
+          message: error.message,
+          timestamp: new Date().toISOString()
+        });
+      }
 
     default:
       return res.status(400).json({
