@@ -4,16 +4,25 @@
     "api/ai-ops.ts": {
       "maxDuration": 300
     },
-    "api/cronjob.ts": {
+    "api/auth.ts": {
       "maxDuration": 300
     },
-    "api/export.ts": {
+    "api/consolidated.ts": {
       "maxDuration": 300
     },
     "api/content-ops.ts": {
       "maxDuration": 300
     },
     "api/course-ops.ts": {
+      "maxDuration": 300
+    },
+    "api/export.ts": {
+      "maxDuration": 300
+    },
+    "api/index.ts": {
+      "maxDuration": 300
+    },
+    "api/system.ts": {
       "maxDuration": 300
     }
   },
@@ -33,7 +42,7 @@
   ],
   "crons": [
     {
-      "path": "/api/cron-schedule",
+      "path": "/api/system?action=cron-schedule",
       "schedule": "0 2 * * *"
     }
   ],
