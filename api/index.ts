@@ -8,7 +8,6 @@ import courseOpsHandler from './course-ops.js';
 import aiOpsHandler from './ai-ops.js';
 import contentOpsHandler from './content-ops.js';
 import authHandler from './auth.js';
-import projectsHandler from './projects.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -46,22 +45,18 @@ const adaptHandler = (handler: (req: any, res: any) => Promise<void | any>) => a
   }
 };
 
-// Import file manager handler
-import fileManagerHandler from './file-manager.js';
-
 // Routes
 app.all('/api/course-ops', adaptHandler(courseOpsHandler));
 app.all('/api/ai-ops', adaptHandler(aiOpsHandler));
 app.all('/api/content-ops', adaptHandler(contentOpsHandler));
 app.all('/api/auth', adaptHandler(authHandler));
-app.all('/api/file-manager', adaptHandler(fileManagerHandler));
-app.all('/api/projects', adaptHandler(projectsHandler));
-app.all('/api/projects/:id', adaptHandler(projectsHandler));
+app.all('/api/consolidated', adaptHandler(require('./consolidated.js').default));
+app.all('/api/system', adaptHandler(require('./system.js').default));
 // Add other routes if needed, e.g. tools
 // app.all('/api/tools/text-to-image', adaptHandler(textToImageHandler));
 
 // Health check
-app.get('/api/health', (req, res) => {
+app.get('/api/health', (req: any, res: any) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
