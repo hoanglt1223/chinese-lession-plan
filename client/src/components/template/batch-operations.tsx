@@ -194,9 +194,9 @@ export function BatchOperations({
         results.push(result);
 
         // Update template status if needed
-        if (result.templateUpdated) {
+        if ('templateUpdated' in result && result.templateUpdated) {
           onTemplatesUpdate?.(templates.map(t =>
-            t.id === templateId ? { ...t, ...result.template } : t
+            t.id === templateId ? { ...t, ...('template' in result ? result.template : {}) } : t
           ));
         }
 
@@ -211,7 +211,7 @@ export function BatchOperations({
 
     // Complete operation
     const completedOperation: BatchOperation = {
-      ...updatedOperation,
+      ...operation,
       status: 'completed',
       processedItems: selectedArray.length,
       progress: 100,

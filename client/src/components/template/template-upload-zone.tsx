@@ -139,7 +139,7 @@ export function TemplateUploadZone({
       }
 
       // Process file
-      const { variables, errors } = await processFile(file);
+      const { variables, errors } = await processFile(uploadedFile.file);
 
       // Update final status
       const finalFiles = [...validatingFiles];

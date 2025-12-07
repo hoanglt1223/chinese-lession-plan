@@ -26,20 +26,6 @@
     {
       "idx": 3,
       "version": "7",
-      "when": 1764992373971,
-      "tag": "0003_wide_silverclaw",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1764993275188,
-      "tag": "0004_peaceful_black_cat",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
       "when": 1764992303165,
       "tag": "0003_glorious_norman_osborn",
       "breakpoints": true
@@ -49,6 +35,13 @@
       "version": "7",
       "when": 1765040818673,
       "tag": "0004_purple_silver_fox",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1765040818674,
+      "tag": "0003_template_upload_system",
       "breakpoints": true
     }
   ]

@@ -172,6 +172,7 @@ export function TemplateEditor({
         foundVariables.push({
           name: variableName,
           type,
+          position: foundVariables.length,
           required: isRequired
         });
       }
@@ -541,7 +542,7 @@ export function TemplateEditor({
                   <div className="text-center py-8 text-muted-foreground">
                     <Zap className="h-8 w-8 mx-auto mb-2 opacity-50" />
                     <p className="text-sm">No variables found</p>
-                    <p className="text-xs">Add {{variable}} in your content</p>
+                    <p className="text-xs">Add {'{{variable}}'} in your content</p>
                   </div>
                 )}
               </div>
@@ -551,7 +552,7 @@ export function TemplateEditor({
       </div>
 
       {/* Custom Styles */}
-      <style jsx>{`
+      <style>{`
         .prose h1, .prose h2, .prose h3 {
           font-weight: 600;
           line-height: 1.25;

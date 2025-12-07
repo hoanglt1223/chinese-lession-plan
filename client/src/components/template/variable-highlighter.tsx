@@ -527,7 +527,7 @@ export function VariableHighlighter({
       </div>
 
       {/* Custom Styles */}
-      <style jsx>{`
+      <style>{`
         .template-variable:hover {
           transform: scale(1.05);
         }
